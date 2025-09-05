@@ -1,3 +1,5 @@
+import { parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDTradePb, parseMDTradingStatusPb } from "@makmurdevs/mdparserlib"
+
 export const bufferFormatRangeItems = (
   items: any[],
   startIndex: number,
@@ -13,4 +15,45 @@ export const bufferFormatRangeItems = (
   }
 
   return newItems
+}
+
+const enum StreamType {
+  LiveOHLCV = "LiveOHLCV",
+  OHLCV = "OHLCV",
+  TradingStatus = "TradingStatus",
+  AuctionIndicator = "AuctionIndicator",
+  Trade = "Trade",
+}
+
+const needLibKey = new Map([
+  [StreamType.LiveOHLCV, /^\{LiveOHLCV\}:(.+):(\d+)$/],
+  [StreamType.OHLCV, /^\{OHLCV\}:(.+):(\d+)$/],
+  [StreamType.TradingStatus, /^\{TradingStatus\}:(.+)$/],
+  [StreamType.AuctionIndicator, /^\{AuctionIndicator\}:(.+)$/],
+  [StreamType.Trade, /^\{Trade\}:(.+)$/],
+])
+
+const keyToParser = {
+  [StreamType.LiveOHLCV]: parseMDOHLCVPb,
+  [StreamType.OHLCV]: parseMDOHLCVPb,
+  [StreamType.TradingStatus]: parseMDTradingStatusPb,
+  [StreamType.AuctionIndicator]: parseMDAuctionIndicatorPb,
+  [StreamType.Trade]: parseMDTradePb,
+}
+
+export const shouldParseWithLib = (key: string) => {
+  const entries = Array.from(needLibKey.entries())
+  let matchCondition = false
+  let matchType = StreamType.LiveOHLCV
+  for (let i = 0; i < entries.length; i++) {
+    const element = entries[i]
+    if (element[1].test(key)) {
+      matchCondition = true
+      matchType = element[0]
+    }
+  }
+  if (matchCondition) {
+    return keyToParser[matchType]
+  }
+  return null
 }

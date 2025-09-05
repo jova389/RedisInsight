@@ -273,9 +273,7 @@ const StreamDataViewWrapper = (props: Props) => {
         decompressedBufferValue,
         viewFormatProp,
         { expanded },
-      )
-      const parsed = JSON.stringify(
-        parseMDOHLCVPb(Buffer.from(decompressedBufferValue))
+        keyString,
       )
       const tooltipContent = createTooltipContent(
         formattedValue,
@@ -295,7 +293,7 @@ const StreamDataViewWrapper = (props: Props) => {
             data-testid={`stream-entry-field-${id}`}
           >
             <FormattedValue
-              value={parsed}
+              value={formattedValue}
               title={
                 isValid
                   ? 'Value'

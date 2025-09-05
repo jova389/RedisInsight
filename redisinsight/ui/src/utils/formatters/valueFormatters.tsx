@@ -33,6 +33,7 @@ import {
   formatTimestamp,
   UTF8ToBuffer,
   isEqualBuffers,
+  shouldParseWithLib,
 } from 'uiSrc/utils'
 import { reSerializeJSON } from 'uiSrc/utils/formatters/json'
 
@@ -91,7 +92,15 @@ const formattingBuffer = (
   reply: RedisResponseBuffer,
   format: KeyValueFormat,
   props?: FormattingProps,
+  key?: string,
 ): { value: JSX.Element | string; isValid: boolean } => {
+  if (key) {
+    const parser = shouldParseWithLib(key)
+    if (parser !== null) {
+      const parsed = parser(Buffer.from(reply))
+      return { value: JSON.stringify(parsed), isValid: true }
+    }
+  }
   switch (format) {
     case KeyValueFormat.ASCII:
       return { value: bufferToASCII(reply), isValid: true }
