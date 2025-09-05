@@ -45,6 +45,7 @@ import {
   MAX_FORMAT_LENGTH_STREAM_TIMESTAMP,
   MAX_VISIBLE_LENGTH_STREAM_TIMESTAMP,
 } from '../constants'
+import { parseMDOHLCVPb } from '@makmurdevs/mdparserlib'
 
 const suffix = '_stream'
 const actionsWidth = 50
@@ -273,6 +274,9 @@ const StreamDataViewWrapper = (props: Props) => {
         viewFormatProp,
         { expanded },
       )
+      const parsed = JSON.stringify(
+        parseMDOHLCVPb(Buffer.from(decompressedBufferValue))
+      )
       const tooltipContent = createTooltipContent(
         formattedValue,
         decompressedBufferValue,
@@ -291,7 +295,7 @@ const StreamDataViewWrapper = (props: Props) => {
             data-testid={`stream-entry-field-${id}`}
           >
             <FormattedValue
-              value={formattedValue}
+              value={parsed}
               title={
                 isValid
                   ? 'Value'
