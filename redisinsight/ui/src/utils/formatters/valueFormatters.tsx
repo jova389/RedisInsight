@@ -34,6 +34,7 @@ import {
   UTF8ToBuffer,
   isEqualBuffers,
   shouldParseWithLib,
+  normalizeEnum,
 } from 'uiSrc/utils'
 import { reSerializeJSON } from 'uiSrc/utils/formatters/json'
 
@@ -98,7 +99,8 @@ const formattingBuffer = (
     const parser = shouldParseWithLib(key)
     if (parser !== null) {
       const parsed = parser(Buffer.from(reply))
-      return { value: JSON.stringify(parsed), isValid: true }
+      const normalized = normalizeEnum(parsed)
+      return { value: normalized, isValid: true }
     }
   }
   switch (format) {

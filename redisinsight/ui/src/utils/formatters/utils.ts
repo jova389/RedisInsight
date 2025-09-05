@@ -1,4 +1,4 @@
-import { parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDTradePb, parseMDTradingStatusPb } from "@makmurdevs/mdparserlib"
+import { Exchange, parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDTradePb, parseMDTradingStatusPb, Side, TradingStatus } from "@makmurdevs/mdparserlib"
 
 export const bufferFormatRangeItems = (
   items: any[],
@@ -39,6 +39,36 @@ const keyToParser = {
   [StreamType.TradingStatus]: parseMDTradingStatusPb,
   [StreamType.AuctionIndicator]: parseMDAuctionIndicatorPb,
   [StreamType.Trade]: parseMDTradePb,
+}
+
+const secondToHours = (secSinceMidnight: number): string => {
+  const now = new Date()
+  now.setHours(
+      Math.floor(secSinceMidnight / 3600),
+      Math.floor((secSinceMidnight % 3600) / 60),
+      secSinceMidnight % 60,
+      0,
+    )
+  return now.toLocaleString()
+}
+
+export const normalizeEnum = (parsed: any): string => {
+  if (parsed.hasOwnProperty("tradingStatus")) {
+    parsed.tradingStatus = TradingStatus[parsed.tradingStatus]
+  }
+  if (parsed.hasOwnProperty("side")) {
+    parsed.side = Side[parsed.side]
+  }
+  if (parsed.hasOwnProperty("exchange")) {
+    parsed.exchange = Exchange[parsed.exchange]
+  }
+  if (parsed.hasOwnProperty("receiveTime")) {
+    parsed.receiveTime = secondToHours(parsed.receiveTime.secSinceMidnight)
+  }
+  if (parsed.hasOwnProperty("sendTime")) {
+    parsed.sendTime = secondToHours(parsed.sendTime.secSinceMidnight)
+  }
+  return JSON.stringify(parsed)
 }
 
 export const shouldParseWithLib = (key: string) => {
