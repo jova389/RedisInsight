@@ -48,7 +48,7 @@ import {
 import { calculateTextareaLines } from 'uiSrc/utils/calculateTextareaLines'
 import { decompressingBuffer } from 'uiSrc/utils/decompressors'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
-import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
+import { RedisResponseBuffer, RedisResponseBufferType } from 'uiSrc/slices/interfaces'
 import { downloadFile } from 'uiSrc/utils/dom/downloadFile'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { IFetchKeyArgs } from 'uiSrc/constants/prop-types/keys'
@@ -88,6 +88,7 @@ const StringDetailsValue = (props: Props) => {
     type: keyType,
     length,
   } = useSelector(selectedKeyDataSelector) ?? { name: '' }
+  const keyString = typeof key === 'string' ? key : bufferToString(key)
   const { viewFormat: viewFormatProp } = useSelector(selectedKeySelector)
   const isTruncatedValue = isTruncatedString(initialValue)
 
@@ -133,6 +134,7 @@ const StringDetailsValue = (props: Props) => {
       decompressedValue,
       fullStringLoaded ? viewFormatProp : KeyValueFormat.Unicode,
       { expanded: true },
+      keyString,
     )
     setAreaValue(initialValueString)
 
@@ -189,7 +191,7 @@ const StringDetailsValue = (props: Props) => {
     const data = stringToSerializedBufferFormat(viewFormat, areaValue)
     const onSuccess = () => {
       setIsEdit(false)
-      setValue(formattingBuffer(data, viewFormat, { expanded: true })?.value)
+      setValue(formattingBuffer(data, viewFormat, { expanded: true }, keyString)?.value)
     }
     dispatch(updateStringValueAction(key, data, onSuccess))
   }

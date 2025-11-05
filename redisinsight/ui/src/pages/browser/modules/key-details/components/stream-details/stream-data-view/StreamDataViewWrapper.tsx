@@ -45,7 +45,6 @@ import {
   MAX_FORMAT_LENGTH_STREAM_TIMESTAMP,
   MAX_VISIBLE_LENGTH_STREAM_TIMESTAMP,
 } from '../constants'
-import { parseMDOHLCVPb } from '@makmurdevs/mdparserlib'
 
 const suffix = '_stream'
 const actionsWidth = 50

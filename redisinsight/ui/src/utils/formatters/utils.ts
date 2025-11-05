@@ -1,4 +1,6 @@
 import { Exchange, parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDSymbolDataPb, parseMDTradePb, parseMDTradingStatusPb, parseMDOBLevelUpdatePb, Side, TradingStatus } from "@makmurdevs/mdparserlib"
+import { RedisResponseBuffer } from "uiSrc/slices/interfaces"
+import { bufferToString, anyToBuffer } from "./bufferFormatters"
 
 export const bufferFormatRangeItems = (
   items: any[],
@@ -25,6 +27,7 @@ const enum StreamType {
   Trade = "Trade",
   SymbolData = "SymbolData",
   OBLevelUpdate = "OBLevelUpdate",
+  DelayedOHLCV = "DelayedOHLCV",
 }
 
 const needLibKey = new Map([
@@ -35,6 +38,7 @@ const needLibKey = new Map([
   [StreamType.Trade, /^\{Trade\}:(.+)$/],
   [StreamType.SymbolData, /^\{SymbolData\}:(.+)$/],
   [StreamType.OBLevelUpdate, /^\{OBLevelUpdate\}:(.+)$/],
+  [StreamType.DelayedOHLCV, /^\{DelayedOHLCV\}:(.+)$/],
 ])
 
 const keyToParser = {
@@ -45,6 +49,11 @@ const keyToParser = {
   [StreamType.Trade]: parseMDTradePb,
   [StreamType.SymbolData]: parseMDSymbolDataPb,
   [StreamType.OBLevelUpdate]: parseMDOBLevelUpdatePb,
+  [StreamType.DelayedOHLCV]: (buffer: Buffer) => {
+    const b2: RedisResponseBuffer = anyToBuffer(new Uint8Array(buffer))
+    const stringb2 = bufferToString(b2)
+    return parseMDOHLCVPb(Buffer.from(stringb2.split(',').map(Number)))
+  },
 }
 
 const secondToHours = (secSinceMidnight: number): string => {
