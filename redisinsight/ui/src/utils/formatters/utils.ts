@@ -1,4 +1,4 @@
-import { Exchange, parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDSymbolDataPb, parseMDTradePb, parseMDTradingStatusPb, Side, TradingStatus } from "@makmurdevs/mdparserlib"
+import { Exchange, parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDSymbolDataPb, parseMDTradePb, parseMDTradingStatusPb, parseMDOBLevelUpdatePb, Side, TradingStatus } from "@makmurdevs/mdparserlib"
 
 export const bufferFormatRangeItems = (
   items: any[],
@@ -24,6 +24,7 @@ const enum StreamType {
   AuctionIndicator = "AuctionIndicator",
   Trade = "Trade",
   SymbolData = "SymbolData",
+  OBLevelUpdate = "OBLevelUpdate",
 }
 
 const needLibKey = new Map([
@@ -33,6 +34,7 @@ const needLibKey = new Map([
   [StreamType.AuctionIndicator, /^\{AuctionIndicator\}:(.+)$/],
   [StreamType.Trade, /^\{Trade\}:(.+)$/],
   [StreamType.SymbolData, /^\{SymbolData\}:(.+)$/],
+  [StreamType.OBLevelUpdate, /^\{OBLevelUpdate\}:(.+)$/],
 ])
 
 const keyToParser = {
@@ -42,6 +44,7 @@ const keyToParser = {
   [StreamType.AuctionIndicator]: parseMDAuctionIndicatorPb,
   [StreamType.Trade]: parseMDTradePb,
   [StreamType.SymbolData]: parseMDSymbolDataPb,
+  [StreamType.OBLevelUpdate]: parseMDOBLevelUpdatePb,
 }
 
 const secondToHours = (secSinceMidnight: number): string => {
