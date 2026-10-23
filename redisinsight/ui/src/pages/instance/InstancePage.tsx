@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useLocation, useParams } from 'react-router-dom'
 
 import {
+  checkConnectToInstanceAction,
+  connectedInstanceSelector,
   fetchConnectedInstanceAction,
   fetchConnectedInstanceInfoAction,
   fetchInstancesAction,
@@ -44,18 +46,19 @@ const InstancePage = ({ routes = [] }: Props) => {
   const [isShouldChildrenRerender, setIsShouldChildrenRerender] =
     useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { pathname } = useLocation()
 
-  const { data: rdiInstances } = useSelector(rdiInstancesSelector)
-  const { data: dbInstances } = useSelector(dbInstancesSelector)
+  const { data: rdiInstances } = useAppSelector(rdiInstancesSelector)
+  const { data: dbInstances } = useAppSelector(dbInstancesSelector)
+  const { id: connectedInstanceId } = useAppSelector(connectedInstanceSelector)
 
   const { instanceId: connectionInstanceId } = useParams<{
     instanceId: string
   }>()
-  const { contextInstanceId } = useSelector(appContextSelector)
-  const connectivityError = useSelector(appConnectivityError)
-  const { [FeatureFlags.envDependent]: envDependent } = useSelector(
+  const { contextInstanceId } = useAppSelector(appContextSelector)
+  const connectivityError = useAppSelector(appConnectivityError)
+  const { [FeatureFlags.envDependent]: envDependent } = useAppSelector(
     appFeatureFlagsFeaturesSelector,
   )
 
@@ -75,12 +78,34 @@ const InstancePage = ({ routes = [] }: Props) => {
   }, [])
 
   useEffect(() => {
-    dispatch(fetchConnectedInstanceAction(connectionInstanceId))
-    dispatch(getDatabaseConfigInfoAction(connectionInstanceId))
-    dispatch(fetchConnectedInstanceInfoAction(connectionInstanceId))
-    dispatch(fetchRecommendationsAction(connectionInstanceId))
-    let intervalId: ReturnType<typeof setInterval>
+    const loadInstanceData = () => {
+      dispatch(fetchConnectedInstanceAction(connectionInstanceId))
+      dispatch(getDatabaseConfigInfoAction(connectionInstanceId))
+      dispatch(fetchConnectedInstanceInfoAction(connectionInstanceId))
+      dispatch(fetchRecommendationsAction(connectionInstanceId))
+    }
 
+    // Picker / Redis Stack / nav already connect before routing here and set
+    // connectedInstance.id. Skip the redundant /connect (heavy: module probe,
+    // INFO, CLIENT LIST, recommendations, analytics) when we're already on
+    // the same id. Always load instance data after connect attempt (success or
+    // fail) so connectedInstance.loading settles and Vector Search does not
+    // spin forever. Only reset when switching away from a different DB —
+    // Redis Stack sets the id before mount; resetting would bounce ProtectedRoute.
+    if (connectedInstanceId === connectionInstanceId) {
+      loadInstanceData()
+    } else {
+      dispatch(
+        checkConnectToInstanceAction(
+          connectionInstanceId,
+          loadInstanceData,
+          loadInstanceData,
+          Boolean(connectedInstanceId),
+        ),
+      )
+    }
+
+    let intervalId: ReturnType<typeof setInterval>
     if (shouldGetRecommendations) {
       intervalId = setInterval(() => {
         dispatch(fetchRecommendationsAction(connectionInstanceId))

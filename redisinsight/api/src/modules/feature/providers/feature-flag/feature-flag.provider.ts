@@ -84,6 +84,50 @@ export class FeatureFlagProvider {
         this.settingsService,
       ),
     );
+    this.strategies.set(
+      KnownFeatures.AzureEntraId,
+      new CommonFlagStrategy(this.featuresConfigService, this.settingsService),
+    );
+    this.strategies.set(
+      KnownFeatures.DevBrowser,
+      new CommonFlagStrategy(this.featuresConfigService, this.settingsService),
+    );
+    this.strategies.set(
+      KnownFeatures.Array,
+      new SwitchableFlagStrategy(
+        this.featuresConfigService,
+        this.settingsService,
+      ),
+    );
+    this.strategies.set(
+      KnownFeatures.DevLanguage,
+      new SwitchableFlagStrategy(
+        this.featuresConfigService,
+        this.settingsService,
+      ),
+    );
+    this.strategies.set(
+      KnownFeatures.DevRdiUi,
+      new SwitchableFlagStrategy(
+        this.featuresConfigService,
+        this.settingsService,
+      ),
+    );
+    this.strategies.set(
+      KnownFeatures.ValueDecoder,
+      new CommonFlagStrategy(this.featuresConfigService, this.settingsService),
+    );
+    this.strategies.set(
+      KnownFeatures.VectorSearchEnhancements,
+      new SwitchableFlagStrategy(
+        this.featuresConfigService,
+        this.settingsService,
+      ),
+    );
+    this.strategies.set(
+      KnownFeatures.AppUpdateStrategySettings,
+      new CommonFlagStrategy(this.featuresConfigService, this.settingsService),
+    );
   }
 
   getStrategy(name: string): FeatureFlagStrategy {

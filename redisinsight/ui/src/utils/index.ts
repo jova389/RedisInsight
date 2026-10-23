@@ -4,6 +4,7 @@ import RouterWithSubRoutes from './routerWithSubRoutes'
 
 export * from './common'
 export * from './validations'
+export * from './arrayIndex'
 export * from './statuses'
 export * from './instance'
 export * from './apiResponse'
@@ -32,5 +33,7 @@ export * from './redisearch'
 export * from './capability'
 export * from './rdi'
 export * from './bigString'
+export * from './vectorSet'
+export * from './whatsNew'
 
 export { Maybe, Nullable, RouterWithSubRoutes, getLetterByIndex }

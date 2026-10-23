@@ -14,17 +14,21 @@ import {
   CustomErrorCodes,
   DatabaseListColumn,
 } from 'uiSrc/constants'
+import { CommandsVersions } from 'uiSrc/constants/commandsVersions'
+import { isVersionHigherOrEquals } from 'uiSrc/utils/comparisons/compareVersions'
 import { setAppContextInitialState } from 'uiSrc/slices/app/context'
 import { resetKeys } from 'uiSrc/slices/browser/keys'
 import successMessages from 'uiSrc/components/notifications/success-messages'
-import { checkRediStack, getApiErrorMessage, Nullable } from 'uiSrc/utils'
+import {
+  checkRediStack,
+  ensureSemanticVersion,
+  getApiErrorMessage,
+  Nullable,
+} from 'uiSrc/utils'
 import {
   INFINITE_MESSAGES,
   InfiniteMessagesIds,
 } from 'uiSrc/components/notifications/components'
-import { Database as DatabaseInstanceResponse } from 'apiSrc/modules/database/models/database'
-import { RedisNodeInfoResponse } from 'apiSrc/modules/database/dto/redis-info.dto'
-import { ExportDatabase } from 'apiSrc/modules/database/models/export-database'
 
 import { fetchMastersSentinelAction } from './sentinel'
 import { fetchTags } from './tags'
@@ -36,6 +40,12 @@ import {
   removeInfiniteNotification,
 } from '../app/notifications'
 import { ConnectionType, InitialStateInstances, Instance } from '../interfaces'
+import {
+  Database as DatabaseInstanceResponse,
+  Environment,
+  RedisNodeInfoResponse,
+  ExportDatabase,
+} from 'apiClient'
 
 const HIDE_CREATING_DB_DELAY_MS = 500
 
@@ -59,7 +69,8 @@ export const initialState: InitialStateInstances = {
     connectionType: ConnectionType.Standalone,
     isRediStack: false,
     modules: [],
-    loading: false,
+    loading: undefined,
+    environment: Environment.Unspecified,
   },
   editedInstance: {
     loading: false,
@@ -79,6 +90,7 @@ export const initialState: InitialStateInstances = {
     data: null,
   },
   shownColumns: [...COLUMN_FIELD_NAME_MAP.keys()],
+  dangerousCommands: [],
 }
 
 // A slice for recipes
@@ -95,7 +107,8 @@ const instancesSlice = createSlice({
       state,
       { payload }: { payload: DatabaseInstanceResponse[] },
     ) => {
-      state.data = checkRediStack(payload)
+      const data = checkRediStack(payload)
+      state.data = data.map(ensureSemanticVersion)
       state.loading = false
       state.freeInstances =
         (filter(
@@ -212,7 +225,7 @@ const instancesSlice = createSlice({
       const isRediStack = state.data?.find(
         (db) => db.id === state.connectedInstance.id,
       )?.isRediStack
-      state.connectedInstance = payload
+      state.connectedInstance = ensureSemanticVersion(payload)
       state.connectedInstance.loading = false
       state.connectedInstance.isRediStack = isRediStack || false
       state.connectedInstance.isFreeDb = payload.cloudDetails?.free || false
@@ -262,6 +275,7 @@ const instancesSlice = createSlice({
     // reset connected instance
     resetConnectedInstance: (state) => {
       state.connectedInstance = initialState.connectedInstance
+      state.dangerousCommands = initialState.dangerousCommands
     },
 
     importInstancesFromFile: (state) => {
@@ -304,6 +318,15 @@ const instancesSlice = createSlice({
     ) => {
       state.shownColumns = [...payload]
     },
+    setConnectedInstanceDangerousCommands: (
+      state,
+      { payload }: { payload: string[] },
+    ) => {
+      state.dangerousCommands = payload.map((cmd) => cmd.toUpperCase())
+    },
+    resetConnectedInstanceDangerousCommands: (state) => {
+      state.dangerousCommands = []
+    },
   },
 })
 
@@ -345,6 +368,8 @@ export const {
   setConnectedInfoInstance,
   setConnectedInfoInstanceSuccess,
   setShownColumns,
+  setConnectedInstanceDangerousCommands,
+  resetConnectedInstanceDangerousCommands,
 } = instancesSlice.actions
 
 // selectors
@@ -356,6 +381,9 @@ export const connectedInstanceSelector = (state: RootState) =>
   state.connections.instances.connectedInstance
 export const connectedInstanceCDSelector = (state: RootState) =>
   state.connections.instances.connectedInstance.cloudDetails
+export const connectedInstanceDangerousCommandsSelector = (
+  state: RootState,
+): string[] => state.connections.instances.dangerousCommands
 export const connectedInstanceInfoSelector = (state: RootState) =>
   state.connections.instances.instanceInfo
 export const editedInstanceSelector = (state: RootState) =>
@@ -364,6 +392,13 @@ export const connectedInstanceOverviewSelector = (state: RootState) =>
   state.connections.instances.instanceOverview
 export const importInstancesSelector = (state: RootState) =>
   state.connections.instances.importInstances
+
+export const isArraySupportedSelector = (state: RootState): boolean => {
+  const { version } = state.connections.instances.instanceOverview
+  return (
+    !!version && isVersionHigherOrEquals(version, CommandsVersions.ARRAY.since)
+  )
+}
 
 // The reducer
 export default instancesSlice.reducer
@@ -717,12 +752,14 @@ export function fetchConnectedInstanceAction(
 
       if (data !== null) {
         dispatch(setConnectedInstanceSuccess(data))
+        dispatch(fetchConnectedInstanceDangerousCommandsAction(data.id))
         dispatch(setDefaultInstanceSuccess())
       }
       onSuccess?.()
     } catch (_err) {
       const error = _err as AxiosError
       const errorMessage = getApiErrorMessage(error)
+      dispatch(setConnectedInstanceFailure())
       dispatch(setDefaultInstanceFailure(errorMessage))
       dispatch(addErrorNotification(error))
       onFail?.()
@@ -895,6 +932,25 @@ export function checkDatabaseIndexAction(
       const error = _err as AxiosError
       dispatch(checkDatabaseIndexFailure())
       dispatch(addErrorNotification(error))
+      onFailAction?.()
+    }
+  }
+}
+
+export function fetchConnectedInstanceDangerousCommandsAction(
+  id: string,
+  onSuccessAction?: (commands: string[]) => void,
+  onFailAction?: () => void,
+) {
+  return async (dispatch: AppDispatch) => {
+    try {
+      const data = await instancesService.getInstanceDangerousCommands(id)
+
+      if (data !== null) {
+        dispatch(setConnectedInstanceDangerousCommands(data))
+        onSuccessAction?.(data)
+      }
+    } catch (_err) {
       onFailAction?.()
     }
   }

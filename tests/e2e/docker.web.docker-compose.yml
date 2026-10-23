@@ -1,46 +1,15 @@
 version: "3.4"
 
 services:
-  e2e:
-    profiles:
-      - e2e
-    build:
-      context: .
-      dockerfile: e2e.Dockerfile
-    tty: true
-    volumes:
-      - ${E2E_VOLUME_PATH:-.}/results:/usr/src/app/results
-      - ${E2E_VOLUME_PATH:-.}/report:/usr/src/app/report
-      - ./plugins:/usr/src/app/plugins
-      - rihomedir:/root/.redis-insight
-      - tmp:/tmp
-      - ./remote:/root/remote
-      # - ./rdi:/root/rdi
-    env_file:
-      - ./.env
-    entrypoint: [
-        './upload-custom-plugins.sh',
-    ]
-    environment:
-      TEST_FILES: $TEST_FILES
-      E2E_CLOUD_DATABASE_HOST: $E2E_CLOUD_DATABASE_HOST
-      E2E_CLOUD_DATABASE_PORT: $E2E_CLOUD_DATABASE_PORT
-      E2E_CLOUD_DATABASE_PASSWORD: $E2E_CLOUD_DATABASE_PASSWORD
-      E2E_CLOUD_DATABASE_USERNAME: $E2E_CLOUD_DATABASE_USERNAME
-      E2E_CLOUD_DATABASE_NAME: $E2E_CLOUD_DATABASE_NAME
-      E2E_CLOUD_API_ACCESS_KEY: $E2E_CLOUD_API_ACCESS_KEY
-      E2E_CLOUD_API_SECRET_KEY: $E2E_CLOUD_API_SECRET_KEY
-      REMOTE_FOLDER_PATH: "/root/remote"
-    command: [
-        './wait-for-it.sh', 'redis-enterprise:12000', '-s', '-t', '240',
-        '--',
-        'npm', 'run', 'test:chrome:ci'
-    ]
-
-  # Built image
+  # Built RedisInsight image
   app:
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # A container has its own hosts file, so the names the hostname-based
+      # cluster advertises are not inherited from the host.
+      - "master-hostname-7-1:host-gateway"
+      - "master-hostname-7-2:host-gateway"
+      - "master-hostname-7-3:host-gateway"
     logging:
       driver: none
     image: redisinsight:amd64
@@ -51,10 +20,15 @@ services:
       RI_SERVER_TLS_CERT: $RI_SERVER_TLS_CERT
       RI_SERVER_TLS_KEY: $RI_SERVER_TLS_KEY
       RI_STDOUT_LOGGER: 'false'
+      # The image bakes in whatever NODE_ENV the build job could resolve, and a
+      # fork PR gets no environment variables, so that value is empty there. An
+      # empty NODE_ENV selects the development config, which ignores
+      # RI_APP_FOLDER_ABSOLUTE_PATH and puts the database somewhere the
+      # container cannot write. Pin it so the suite does not depend on the build.
+      NODE_ENV: staging
     volumes:
       - rihomedir:/data
       - tmp:/tmp
-      - ./test-data:/test-data
     ports:
       - 5540:5540
 

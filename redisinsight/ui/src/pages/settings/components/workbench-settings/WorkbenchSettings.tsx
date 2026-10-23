@@ -1,6 +1,6 @@
 import { toNumber } from 'lodash'
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { SettingItem } from 'uiSrc/components'
 import { PIPELINE_COUNT_DEFAULT } from 'uiSrc/constants/api'
 import {
@@ -16,13 +16,18 @@ import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { SwitchInput } from 'uiSrc/components/base/inputs'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Link } from 'uiSrc/components/base/link/Link'
+import { Trans, useTranslation } from 'uiSrc/i18n'
+
+const PIPELINING_DOCS_URL =
+  'https://redis.io/docs/latest/develop/use/pipelining/'
 
 const WorkbenchSettings = () => {
-  const { cleanup } = useSelector(userSettingsWBSelector)
+  const { t } = useTranslation()
+  const { cleanup } = useAppSelector(userSettingsWBSelector)
   const { batchSize = PIPELINE_COUNT_DEFAULT } =
-    useSelector(userSettingsConfigSelector) ?? {}
+    useAppSelector(userSettingsConfigSelector) ?? {}
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const onSwitchWbCleanUp = (val: boolean) => {
     dispatch(setWorkbenchCleanUp(val))
@@ -41,13 +46,13 @@ const WorkbenchSettings = () => {
 
   return (
     <>
-      <Title size="M">Editor Cleanup</Title>
+      <Title size="M">{t('settings.workbench.cleanup.title')}</Title>
       <Spacer size="m" />
       <FormField>
         <SwitchInput
           checked={cleanup}
           onCheckedChange={onSwitchWbCleanUp}
-          title="Clear the Editor after running commands"
+          title={t('settings.workbench.cleanup.label')}
           data-testid="switch-workbench-cleanup"
         />
       </FormField>
@@ -56,23 +61,25 @@ const WorkbenchSettings = () => {
         initValue={batchSize.toString()}
         onApply={handleApplyPipelineCountChanges}
         validation={(value) => validateNumber(value)}
-        title="Pipeline Mode"
+        title={t('settings.workbench.pipeline.title')}
         testid="pipeline-bunch"
         placeholder={`${PIPELINE_COUNT_DEFAULT}`}
-        label="Commands in pipeline:"
+        label={t('settings.workbench.pipeline.label')}
         summary={
-          <>
-            {'Sets the size of a command batch for the '}
-            <Link
-              href="https://redis.io/docs/latest/develop/use/pipelining/"
-              target="_blank"
-              data-testid="pipelining-link"
-              style={{ padding: 0 }}
-            >
-              pipeline
-            </Link>
-            {' mode in Workbench. 0 or 1 pipelines every command.'}
-          </>
+          <Trans
+            i18nKey="settings.workbench.pipeline.summary"
+            components={{
+              pipelineLink: (
+                <Link
+                  variant="inline"
+                  href={PIPELINING_DOCS_URL}
+                  target="_blank"
+                  data-testid="pipelining-link"
+                  style={{ padding: 0 }}
+                />
+              ),
+            }}
+          />
         }
       />
     </>

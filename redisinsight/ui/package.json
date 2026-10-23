@@ -11,10 +11,13 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
-    "stats": "NODE_OPTIONS=--max_old_space_size=8192 npx vite-bundle-visualizer --open -o ./dist-stats.html --sourcemap"
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 vite build",
+    "stats": "NODE_OPTIONS=--max_old_space_size=8192 npx vite-bundle-visualizer --open -o ./dist-stats.html --sourcemap",
+    "type-check": "tsx ../../scripts/tsc-safe-run.ts --project tsconfig.json compare .tscheck.rec.json 'npm run tscheck --prefix redisinsight/ui'",
+    "tscheck": "tsx ../../scripts/tsc-safe-run.ts --project tsconfig.json overwrite .tscheck.rec.json",
+    "tscheck:force": "tsx ../../scripts/tsc-safe-run.ts --project tsconfig.json force_overwrite .tscheck.rec.json"
   },
-  "resolutions": {
-    "**/form-data": "^4.0.4"
+  "overrides": {
+    "form-data": "^4.0.4"
   }
 }

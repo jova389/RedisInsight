@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react'
-import cx from 'classnames'
-
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useLocation, useParams } from 'react-router-dom'
+
 import {
   changeSelectedTab,
   changeSidePanel,
@@ -23,10 +22,14 @@ import {
 } from 'uiSrc/telemetry'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 
-import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import { LightBulbIcon } from 'uiSrc/components/base/icons'
 import { RiTooltip } from 'uiSrc/components'
-import styles from './styles.module.scss'
+
+import {
+  BulbHighlighting,
+  BulbIconButton,
+  BulbWrapper,
+} from './InsightsTrigger.styles'
 
 export interface Props {
   source?: string
@@ -34,14 +37,14 @@ export interface Props {
 
 const InsightsTrigger = (props: Props) => {
   const { source = 'overview' } = props
-  const { openedPanel } = useSelector(sidePanelsSelector)
-  const { tabSelected } = useSelector(insightsPanelSelector)
-  const { isHighlighted } = useSelector(recommendationsSelector)
-  const { provider } = useSelector(connectedInstanceSelector)
+  const { openedPanel } = useAppSelector(sidePanelsSelector)
+  const { tabSelected } = useAppSelector(insightsPanelSelector)
+  const { isHighlighted } = useAppSelector(recommendationsSelector)
+  const { provider } = useAppSelector(connectedInstanceSelector)
 
   const isInsightsOpen = openedPanel === SidePanels.Insights
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { pathname, search } = useLocation()
   const { instanceId } = useParams<{ instanceId: string }>()
 
@@ -79,29 +82,27 @@ const InsightsTrigger = (props: Props) => {
   }
 
   return (
-    <div className={cx(styles.container, { [styles.isOpen]: isInsightsOpen })}>
-      <RiTooltip
-        title={isHighlighted && instanceId ? undefined : 'Insights'}
-        content={
-          isHighlighted && instanceId
-            ? 'New tips are available'
-            : 'Open interactive tutorials to learn more about Redis or Redis Stack capabilities, or use tips to improve your database.'
-        }
-      >
-        <IconButton
+    <RiTooltip
+      title={isHighlighted && instanceId ? undefined : 'Insights'}
+      content={
+        isHighlighted && instanceId
+          ? 'New tips are available'
+          : 'Open interactive tutorials to learn more about Redis or Redis Stack capabilities, or use tips to improve your database.'
+      }
+    >
+      <BulbWrapper>
+        <BulbIconButton
           size="S"
-          className={styles.btn}
           role="button"
           icon={LightBulbIcon}
           onClick={handleClickTrigger}
           data-testid="insights-trigger"
-        >
-          {isHighlighted && instanceId && (
-            <span className={styles.highlighting} />
-          )}
-        </IconButton>
-      </RiTooltip>
-    </div>
+          isOpen={isInsightsOpen}
+          aria-label="Insights-trigger"
+        />
+        {isHighlighted && instanceId && <BulbHighlighting />}
+      </BulbWrapper>
+    </RiTooltip>
   )
 }
 

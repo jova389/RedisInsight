@@ -19,7 +19,8 @@ import {
 } from 'uiSrc/pages/workbench/constants'
 import { getUtmExternalLink } from 'uiSrc/utils/links'
 import { IRedisCommand } from 'uiSrc/constants'
-import { generateDetail, removeNotSuggestedArgs } from './query'
+import i18n from 'uiSrc/i18n'
+import { generateDetail } from './query'
 import { buildSuggestion } from './monaco'
 
 export const asSuggestionsRef = (
@@ -39,15 +40,17 @@ const NO_INDEXES_DOC_LINK = getUtmExternalLink(
 export const getNoIndexesSuggestion = (range: monaco.IRange) => [
   {
     id: EmptySuggestionsIds.NoIndexes,
-    label: 'No indexes to display',
+    label: i18n.t('workbench.suggestions.noIndexes.label'),
     kind: monacoEditor.languages.CompletionItemKind.Issue,
     insertText: '',
     insertTextRules:
       monacoEditor.languages.CompletionItemInsertTextRule.InsertAsSnippet,
     range,
-    detail: 'Create an index',
+    detail: i18n.t('workbench.suggestions.noIndexes.detail'),
     documentation: {
-      value: `See the [documentation](${NO_INDEXES_DOC_LINK}) for detailed instructions on how to create an index.`,
+      value: i18n.t('workbench.suggestions.noIndexes.documentation', {
+        link: NO_INDEXES_DOC_LINK,
+      }),
     },
   },
 ]
@@ -56,10 +59,12 @@ export const getIndexesSuggestions = (
   indexes: RedisResponseBuffer[],
   range: monaco.IRange,
   isNextArgQuery = true,
+  activeIndexName?: string,
 ) =>
   indexes.map((index) => {
     const value = formatLongName(bufferToString(index))
     const insertQueryQuotes = isNextArgQuery ? " '\${1:query to search}'" : ''
+    const isActive = activeIndexName !== undefined && value === activeIndexName
 
     return {
       label: value || ' ',
@@ -69,6 +74,8 @@ export const getIndexesSuggestions = (
         monacoEditor.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       range,
       detail: value || ' ',
+      preselect: isActive,
+      sortText: isActive ? `0_${value}` : `1_${value}`,
     }
   })
 
@@ -191,7 +198,7 @@ export const getMandatoryArgumentSuggestions = (
 
 export const getCommandSuggestions = (
   foundArg: Nullable<FoundCommandArgument>,
-  allArgs: string[],
+  _allArgs: string[],
   range: monaco.IRange,
 ) => {
   const appendCommands = foundArg?.append ?? []

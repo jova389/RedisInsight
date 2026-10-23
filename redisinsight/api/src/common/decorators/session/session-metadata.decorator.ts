@@ -15,8 +15,9 @@ const validator = new Validator();
 export const sessionMetadataFromRequest = (
   request: Request,
 ): SessionMetadata => {
-  const userId = request.res?.locals?.session?.data?.userId.toString();
-  const sessionId = request.res?.locals?.session?.data?.sessionId.toString();
+  const userId = request.res?.locals?.session?.data?.userId?.toString();
+  const accountId = request.res?.locals?.session?.data?.accountId?.toString();
+  const sessionId = request.res?.locals?.session?.data?.sessionId?.toString();
   const data = omit(request.res?.locals?.session?.data, [
     'userId',
     'accountId',
@@ -28,13 +29,16 @@ export const sessionMetadataFromRequest = (
 
   const requestSession = {
     userId,
+    accountId,
     data,
     sessionId,
     correlationId,
     requestMetadata,
   };
 
-  const session = plainToInstance(SessionMetadata, requestSession, { groups: ['security'] });
+  const session = plainToInstance(SessionMetadata, requestSession, {
+    groups: ['security'],
+  });
 
   const errors = validator.validateSync(session, {
     whitelist: false, // we need this to allow additional fields if needed for flexibility

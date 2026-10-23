@@ -69,6 +69,10 @@ export const databaseSchema = Joi.object().keys({
     .allow(null),
   ssh: Joi.boolean().allow(null),
   forceStandalone: Joi.boolean().allow(null),
+  environment: Joi.string()
+    .valid('unspecified', 'production', 'development')
+    .allow(null),
+  connectionFamily: Joi.string().valid('auto', 'ipv4', 'ipv6').allow(null),
   sshOptions: Joi.object({
     id: Joi.string().allow(null),
     host: Joi.string().required(),
@@ -85,6 +89,13 @@ export const databaseSchema = Joi.object().keys({
       subscriptionType: Joi.string().valid('fixed', 'flexible').required(),
       planMemoryLimit: Joi.number(),
       memoryLimitMeasurementUnit: Joi.string(),
+    })
+    .allow(null),
+  providerDetails: Joi.object()
+    .keys({
+      provider: Joi.string().required(),
+      authType: Joi.string().required(),
+      azureAccountId: Joi.string(),
     })
     .allow(null),
   tags: Joi.array()

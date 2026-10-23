@@ -1,5 +1,5 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { FormikProps } from 'formik'
 
 import { BuildType } from 'uiSrc/constants/env'
@@ -12,12 +12,21 @@ import {
   selectOnFocus,
   validateField,
 } from 'uiSrc/utils'
-import { RiTooltip } from 'uiSrc/components'
+import { RedisConnectionFamily } from 'apiClient'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { FormField } from 'uiSrc/components/base/forms/FormField'
-import { NumericInput, PasswordInput, TextInput } from 'uiSrc/components/base/inputs'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import {
+  FormField,
+  RiInfoIconProps,
+} from 'uiSrc/components/base/forms/FormField'
+import {
+  NumericInput,
+  PasswordInput,
+  TextInput,
+} from 'uiSrc/components/base/inputs'
+import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
+import { useTranslation } from 'uiSrc/i18n'
+import { HostInfoTooltipContent } from '../host-info-tooltip-content/HostInfoTooltipContent'
 
 interface IShowFields {
   alias: boolean
@@ -43,59 +52,46 @@ const DatabaseForm = (props: Props) => {
     readyOnlyFields = [],
   } = props
 
-  const { server } = useSelector(appInfoSelector)
+  const { t } = useTranslation()
 
-  const AppendHostName = () => (
-    <RiTooltip
-      title={
-        <div>
-          <p>
-            <b>Pasting a connection URL auto fills the database details.</b>
-          </p>
-          <p style={{ margin: 0, paddingTop: '10px' }}>
-            The following connection URLs are supported:
-          </p>
-        </div>
-      }
-      className="homePage_tooltip"
-      anchorClassName="inputAppendIcon"
-      position="right"
-      content={
-        <ul className="homePage_toolTipUl">
-          <li>
-            <span className="dot" />
-            redis://[[username]:[password]]@host:port
-          </li>
-          <li>
-            <span className="dot" />
-            rediss://[[username]:[password]]@host:port
-          </li>
-          <li>
-            <span className="dot" />
-            host:port
-          </li>
-        </ul>
-      }
-    >
-      <RiIcon type="InfoIcon" style={{ cursor: 'pointer' }} />
-    </RiTooltip>
-  )
+  const { server } = useAppSelector(appInfoSelector)
+
+  const hostInfo: RiInfoIconProps = {
+    content: HostInfoTooltipContent({ includeAutofillInfo: true, t }),
+    placement: 'right',
+    maxWidth: '100%',
+  }
+
+  const CONNECTION_FAMILY_OPTIONS = [
+    {
+      value: RedisConnectionFamily.Auto,
+      label: t('home.form.database.connectionFamily.auto'),
+    },
+    { value: RedisConnectionFamily.Ipv4, label: 'IPv4' },
+    { value: RedisConnectionFamily.Ipv6, label: 'IPv6' },
+  ]
+
+  const connectionFamilyInfo: RiInfoIconProps = {
+    content: t('home.form.database.connectionFamily.tooltip'),
+    placement: 'right',
+    maxWidth: '100%',
+  }
 
   const isShowPort =
     server?.buildType !== BuildType.RedisStack && showFields.port
   const isFieldDisabled = (name: string) => readyOnlyFields.includes(name)
 
   return (
-    <>
+    <Col gap="l">
       {showFields.alias && (
         <Row gap="m">
           <FlexItem grow>
-            <FormField label="Database Alias*">
+            <FormField label={t('home.form.database.field.alias')} required>
               <TextInput
                 name="name"
                 id="name"
                 data-testid="name"
-                placeholder="Enter Database Alias"
+                placeholder={t('home.form.database.placeholder.alias')}
                 onFocus={selectOnFocus}
                 value={formik.values.name ?? ''}
                 maxLength={500}
@@ -106,14 +102,14 @@ const DatabaseForm = (props: Props) => {
           </FlexItem>
         </Row>
       )}
-
       {(showFields.host || isShowPort) && (
         <Row gap="m">
           {showFields.host && (
             <FlexItem grow={4}>
               <FormField
-                label="Host*"
-                additionalText={<AppendHostName />}
+                label={t('home.form.database.field.host')}
+                required
+                infoIconProps={hostInfo}
               >
                 <TextInput
                   autoFocus={autoFocus}
@@ -122,13 +118,10 @@ const DatabaseForm = (props: Props) => {
                   data-testid="host"
                   color="secondary"
                   maxLength={200}
-                  placeholder="Enter Hostname / IP address / Connection URL"
+                  placeholder={t('home.form.database.placeholder.host')}
                   value={formik.values.host ?? ''}
-                  onChange={value => {
-                    formik.setFieldValue(
-                      'host',
-                      validateField(value.trim()),
-                    )
+                  onChange={(value) => {
+                    formik.setFieldValue('host', validateField(value.trim()))
                   }}
                   onPaste={(event: React.ClipboardEvent<HTMLInputElement>) =>
                     handlePasteHostName(onHostNamePaste, event)
@@ -141,16 +134,13 @@ const DatabaseForm = (props: Props) => {
           )}
           {isShowPort && (
             <FlexItem grow={2}>
-              <FormField
-                label="Port*"
-                additionalText={`Should not exceed ${MAX_PORT_NUMBER}.`}
-              >
+              <FormField label={t('home.form.database.field.port')} required>
                 <NumericInput
                   autoValidate
                   name="port"
                   id="port"
                   data-testid="port"
-                  placeholder="Enter Port"
+                  placeholder={t('home.form.database.placeholder.port')}
                   onChange={(value) => formik.setFieldValue('port', value)}
                   value={Number(formik.values.port)}
                   min={0}
@@ -164,15 +154,40 @@ const DatabaseForm = (props: Props) => {
         </Row>
       )}
 
+      {showFields.host && (
+        <Row gap="m">
+          <FlexItem grow>
+            <FormField
+              label={t('home.form.database.field.ipProtocol')}
+              infoIconProps={connectionFamilyInfo}
+            >
+              <RiSelect
+                name="connectionFamily"
+                data-testid="connectionFamily"
+                value={
+                  formik.values.connectionFamily ?? RedisConnectionFamily.Auto
+                }
+                options={CONNECTION_FAMILY_OPTIONS}
+                onChange={(value) =>
+                  formik.setFieldValue('connectionFamily', value)
+                }
+                disabled={isFieldDisabled('connectionFamily')}
+              />
+            </FormField>
+          </FlexItem>
+          <FlexItem grow />
+        </Row>
+      )}
+
       <Row gap="m">
         <FlexItem grow>
-          <FormField label="Username">
+          <FormField label={t('home.form.database.field.username')}>
             <TextInput
               name="username"
               id="username"
               data-testid="username"
               maxLength={200}
-              placeholder="Enter Username"
+              placeholder={t('home.form.database.placeholder.username')}
               value={formik.values.username ?? ''}
               onChangeCapture={formik.handleChange}
               disabled={isFieldDisabled('username')}
@@ -181,13 +196,13 @@ const DatabaseForm = (props: Props) => {
         </FlexItem>
 
         <FlexItem grow>
-          <FormField label="Password">
+          <FormField label={t('home.form.database.field.password')}>
             <PasswordInput
               name="password"
               id="password"
               data-testid="password"
               maxLength={10_000}
-              placeholder="Enter Password"
+              placeholder={t('home.form.database.placeholder.password')}
               value={
                 formik.values.password === true
                   ? SECURITY_FIELD
@@ -209,13 +224,13 @@ const DatabaseForm = (props: Props) => {
       {showFields.timeout && (
         <Row gap="m" responsive>
           <FlexItem grow>
-            <FormField label="Timeout (s)">
+            <FormField label={t('home.form.database.field.timeout')}>
               <NumericInput
                 autoValidate
                 name="timeout"
                 id="timeout"
                 data-testid="timeout"
-                placeholder="Enter Timeout (in seconds)"
+                placeholder={t('home.form.database.placeholder.timeout')}
                 onChange={(value) => formik.setFieldValue('timeout', value)}
                 value={Number(formik.values.timeout)}
                 min={1}
@@ -228,7 +243,7 @@ const DatabaseForm = (props: Props) => {
           <FlexItem grow />
         </Row>
       )}
-    </>
+    </Col>
   )
 }
 

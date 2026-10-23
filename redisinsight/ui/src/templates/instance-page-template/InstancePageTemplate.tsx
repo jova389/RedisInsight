@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useSelector } from 'react-redux'
-import { useTheme } from '@redis-ui/styles'
+import { useAppSelector } from 'uiSrc/slices/hooks'
+import styled from 'styled-components'
+
 import InstanceHeader from 'uiSrc/components/instance-header'
+import { PromoteProductionPrompt } from 'uiSrc/components/instance-header/components/promote-production-prompt/PromoteProductionPrompt'
 import { ExplorePanelTemplate } from 'uiSrc/templates'
 import BottomGroupComponents from 'uiSrc/components/bottom-group-components/BottomGroupComponents'
 import { cliSettingsSelector } from 'uiSrc/slices/cli/cli-settings'
@@ -18,7 +20,9 @@ import {
 import { ImperativePanelGroupHandle } from 'uiSrc/components/base/layout/resize'
 import { AppNavigation } from 'uiSrc/components'
 import { AppNavigationActionsProvider } from 'uiSrc/contexts/AppNavigationActionsProvider'
+import { ProductionWriteConfirmationProvider } from 'uiSrc/components/production-write-confirmation'
 import { Nullable } from 'uiSrc/utils'
+import { useNavigation } from 'uiSrc/components/navigation-menu/hooks/useNavigation'
 
 export const firstPanelId = 'main-component'
 export const secondPanelId = 'cli'
@@ -26,6 +30,10 @@ export const secondPanelId = 'cli'
 export interface Props {
   children: React.ReactNode
 }
+
+const ButtonGroupResizablePanel = styled(ResizablePanel)`
+  flex-basis: 27px !important;
+`
 
 export const getDefaultSizes = () => {
   const storedSizes = localStorageService.get(
@@ -35,17 +43,6 @@ export const getDefaultSizes = () => {
   return storedSizes && Array.isArray(storedSizes) ? storedSizes : [60, 40]
 }
 
-export const calculateMainPanelInitialSize = () => {
-  const total = window.innerHeight
-  const remaining = total - 26
-  return Math.floor((remaining / total) * 100)
-}
-
-export const calculateBottomGroupPanelInitialSize = () => {
-  const total = window.innerHeight
-  return Math.ceil((26 / total) * 100)
-}
-
 const roundUpSizes = (sizes: number[]) => [
   Math.floor(sizes[0]),
   Math.ceil(sizes[1]),
@@ -53,14 +50,11 @@ const roundUpSizes = (sizes: number[]) => [
 
 const InstancePageTemplate = (props: Props) => {
   const { children } = props
-  const theme = useTheme()
   const [sizes, setSizes] = useState<number[]>(getDefaultSizes())
 
-  const { isShowCli, isShowHelper } = useSelector(cliSettingsSelector)
-  const { isShowMonitor } = useSelector(monitorSelector)
-
-  const sizeMain: number = calculateMainPanelInitialSize()
-  const sizeBottomCollapsed: number = calculateBottomGroupPanelInitialSize()
+  const { isShowCli, isShowHelper } = useAppSelector(cliSettingsSelector)
+  const { isShowMonitor } = useAppSelector(monitorSelector)
+  const { privateRoutes } = useNavigation()
 
   const ref = useRef<ImperativePanelGroupHandle>(null)
 
@@ -93,7 +87,7 @@ const InstancePageTemplate = (props: Props) => {
     if (isShowBottomGroup) {
       ref.current?.setLayout(roundUpSizes(sizes))
     } else {
-      ref.current?.setLayout([sizeMain, sizeBottomCollapsed])
+      ref.current?.setLayout([100, 0])
     }
   }, [isShowBottomGroup])
 
@@ -102,47 +96,51 @@ const InstancePageTemplate = (props: Props) => {
   return (
     <>
       <InstanceHeader />
-      <AppNavigation actions={actions} onChange={() => setActions(null)} />
+      <PromoteProductionPrompt />
+      <AppNavigation
+        actions={actions}
+        onChange={() => setActions(null)}
+        routes={privateRoutes}
+      />
       <Spacer size="m" />
-      <ResizableContainer
-        ref={ref}
-        direction="vertical"
-        onLayout={onPanelWidthChange}
-      >
-        <ResizablePanel
-          id={firstPanelId}
-          minSize={7}
-          defaultSize={isShowBottomGroup ? sizes[0] : sizeMain}
-          data-testid={firstPanelId}
+      <ProductionWriteConfirmationProvider>
+        <ResizableContainer
+          ref={ref}
+          direction="vertical"
+          onLayout={onPanelWidthChange}
         >
-          <AppNavigationActionsProvider
-            value={{
-              actions,
-              setActions,
-            }}
+          <ResizablePanel
+            id={firstPanelId}
+            minSize={7}
+            defaultSize={isShowBottomGroup ? sizes[0] : 100}
+            data-testid={firstPanelId}
           >
-            <ExplorePanelTemplate>{children}</ExplorePanelTemplate>
-          </AppNavigationActionsProvider>
-        </ResizablePanel>
-        <ResizablePanelHandle
-          direction="horizontal"
-          id="resize-btn-browser-cli"
-          data-testid="resize-btn-browser-cli"
-          style={{ display: isShowBottomGroup ? 'inherit' : 'none' }}
-        />
-        <Spacer size="m" />
-        <ResizablePanel
-          id={secondPanelId}
-          defaultSize={isShowBottomGroup ? sizes[1] : sizeBottomCollapsed}
-          minSize={isShowBottomGroup ? 20 : 0}
-          data-testid={secondPanelId}
-          style={{
-            borderTop: `1px solid ${theme.semantic.color.border.neutral500}`,
-          }}
-        >
-          <BottomGroupComponents />
-        </ResizablePanel>
-      </ResizableContainer>
+            <AppNavigationActionsProvider
+              value={{
+                actions,
+                setActions,
+              }}
+            >
+              <ExplorePanelTemplate>{children}</ExplorePanelTemplate>
+            </AppNavigationActionsProvider>
+          </ResizablePanel>
+          <ResizablePanelHandle
+            direction="horizontal"
+            id="resize-btn-browser-cli"
+            data-testid="resize-btn-browser-cli"
+            style={{ display: isShowBottomGroup ? 'inherit' : 'none' }}
+          />
+          {!isShowBottomGroup && <Spacer size="l" />}
+          <ButtonGroupResizablePanel
+            id={secondPanelId}
+            defaultSize={isShowBottomGroup ? sizes[1] : 0}
+            minSize={isShowBottomGroup ? 20 : 0}
+            data-testid={secondPanelId}
+          >
+            <BottomGroupComponents />
+          </ButtonGroupResizablePanel>
+        </ResizableContainer>
+      </ProductionWriteConfirmationProvider>
     </>
   )
 }

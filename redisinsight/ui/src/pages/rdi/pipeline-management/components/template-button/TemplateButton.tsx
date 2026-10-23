@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { useParams } from 'react-router-dom'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
@@ -10,9 +10,9 @@ import {
 import { RiTooltip } from 'uiSrc/components'
 import { RdiPipelineTabs } from 'uiSrc/slices/interfaces'
 import { SecondaryButton } from 'uiSrc/components/base/forms/buttons'
+import { useTranslation } from 'uiSrc/i18n'
 import { getTooltipContent } from '../template-form/TemplateForm'
 import { INGEST_OPTION } from '../template-form/constants'
-import styles from './styles.module.scss'
 
 export interface TemplateButtonProps {
   value: string
@@ -20,9 +20,10 @@ export interface TemplateButtonProps {
 }
 
 const TemplateButton = ({ setFieldValue, value }: TemplateButtonProps) => {
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
-  const { loading, data } = useSelector(rdiPipelineStrategiesSelector)
+  const { loading, data } = useAppSelector(rdiPipelineStrategiesSelector)
 
   const templateOption = data?.length
     ? data.find((strategy) => strategy.strategy === INGEST_OPTION)?.strategy ||
@@ -54,14 +55,13 @@ const TemplateButton = ({ setFieldValue, value }: TemplateButtonProps) => {
       <SecondaryButton
         inverted
         size="s"
-        className={styles.btn}
-        aria-label="Insert template"
+        aria-label={t('rdi.pipeline.template.insertAria')}
         loading={loading}
         disabled={!templateOption || !!value}
         onClick={handleApply}
         data-testid="template-btn"
       >
-        Insert template
+        {t('rdi.pipeline.template.insertButton')}
       </SecondaryButton>
     </RiTooltip>
   )

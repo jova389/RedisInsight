@@ -1,6 +1,6 @@
 import React from 'react'
 import { cloneDeep } from 'lodash'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { instance, mock } from 'ts-mockito'
 import { getDBAnalysis } from 'uiSrc/slices/analytics/dbAnalysis'
 import { RootState } from 'uiSrc/slices/store'
@@ -45,13 +45,13 @@ jest.mock('uiSrc/telemetry', () => ({
   sendEventTelemetry: jest.fn(),
 }))
 
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useSelector: jest.fn(),
+jest.mock('uiSrc/slices/hooks', () => ({
+  ...jest.requireActual('uiSrc/slices/hooks'),
+  useAppSelector: jest.fn(),
 }))
 
 const connectType = (state: any, connectionType: any) => {
-  ;(useSelector as jest.Mock).mockImplementation(
+  ;(useAppSelector as jest.Mock).mockImplementation(
     (callback: (arg0: RootState) => RootState) =>
       callback({
         ...state,
@@ -135,7 +135,11 @@ describe('DatabaseAnalysisHeader', () => {
 
   it('should show "Analyze" text on the start analysis button', async () => {
     render(
-      <Header {...instance(mockedProps)} items={mockReports} progress={mockProgress} />,
+      <Header
+        {...instance(mockedProps)}
+        items={mockReports}
+        progress={mockProgress}
+      />,
     )
 
     const analizeButtonId = screen.getByTestId('start-database-analysis-btn')

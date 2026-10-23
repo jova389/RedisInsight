@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
-import { useFormikContext } from 'formik'
 import { findIndex } from 'lodash'
 
 import { sendPageViewTelemetry, TelemetryPageView } from 'uiSrc/telemetry'
-import { rdiPipelineSelector, setPipeline } from 'uiSrc/slices/rdi/pipeline'
-import { IPipeline } from 'uiSrc/slices/interfaces'
+import { rdiPipelineSelector } from 'uiSrc/slices/rdi/pipeline'
 import { Pages } from 'uiSrc/constants'
-import { convertTimestampToMilliseconds, Maybe } from 'uiSrc/utils'
+import { Maybe } from 'uiSrc/utils'
 import Job from './Job'
 
 const JobWrapper = () => {
@@ -25,7 +23,7 @@ const JobWrapper = () => {
 
   const history = useHistory()
 
-  const { data, jobs } = useSelector(rdiPipelineSelector)
+  const { data, jobs } = useAppSelector(rdiPipelineSelector)
 
   useEffect(() => {
     const jobIndex = findIndex(jobs, ({ name }) => name === decodedJobName)

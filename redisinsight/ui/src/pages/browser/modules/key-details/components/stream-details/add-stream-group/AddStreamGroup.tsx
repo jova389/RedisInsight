@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import { lastDeliveredIDTooltipText } from 'uiSrc/constants/texts'
@@ -19,10 +19,11 @@ import {
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { RiTooltip } from 'uiSrc/components'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import { CreateConsumerGroupsDto } from 'apiSrc/modules/browser/stream/dto'
+import { CreateConsumerGroupsDto } from 'apiClient'
 
 import { Panel } from 'uiSrc/components/panel'
 import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 import {
   StreamGroupContent,
   TimeStampInfoIcon,
@@ -35,7 +36,8 @@ export interface Props {
 
 const AddStreamGroup = (props: Props) => {
   const { closePanel } = props
-  const { name: keyName = '' } = useSelector(selectedKeyDataSelector) ?? {
+  const { t } = useTranslation()
+  const { name: keyName = '' } = useAppSelector(selectedKeyDataSelector) ?? {
     name: undefined,
   }
 
@@ -47,7 +49,7 @@ const AddStreamGroup = (props: Props) => {
 
   const { instanceId } = useParams<{ instanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     const isValid = !!groupName.length && !idError
@@ -56,11 +58,11 @@ const AddStreamGroup = (props: Props) => {
 
   useEffect(() => {
     if (!consumerGroupIdRegex.test(id)) {
-      setIdError('ID format is not correct')
+      setIdError(t('browser.stream.group.idFormatError'))
       return
     }
     setIdError('')
-  }, [id])
+  }, [id, t])
 
   const onSuccessAdded = () => {
     closePanel()
@@ -101,7 +103,9 @@ const AddStreamGroup = (props: Props) => {
                     <TextInput
                       name="group-name"
                       id="group-name"
-                      placeholder="Enter Group Name*"
+                      placeholder={t(
+                        'browser.stream.addGroup.groupNamePlaceholder',
+                      )}
                       value={groupName}
                       onChange={(value) => setGroupName(value)}
                       autoComplete="off"
@@ -116,7 +120,7 @@ const AddStreamGroup = (props: Props) => {
                         <RiTooltip
                           anchorClassName="inputAppendIcon"
                           position="left"
-                          title="Enter Valid ID, 0 or $"
+                          title={t('browser.stream.group.idTooltipTitle')}
                           content={lastDeliveredIDTooltipText}
                         >
                           <TimeStampInfoIcon data-testid="entry-id-info-icon" />
@@ -127,7 +131,7 @@ const AddStreamGroup = (props: Props) => {
                             color="primary"
                             data-testid="id-help-text"
                           >
-                            Timestamp - Sequence Number or $
+                            {t('browser.stream.group.idFormatHint')}
                           </Text>
                         )}
                         {showIdError && (
@@ -141,7 +145,7 @@ const AddStreamGroup = (props: Props) => {
                     <TextInput
                       name="id"
                       id="id"
-                      placeholder="ID*"
+                      placeholder={t('browser.stream.group.idPlaceholder')}
                       value={id}
                       onChange={(value) =>
                         setId(validateConsumerGroupId(value))
@@ -163,14 +167,14 @@ const AddStreamGroup = (props: Props) => {
           onClick={() => closePanel(true)}
           data-testid="cancel-stream-groups-btn"
         >
-          Cancel
+          {t('browser.stream.addGroup.cancel')}
         </SecondaryButton>
         <PrimaryButton
           onClick={submitData}
           disabled={!isFormValid}
           data-testid="save-groups-btn"
         >
-          Save
+          {t('browser.stream.addGroup.save')}
         </PrimaryButton>
       </Panel>
     </Col>

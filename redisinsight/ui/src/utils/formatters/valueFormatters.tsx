@@ -1,4 +1,5 @@
-import { decode, encode } from 'msgpackr'
+import React from 'react'
+import { encode } from 'msgpackr'
 // eslint-disable-next-line import/order
 import { Buffer } from 'buffer'
 import { isUndefined, get } from 'lodash'
@@ -9,11 +10,13 @@ import JSONBigInt from 'json-bigint'
 import { store } from 'uiSrc/slices/store'
 
 import JSONViewer from 'uiSrc/components/json-viewer/JSONViewer'
+import { MarkdownViewer } from 'uiSrc/components/markdown-viewer'
 import {
   DATETIME_FORMATTER_DEFAULT,
   KeyValueFormat,
   TimezoneOption,
 } from 'uiSrc/constants'
+import { decodeMsgpackWithLz4 } from './msgpack'
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
 import {
   anyToBuffer,
@@ -37,6 +40,23 @@ import {
   normalizeEnum,
 } from 'uiSrc/utils'
 import { reSerializeJSON } from 'uiSrc/utils/formatters/json'
+
+const BigIntJSONParser = JSONBigInt({ useNativeBigInt: true })
+
+// json-bigint returns objects with a null prototype; php-serialize reads
+// `item.constructor.name` to detect plain objects and crashes on those.
+// Rebuild the structure with standard Object prototypes before serializing.
+const withStandardPrototype = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(withStandardPrototype)
+  if (v !== null && typeof v === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(v)) {
+      out[k] = withStandardPrototype((v as Record<string, unknown>)[k])
+    }
+    return out
+  }
+  return v
+}
 
 export interface FormattingProps {
   expanded?: boolean
@@ -114,7 +134,8 @@ const formattingBuffer = (
       return bufferToJSON(reply, props as FormattingProps)
     case KeyValueFormat.Msgpack: {
       try {
-        const decoded = decode(Uint8Array.from(reply.data))
+        const data = Uint8Array.from(reply.data)
+        const decoded = decodeMsgpackWithLz4(data)
         const value = JSONBigInt.stringify(decoded)
         return JSONViewer({ value, ...props })
       } catch (e) {
@@ -230,6 +251,15 @@ const formattingBuffer = (
       }
       return { value, isValid: false }
     }
+    case KeyValueFormat.Markdown: {
+      const value = bufferToUTF8(reply)
+      // Selecting Markdown renders it wherever a value is shown, so it does not
+      // depend on a row being expanded. Tooltips still get the raw source.
+      if (props?.tooltip) {
+        return { value, isValid: true }
+      }
+      return { value: <MarkdownViewer value={value} />, isValid: true }
+    }
     default:
       return { value: bufferToUnicode(reply), isValid: true }
   }
@@ -255,8 +285,10 @@ const bufferToSerializedFormat = (
       return bufferToFloat64Array(value.data as Uint8Array)
     case KeyValueFormat.Msgpack: {
       try {
-        const decoded = decode(Uint8Array.from(value.data))
-        const stringified = JSON.stringify(decoded)
+        const decoded = decodeMsgpackWithLz4(Uint8Array.from(value.data))
+        // Use JSONBigInt (like formattingBuffer) so 64-bit integers/BigInts are
+        // preserved instead of throwing and falling back to raw UTF-8.
+        const stringified = JSONBigInt.stringify(decoded)
         return reSerializeJSON(stringified, space)
       } catch (e) {
         return bufferToUTF8(value)
@@ -269,8 +301,44 @@ const bufferToSerializedFormat = (
           {},
           { strict: false, encoding: 'utf8' },
         )
-        const stringified = JSON.stringify(decoded)
+        // php-serialize v5.1+ returns BigInt for integers outside the safe
+        // range; JSON.stringify would throw on those, so use JSONBigInt
+        // (matches the view path in formattingBuffer).
+        const stringified = JSONBigInt.stringify(decoded)
         return reSerializeJSON(stringified, space)
+      } catch (e) {
+        return bufferToUTF8(value)
+      }
+    }
+    // The formats below are decoded for display (formattingBuffer renders them
+    // as a JSON tree). Mirror that decode here so a copied value matches the
+    // displayed value instead of falling through to raw UTF-8.
+    case KeyValueFormat.JAVA: {
+      try {
+        const decoded = bufferToJava(value)
+        return reSerializeJSON(JSONBigInt.stringify(decoded), space)
+      } catch (e) {
+        return bufferToUTF8(value)
+      }
+    }
+    case KeyValueFormat.Pickle: {
+      try {
+        const decoded = new Parser().parse(new Uint8Array(value.data))
+        if (isUndefined(decoded)) {
+          return bufferToUTF8(value)
+        }
+        return reSerializeJSON(JSONBigInt.stringify(decoded), space)
+      } catch (e) {
+        return bufferToUTF8(value)
+      }
+    }
+    case KeyValueFormat.Protobuf: {
+      try {
+        if (value.data?.length === 0) {
+          throw new Error()
+        }
+        const decoded = getData(Buffer.from(value.data))
+        return reSerializeJSON(JSONBigInt.stringify(decoded), space)
       } catch (e) {
         return bufferToUTF8(value)
       }
@@ -315,7 +383,10 @@ const stringToSerializedBufferFormat = (
     }
     case KeyValueFormat.PHP: {
       try {
-        const json = JSON.parse(value)
+        // BigInt-aware parse so integers outside JS safe range survive the
+        // JSON → PHP-serialize round-trip without silent precision loss
+        // (php-serialize accepts BigInt natively and emits i:N;).
+        const json = withStandardPrototype(BigIntJSONParser.parse(value))
         const serialized = serialize(json)
         return stringToBuffer(serialized)
       } catch (e) {

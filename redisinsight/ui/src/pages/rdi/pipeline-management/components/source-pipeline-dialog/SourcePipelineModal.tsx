@@ -1,26 +1,24 @@
 import React, { useEffect, useState } from 'react'
 import { keys } from '@elastic/eui'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import {
-  fetchRdiPipeline,
-  rdiPipelineSelector,
-  setChangedFile,
-} from 'uiSrc/slices/rdi/pipeline'
+import { rdiPipelineSelector, setChangedFile } from 'uiSrc/slices/rdi/pipeline'
 import {
   appContextPipelineManagement,
   setPipelineDialogState,
 } from 'uiSrc/slices/app/context'
 import UploadModal from 'uiSrc/pages/rdi/pipeline-management/components/upload-modal/UploadModal'
-import { Text } from 'uiSrc/components/base/text'
-
+import { Text, Title } from 'uiSrc/components/base/text'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import { ContractsIcon, UploadIcon } from 'uiSrc/components/base/icons'
 import { FileChangeType } from 'uiSrc/slices/interfaces'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { Modal } from 'uiSrc/components/base/display'
-import { CancelIcon } from 'uiSrc/components/base/icons'
-import styles from './styles.module.scss'
+import { Spacer } from 'uiSrc/components/base/layout'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { ButtonWrapper } from './SourcePipelineModal.styles'
 
 export const EMPTY_PIPELINE = {
   config: '',
@@ -28,21 +26,21 @@ export const EMPTY_PIPELINE = {
 }
 
 export enum PipelineSourceOptions {
-  SERVER = 'download from server',
   FILE = 'upload from file',
   NEW = 'new pipeline',
 }
 
 const SourcePipelineDialog = () => {
+  const { t } = useTranslation()
   const [isShowDownloadDialog, setIsShowDownloadDialog] = useState(false)
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
 
-  const { isOpenDialog } = useSelector(appContextPipelineManagement)
+  const { isOpenDialog } = useAppSelector(appContextPipelineManagement)
 
   // data is original response from the server converted to config and jobs yaml strings
   // since by default it is null we can determine if it was fetched and it's content
-  const { data } = useSelector(rdiPipelineSelector)
+  const { data } = useAppSelector(rdiPipelineSelector)
 
   useEffect(() => {
     if (data?.config === '') {
@@ -50,7 +48,7 @@ const SourcePipelineDialog = () => {
     }
   }, [data])
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const onSelect = (option: PipelineSourceOptions) => {
     sendEventTelemetry({
@@ -60,12 +58,6 @@ const SourcePipelineDialog = () => {
         option,
       },
     })
-  }
-
-  const onLoadPipeline = () => {
-    dispatch(fetchRdiPipeline(rdiInstanceId))
-    onSelect(PipelineSourceOptions.SERVER)
-    dispatch(setPipelineDialogState(false))
   }
 
   const onStartNewPipeline = () => {
@@ -105,54 +97,49 @@ const SourcePipelineDialog = () => {
   }
 
   return (
-    <Modal.Compose open>
+    <Modal.Compose open onOpenChange={(open) => !open && handleCloseDialog()}>
       <Modal.Content.Compose>
-        <Modal.Content.Close icon={CancelIcon} onClick={handleCloseDialog} />
-        <Modal.Content.Header.Title>
-          Start with your pipeline
-        </Modal.Content.Header.Title>
-        <Modal.Content.Body.Compose width="100%">
-          <div className={styles.content}>
-            <div className={styles.actions}>
-              <div
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => onEnter(event, onLoadPipeline)}
-                onClick={onLoadPipeline}
-                className={styles.action}
-                data-testid="server-source-pipeline-dialog"
-              >
-                <RiIcon type="UploadIcon" size="xl" className={styles.icon} />
-                <Text className={styles.text}>Download from server</Text>
-              </div>
-              <div
+        <Modal.Content.Body.Compose>
+          <Spacer size="xl" />
+          <Col gap="xxl">
+            <Col align="center" justify="center">
+              <Title size="L" color="primary">
+                {t('rdi.pipeline.source.title')}
+              </Title>
+              <Title size="L" color="primary">
+                {t('rdi.pipeline.source.subtitle')}
+              </Title>
+            </Col>
+            <Row gap="xxl">
+              <ButtonWrapper
+                gap="s"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(event) => onEnter(event, onUploadClick)}
                 onClick={onUploadClick}
-                className={styles.action}
                 data-testid="file-source-pipeline-dialog"
               >
-                <RiIcon type="ExportIcon" size="xl" className={styles.icon} />
-                <Text className={styles.text}>Upload from file</Text>
-              </div>
-              <div
+                <UploadIcon size="XL" />
+                <Text color="primary" size="S" textAlign="center">
+                  {t('rdi.pipeline.source.importZip')}
+                </Text>
+              </ButtonWrapper>
+              <ButtonWrapper
+                gap="s"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(event) => onEnter(event, onStartNewPipeline)}
                 onClick={onStartNewPipeline}
-                className={styles.action}
                 data-testid="empty-source-pipeline-dialog"
               >
-                <RiIcon
-                  type="ContractsIcon"
-                  size="xl"
-                  className={styles.icon}
-                />
-                <Text className={styles.text}>Create new pipeline</Text>
-              </div>
-            </div>
-          </div>
+                <ContractsIcon size="XL" />
+                <Text color="primary" size="S" textAlign="center">
+                  {t('rdi.pipeline.source.createNew')}
+                </Text>
+              </ButtonWrapper>
+            </Row>
+          </Col>
+          <Spacer size="xl" />
         </Modal.Content.Body.Compose>
       </Modal.Content.Compose>
     </Modal.Compose>

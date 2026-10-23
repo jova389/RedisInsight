@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
-import cx from 'classnames'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import {
   dbAnalysisSelector,
@@ -21,12 +20,12 @@ import {
   ExpirationGroupsView,
 } from 'uiSrc/pages/database-analysis/components'
 
-import styles from './styles.module.scss'
+import { ContentWrapper } from './AnalysisDataView.styles'
 
 const AnalysisDataView = () => {
-  const { id: instanceId, provider } = useSelector(connectedInstanceSelector)
-  const { loading, data } = useSelector(dbAnalysisSelector)
-  const { data: reports } = useSelector(dbAnalysisReportsSelector)
+  const { id: instanceId, provider } = useAppSelector(connectedInstanceSelector)
+  const { loading, data } = useAppSelector(dbAnalysisSelector)
+  const { data: reports } = useAppSelector(dbAnalysisReportsSelector)
 
   const [extrapolation, setExtrapolation] = useState(DEFAULT_EXTRAPOLATION)
 
@@ -54,29 +53,27 @@ const AnalysisDataView = () => {
   }
 
   return (
-    <>
-      <div className={cx(styles.content)}>
-        <SummaryPerData
-          data={data}
-          loading={loading}
-          extrapolation={extrapolation}
-          onSwitchExtrapolation={onSwitchExtrapolation}
-        />
-        <ExpirationGroupsView
-          data={data}
-          loading={loading}
-          extrapolation={extrapolation}
-          onSwitchExtrapolation={onSwitchExtrapolation}
-        />
-        <TopNamespace
-          data={data}
-          loading={loading}
-          extrapolation={extrapolation}
-          onSwitchExtrapolation={onSwitchExtrapolation}
-        />
-        <TopKeys data={data} loading={loading} />
-      </div>
-    </>
+    <ContentWrapper>
+      <SummaryPerData
+        data={data}
+        loading={loading}
+        extrapolation={extrapolation}
+        onSwitchExtrapolation={onSwitchExtrapolation}
+      />
+      <ExpirationGroupsView
+        data={data}
+        loading={loading}
+        extrapolation={extrapolation}
+        onSwitchExtrapolation={onSwitchExtrapolation}
+      />
+      <TopNamespace
+        data={data}
+        loading={loading}
+        extrapolation={extrapolation}
+        onSwitchExtrapolation={onSwitchExtrapolation}
+      />
+      <TopKeys data={data} loading={loading} />
+    </ContentWrapper>
   )
 }
 

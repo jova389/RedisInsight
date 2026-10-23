@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import {
@@ -14,13 +14,17 @@ import { autoFillFormDetails } from 'uiSrc/pages/home/utils'
 
 import { useModalHeader } from 'uiSrc/contexts/ModalTitleProvider'
 import { Title } from 'uiSrc/components/base/text/Title'
+import { useTranslation } from 'uiSrc/i18n'
 import ClusterConnectionForm from './cluster-connection-form/ClusterConnectionForm'
+
+import { ContentWrapper } from '../ManualConnection.styles'
 
 export interface Props {
   onClose?: () => void
 }
 
 const ClusterConnectionFormWrapper = ({ onClose }: Props) => {
+  const { t } = useTranslation()
   const [initialValues, setInitialValues] = useState({
     host: '',
     port: '',
@@ -29,21 +33,27 @@ const ClusterConnectionFormWrapper = ({ onClose }: Props) => {
   })
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { setModalHeader } = useModalHeader()
 
   const formRef = useRef<HTMLDivElement>(null)
 
-  const { loading, credentials } = useSelector(clusterSelector)
+  const { loading, credentials } = useAppSelector(clusterSelector)
 
-  useEffect(() => {
-    setModalHeader(<Title size="M">Redis Software</Title>, true)
-
-    return () => {
+  useEffect(
+    () => () => {
       setModalHeader(null)
       dispatch(resetErrors())
-    }
-  }, [])
+    },
+    [],
+  )
+
+  useEffect(() => {
+    setModalHeader(
+      <Title size="M">{t('home.form.cluster.modalTitle')}</Title>,
+      true,
+    )
+  }, [t])
 
   useEffect(() => {
     if (credentials) {
@@ -58,7 +68,8 @@ const ClusterConnectionFormWrapper = ({ onClose }: Props) => {
 
   const formSubmit = (values: ICredentialsRedisCluster) => {
     sendEventTelemetry({
-      event: TelemetryEvent.CONFIG_DATABASES_REDIS_SOFTWARE_AUTODISCOVERY_SUBMITTED,
+      event:
+        TelemetryEvent.CONFIG_DATABASES_REDIS_SOFTWARE_AUTODISCOVERY_SUBMITTED,
     })
 
     dispatch(fetchInstancesRedisCluster(values, onSuccess))
@@ -77,7 +88,7 @@ const ClusterConnectionFormWrapper = ({ onClose }: Props) => {
     )
 
   return (
-    <div ref={formRef}>
+    <ContentWrapper as="div" ref={formRef}>
       <ClusterConnectionForm
         host={credentials?.host ?? ''}
         port={credentials?.port?.toString() ?? ''}
@@ -89,7 +100,7 @@ const ClusterConnectionFormWrapper = ({ onClose }: Props) => {
         onSubmit={formSubmit}
         loading={loading}
       />
-    </div>
+    </ContentWrapper>
   )
 }
 

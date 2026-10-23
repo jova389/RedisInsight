@@ -1,7 +1,7 @@
 import { startCase } from 'lodash'
 import React, { useContext } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import EnablementAreaContext from 'uiSrc/pages/workbench/contexts/enablementAreaContext'
 import { CodeButtonParams } from 'uiSrc/constants'
 import { parseParams } from 'uiSrc/utils'
@@ -16,9 +16,9 @@ import CodeButtonBlock from 'uiSrc/components/markdown/CodeButtonBlock'
 import { getFileInfo, getTutorialSection } from '../../utils'
 
 export interface Props {
-  label: string
+  label?: string
   children: string
-  lang: string
+  lang?: string
   params?: string
   path?: string
 }
@@ -29,7 +29,7 @@ const Code = (props: Props) => {
     provider,
     modules = [],
     isFreeDb,
-  } = useSelector(connectedInstanceSelector)
+  } = useAppSelector(connectedInstanceSelector)
 
   const { search } = useLocation()
   const { setScript } = useContext(EnablementAreaContext)

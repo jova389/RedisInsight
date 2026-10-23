@@ -1,14 +1,17 @@
 import cx from 'classnames'
 import React, { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useTranslation } from 'uiSrc/i18n'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { EXTERNAL_LINKS } from 'uiSrc/constants/links'
-import { ReleaseNotesSource } from 'uiSrc/constants/telemetry'
+import { ReleaseNotesSource, WhatsNewSource } from 'uiSrc/constants/telemetry'
 import {
   appElectronInfoSelector,
   setReleaseNotesViewed,
   setShortcutsFlyoutState,
 } from 'uiSrc/slices/app/info'
+import { openWhatsNew } from 'uiSrc/slices/app/whatsNew'
+import { getLatestWhatsNewVersion } from 'uiSrc/utils'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import { setOnboarding } from 'uiSrc/slices/app/features'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
@@ -32,13 +35,14 @@ import navStyles from '../../styles.module.scss'
 import styles from './styles.module.scss'
 
 const HelpMenu = () => {
-  const { id: connectedInstanceId = '' } = useSelector(
+  const { id: connectedInstanceId = '' } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { isReleaseNotesViewed } = useSelector(appElectronInfoSelector)
+  const { isReleaseNotesViewed } = useAppSelector(appElectronInfoSelector)
   const [isHelpMenuActive, setIsHelpMenuActive] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+  const { t } = useTranslation()
 
   const onKeyboardShortcutClick = () => {
     setIsHelpMenuActive(false)
@@ -55,6 +59,18 @@ const HelpMenu = () => {
     if (isReleaseNotesViewed === false) {
       dispatch(setReleaseNotesViewed(true))
     }
+  }
+
+  const onWhatsNewClick = () => {
+    setIsHelpMenuActive(false)
+    sendEventTelemetry({
+      event: TelemetryEvent.WHATS_NEW_OPENED,
+      eventData: {
+        source: WhatsNewSource.helpCenter,
+        version: getLatestWhatsNewVersion()?.version,
+      },
+    })
+    dispatch(openWhatsNew())
   }
 
   const onResetOnboardingClick = () => {
@@ -160,6 +176,18 @@ const HelpMenu = () => {
                   Release Notes
                 </Text>
               </Link>
+            </Row>
+
+            <Row className={styles.helpMenuItemLink} align="center" gap="xs">
+              <RiIcon type="StarsIcon" size="l" />
+              <Text
+                size="xs"
+                className={styles.helpMenuTextLink}
+                onClick={onWhatsNewClick}
+                data-testid="whats-new-btn"
+              >
+                {t('whatsNew.menuItem')}
+              </Text>
             </Row>
 
             <FeatureFlagComponent name={FeatureFlags.envDependent}>

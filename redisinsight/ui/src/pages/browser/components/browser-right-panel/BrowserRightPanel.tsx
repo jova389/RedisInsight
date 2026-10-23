@@ -1,11 +1,10 @@
 import { every } from 'lodash'
 import React, { useCallback } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import AddKey from 'uiSrc/pages/browser/components/add-key/AddKey'
 import BulkActions from 'uiSrc/pages/browser/components/bulk-actions'
-import CreateRedisearchIndex from 'uiSrc/pages/browser/components/create-redisearch-index/'
 import { KeyDetails } from 'uiSrc/pages/browser/modules'
 
 import {
@@ -32,7 +31,6 @@ export interface Props {
   handleAddKeyPanel: (value: boolean) => void
   isBulkActionsPanelOpen: boolean
   handleBulkActionsPanel: (value: boolean) => void
-  isCreateIndexPanelOpen: boolean
   closeRightPanels: () => void
 }
 
@@ -45,37 +43,25 @@ const BrowserRightPanel = (props: Props) => {
     handleAddKeyPanel,
     isBulkActionsPanelOpen,
     handleBulkActionsPanel,
-    isCreateIndexPanelOpen,
     closeRightPanels,
   } = props
 
-  const { isBrowserFullScreen, viewType } = useSelector(keysSelector)
+  const { isBrowserFullScreen, viewType } = useAppSelector(keysSelector)
   const { total, lastRefreshTime: keysLastRefreshTime } =
-    useSelector(keysDataSelector)
-  const { type, length } = useSelector(selectedKeyDataSelector) ?? {
+    useAppSelector(keysDataSelector)
+  const { type, length } = useAppSelector(selectedKeyDataSelector) ?? {
     type: '',
     length: 0,
   }
 
   const { instanceId } = useParams<{ instanceId: string }>()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const closePanel = () => {
     dispatch(toggleBrowserFullScreen(true))
 
     setSelectedKey(null)
     closeRightPanels()
-  }
-
-  const onCloseRedisearchPanel = () => {
-    closePanel()
-    sendEventTelemetry({
-      event: TelemetryEvent.SEARCH_INDEX_ADD_CANCELLED,
-      eventData: {
-        databaseId: instanceId,
-        view: viewType,
-      },
-    })
   }
 
   const handleToggleFullScreen = () => {
@@ -114,10 +100,7 @@ const BrowserRightPanel = (props: Props) => {
 
   return (
     <>
-      {every(
-        [!isAddKeyPanelOpen, !isBulkActionsPanelOpen, !isCreateIndexPanelOpen],
-        Boolean,
-      ) && (
+      {every([!isAddKeyPanelOpen, !isBulkActionsPanelOpen], Boolean) && (
         <KeyDetails
           isFullScreen={isBrowserFullScreen}
           arePanelsCollapsed={arePanelsCollapsed}
@@ -130,34 +113,24 @@ const BrowserRightPanel = (props: Props) => {
           keysLastRefreshTime={keysLastRefreshTime}
         />
       )}
-      {isAddKeyPanelOpen &&
-        every([!isBulkActionsPanelOpen, !isCreateIndexPanelOpen], Boolean) && (
-          <AddKey
-            onAddKeyPanel={handleAddKeyPanel}
+      {isAddKeyPanelOpen && !isBulkActionsPanelOpen && (
+        <AddKey
+          onAddKeyPanel={handleAddKeyPanel}
+          onClosePanel={closePanel}
+          arePanelsCollapsed={arePanelsCollapsed}
+        />
+      )}
+      {isBulkActionsPanelOpen && !isAddKeyPanelOpen && (
+        <FeatureFlagComponent name={FeatureFlags.envDependent}>
+          <BulkActions
+            isFullScreen={isBrowserFullScreen}
+            arePanelsCollapsed={arePanelsCollapsed}
             onClosePanel={closePanel}
-            arePanelsCollapsed={arePanelsCollapsed}
+            onBulkActionsPanel={handleBulkActionsPanel}
+            onToggleFullScreen={handleToggleFullScreen}
           />
-        )}
-      {isBulkActionsPanelOpen &&
-        every([!isAddKeyPanelOpen, !isCreateIndexPanelOpen], Boolean) && (
-          <FeatureFlagComponent name={FeatureFlags.envDependent}>
-            <BulkActions
-              isFullScreen={isBrowserFullScreen}
-              arePanelsCollapsed={arePanelsCollapsed}
-              onClosePanel={closePanel}
-              onBulkActionsPanel={handleBulkActionsPanel}
-              onToggleFullScreen={handleToggleFullScreen}
-            />
-          </FeatureFlagComponent>
-        )}
-      {isCreateIndexPanelOpen &&
-        every([!isAddKeyPanelOpen, !isBulkActionsPanelOpen], Boolean) && (
-          <CreateRedisearchIndex
-            arePanelsCollapsed={arePanelsCollapsed}
-            onCreateIndex={closePanel}
-            onClosePanel={onCloseRedisearchPanel}
-          />
-        )}
+        </FeatureFlagComponent>
+      )}
     </>
   )
 }

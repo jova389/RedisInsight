@@ -1,17 +1,18 @@
 import React from 'react'
 
 import cx from 'classnames'
+import { Environment } from 'apiClient'
 import { KeyTypes, ModulesKeyTypes } from 'uiSrc/constants'
 import { formatLongName } from 'uiSrc/utils'
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import {
   DestructiveButton,
   IconButton,
 } from 'uiSrc/components/base/forms/buttons'
 import { DeleteIcon } from 'uiSrc/components/base/icons'
-import { Text } from 'uiSrc/components/base/text'
-import { RiPopover } from 'uiSrc/components/base'
+import ConfirmationPopover from 'uiSrc/components/confirmation-popover'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface DeleteProps {
   nameString: string
@@ -33,40 +34,51 @@ export const DeleteKeyPopover = ({
   deleting,
   onDelete,
   onOpenPopover,
-}: DeleteProps) => (
-  <RiPopover
-    anchorClassName={cx('showOnHoverKey', { show: deletePopoverId === rowId })}
-    anchorPosition="leftUp"
-    isOpen={deletePopoverId === rowId}
-    closePopover={() => onOpenPopover(-1, type)}
-    panelPaddingSize="l"
-    button={
-      <IconButton
-        icon={DeleteIcon}
-        onClick={() => onOpenPopover(rowId, type)}
-        aria-label="Delete Key"
-        data-testid={`delete-key-btn-${nameString}`}
-      />
+}: DeleteProps) => {
+  const { t } = useTranslation()
+  const { environment } = useDatabaseEnvironment()
+  const bypassConfirmation = environment === Environment.Development
+
+  const onClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    e.stopPropagation()
+    if (bypassConfirmation) {
+      onDelete(name)
+      return
     }
-    onClick={(e) => e.stopPropagation()}
-  >
-    <>
-      <Text size="m" component="div">
-        <h4 style={{ wordBreak: 'break-all' }}>
-          <b>{formatLongName(nameString)}</b>
-        </h4>
-        <Text size="s">will be deleted.</Text>
-      </Text>
-      <Spacer size="m" />
-      <DestructiveButton
-        size="small"
-        icon={DeleteIcon}
-        disabled={deleting}
-        onClick={() => onDelete(name)}
-        data-testid="submit-delete-key"
-      >
-        Delete
-      </DestructiveButton>
-    </>
-  </RiPopover>
-)
+    onOpenPopover(rowId, type)
+  }
+
+  return (
+    <ConfirmationPopover
+      anchorClassName={cx('showOnHoverKey', {
+        show: deletePopoverId === rowId,
+      })}
+      anchorPosition="leftCenter"
+      isOpen={deletePopoverId === rowId}
+      closePopover={() => onOpenPopover(-1, type)}
+      panelPaddingSize="l"
+      button={
+        <IconButton
+          icon={DeleteIcon}
+          onClick={onClick}
+          aria-label={t('browser.deletePopover.aria')}
+          data-testid={`delete-key-btn-${nameString}`}
+        />
+      }
+      onClick={(e) => e.stopPropagation()}
+      title={formatLongName(nameString)}
+      message={t('browser.deletePopover.message')}
+      confirmButton={
+        <DestructiveButton
+          size="small"
+          icon={DeleteIcon}
+          disabled={deleting}
+          onClick={() => onDelete(name)}
+          data-testid="submit-delete-key"
+        >
+          {t('browser.deletePopover.button')}
+        </DestructiveButton>
+      }
+    />
+  )
+}

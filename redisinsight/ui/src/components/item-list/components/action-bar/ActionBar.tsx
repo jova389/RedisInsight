@@ -1,50 +1,38 @@
 import React from 'react'
 
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { FlexItem } from 'uiSrc/components/base/layout/flex'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import { CancelSlimIcon } from 'uiSrc/components/base/icons'
-import styles from './styles.module.scss'
+import { useTranslation } from 'uiSrc/i18n'
+import { Container } from './ActionBar.styles'
 
 export interface Props {
-  width: number
+  width?: number
   selectionCount: number
   actions: (JSX.Element | null)[]
   onCloseActionBar: () => void
 }
 
-const ActionBar = ({
-  width,
-  selectionCount,
-  actions,
-  onCloseActionBar,
-}: Props) => (
-  <div className={styles.inner}>
-    <Row
-      centered
-      className={styles.container}
-      gap="l"
-      style={{
-        left: `calc(${width / 2}px - 156px)`,
-      }}
-    >
-      <FlexItem className={styles.text}>
-        {`You selected: ${selectionCount} items`}
+const ActionBar = ({ selectionCount, actions, onCloseActionBar }: Props) => {
+  const { t } = useTranslation()
+  return (
+    <Container centered gap="l">
+      <FlexItem>
+        {t('itemList.actionBar.selectionCount', { count: selectionCount })}
       </FlexItem>
       {actions?.map((action, index) => (
-        <FlexItem className={styles.actions} key={`action-${index + 1}`}>
-          {action}
-        </FlexItem>
+        <FlexItem key={`action-${index + 1}`}>{action}</FlexItem>
       ))}
-      <FlexItem className={styles.cross}>
+      <FlexItem>
         <IconButton
           icon={CancelSlimIcon}
-          aria-label="Cancel selecting"
+          aria-label={t('itemList.actionBar.cancelAriaLabel')}
           onClick={() => onCloseActionBar()}
           data-testid="cancel-selecting"
         />
       </FlexItem>
-    </Row>
-  </div>
-)
+    </Container>
+  )
+}
 
 export default ActionBar

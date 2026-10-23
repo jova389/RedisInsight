@@ -1,0 +1,17 @@
+export enum AutoDiscoverCloudIds {
+  Alert = 'alert',
+  Name = 'name',
+  PublicEndpoint = 'publicEndpoint',
+  Id = 'id',
+  MessageAdded = 'messageAdded',
+  Modules = 'modules',
+  NumberOfDatabases = 'numberOfDatabases',
+  Options = 'options',
+  Provider = 'provider',
+  Region = 'region',
+  Status = 'status',
+  SubscriptionName = 'subscriptionName',
+  SubscriptionId = 'subscriptionId',
+  SubscriptionType = 'subscriptionType',
+  Type = 'type',
+}

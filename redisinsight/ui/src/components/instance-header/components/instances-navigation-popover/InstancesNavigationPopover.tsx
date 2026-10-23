@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
 import { instancesSelector as rdiInstancesSelector } from 'uiSrc/slices/rdi/instances'
 import { instancesSelector as dbInstancesSelector } from 'uiSrc/slices/instances/instances'
@@ -13,10 +13,11 @@ import { localStorageService } from 'uiSrc/services'
 import { filterAndSort } from 'uiSrc/utils'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { Text } from 'uiSrc/components/base/text'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import Tabs, { TabInfo } from 'uiSrc/components/base/layout/tabs'
 import { RiPopover } from 'uiSrc/components/base'
 import InstancesList from './components/instances-list'
+import { ChevronDownIcon } from 'uiSrc/components/base/icons'
+import { ButtonWrapper } from './InstancesNavigationPopover.styles'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -44,8 +45,8 @@ const InstancesNavigationPopover = ({ name }: Props) => {
     rdiInstanceId ? InstancesTabs.RDI : InstancesTabs.Databases,
   )
 
-  const { data: rdiInstances } = useSelector(rdiInstancesSelector)
-  const { data: dbInstances } = useSelector(dbInstancesSelector)
+  const { data: rdiInstances } = useAppSelector(rdiInstancesSelector)
+  const { data: dbInstances } = useAppSelector(dbInstancesSelector)
   const history = useHistory()
 
   useEffect(() => {
@@ -112,21 +113,20 @@ const InstancesNavigationPopover = ({ name }: Props) => {
   return (
     <RiPopover
       ownFocus
-      anchorPosition="downRight"
+      anchorPosition="downLeft"
       panelPaddingSize="none"
       isOpen={isPopoverOpen}
       closePopover={() => showPopover()}
       button={
-        <Text
-          className={styles.showPopoverBtn}
+        <ButtonWrapper
+          align="center"
+          gap="s"
           onClick={() => showPopover()}
           data-testid="nav-instance-popover-btn"
         >
-          <b className={styles.breadCrumbLink}>{name}</b>
-          <span>
-            <RiIcon color="primary500" type="CaretDownIcon" />
-          </span>
-        </Text>
+          <Text color="primary">{name}</Text>
+          <ChevronDownIcon size="S" />
+        </ButtonWrapper>
       }
     >
       <div className={styles.wrapper}>

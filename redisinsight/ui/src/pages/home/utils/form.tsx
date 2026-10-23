@@ -1,6 +1,7 @@
 import { isUndefined, toString } from 'lodash'
 import React from 'react'
 import { FormikErrors } from 'formik'
+import { Environment, RedisConnectionFamily } from 'apiClient'
 import { InstanceType } from 'uiSrc/slices/interfaces'
 import {
   ADD_NEW,
@@ -16,6 +17,7 @@ import {
 } from 'uiSrc/pages/home/constants'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
 import { Nullable, parseRedisUrl } from 'uiSrc/utils'
+import i18n from 'uiSrc/i18n'
 
 export const getTlsSettings = (values: DbConnectionInfo) => ({
   useTls: values.tls,
@@ -133,10 +135,10 @@ export const getFormErrors = (values: DbConnectionInfo) => {
   const errs: FormikErrors<DbConnectionInfo> = {}
 
   if (!values.host) {
-    errs.host = fieldDisplayNames.host
+    errs.host = i18n.t(fieldDisplayNames.host)
   }
   if (!values.port) {
-    errs.port = fieldDisplayNames.port
+    errs.port = i18n.t(fieldDisplayNames.port)
   }
 
   if (
@@ -144,7 +146,7 @@ export const getFormErrors = (values: DbConnectionInfo) => {
     values.verifyServerTlsCert &&
     values.selectedCaCertName === NO_CA_CERT
   ) {
-    errs.selectedCaCertName = fieldDisplayNames.selectedCaCertName
+    errs.selectedCaCertName = i18n.t(fieldDisplayNames.selectedCaCertName)
   }
 
   if (
@@ -152,7 +154,7 @@ export const getFormErrors = (values: DbConnectionInfo) => {
     values.selectedCaCertName === ADD_NEW_CA_CERT &&
     values.newCaCertName === ''
   ) {
-    errs.newCaCertName = fieldDisplayNames.newCaCertName
+    errs.newCaCertName = i18n.t(fieldDisplayNames.newCaCertName)
   }
 
   if (
@@ -160,11 +162,11 @@ export const getFormErrors = (values: DbConnectionInfo) => {
     values.selectedCaCertName === ADD_NEW_CA_CERT &&
     values.newCaCert === ''
   ) {
-    errs.newCaCert = fieldDisplayNames.newCaCert
+    errs.newCaCert = i18n.t(fieldDisplayNames.newCaCert)
   }
 
   if (values.tls && values.sni && values.servername === '') {
-    errs.servername = fieldDisplayNames.servername
+    errs.servername = i18n.t(fieldDisplayNames.servername)
   }
 
   if (
@@ -173,31 +175,31 @@ export const getFormErrors = (values: DbConnectionInfo) => {
     values.selectedTlsClientCertId === ADD_NEW
   ) {
     if (values.newTlsCertPairName === '') {
-      errs.newTlsCertPairName = fieldDisplayNames.newTlsCertPairName
+      errs.newTlsCertPairName = i18n.t(fieldDisplayNames.newTlsCertPairName)
     }
     if (values.newTlsClientCert === '') {
-      errs.newTlsClientCert = fieldDisplayNames.newTlsClientCert
+      errs.newTlsClientCert = i18n.t(fieldDisplayNames.newTlsClientCert)
     }
     if (values.newTlsClientKey === '') {
-      errs.newTlsClientKey = fieldDisplayNames.newTlsClientKey
+      errs.newTlsClientKey = i18n.t(fieldDisplayNames.newTlsClientKey)
     }
   }
 
   if (values.ssh) {
     if (!values.sshHost) {
-      errs.sshHost = fieldDisplayNames.sshHost
+      errs.sshHost = i18n.t(fieldDisplayNames.sshHost)
     }
     if (!values.sshPort) {
-      errs.sshPort = fieldDisplayNames.sshPort
+      errs.sshPort = i18n.t(fieldDisplayNames.sshPort)
     }
     if (!values.sshUsername) {
-      errs.sshUsername = fieldDisplayNames.sshUsername
+      errs.sshUsername = i18n.t(fieldDisplayNames.sshUsername)
     }
     if (
       values.sshPassType === SshPassType.PrivateKey &&
       !values.sshPrivateKey
     ) {
-      errs.sshPrivateKey = fieldDisplayNames.sshPrivateKey
+      errs.sshPrivateKey = i18n.t(fieldDisplayNames.sshPrivateKey)
     }
   }
 
@@ -278,9 +280,7 @@ export const getSubmitButtonContent = (
   if (errorsArr.length > maxErrorsCount) {
     errorsArr.splice(maxErrorsCount, errorsArr.length, ['...'])
   }
-  return submitIsDisabled ? (
-    <span>{errorsArr}</span>
-  ) : null
+  return submitIsDisabled ? <span>{errorsArr}</span> : null
 }
 
 export const getFormValues = (instance?: Nullable<Record<string, any>>) => ({
@@ -296,6 +296,8 @@ export const getFormValues = (instance?: Nullable<Record<string, any>>) => ({
   tls: instance?.tls ?? false,
   db: instance?.db,
   compressor: instance?.compressor ?? NONE,
+  environment: instance?.environment ?? Environment.Unspecified,
+  connectionFamily: instance?.connectionFamily ?? RedisConnectionFamily.Auto,
   modules: instance?.modules,
   showDb: !!instance?.db,
   forceStandalone: instance?.forceStandalone ?? false,

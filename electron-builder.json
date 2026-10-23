@@ -1,14 +1,14 @@
 {
   "productName": "Redis Insight",
   "appId": "org.RedisLabs.RedisInsight-V2",
-  "copyright": "Copyright © 2024 Redis Ltd.",
+  "copyright": "Copyright © 2026 Redis Ltd.",
   "files": ["dist", "node_modules", "package.json"],
   "artifactName": "Redis-Insight-${os}-${arch}.${ext}",
   "compression": "normal",
   "npmRebuild": false,
   "nodeGypRebuild": false,
   "buildDependenciesFromSource": false,
-  "asarUnpack": ["**/node_modules/keytar/**/*", "node_modules/sqlite3"],
+  "asarUnpack": ["**/node_modules/keytar/**/*", "node_modules/better-sqlite3"],
   "protocols": [
     {
       "name": "RedisInsight",
@@ -16,6 +16,9 @@
       "schemes": ["redisinsight"]
     }
   ],
+  "electronFuses": {
+    "runAsNode": false
+  },
   "mac": {
     "target": [
       {
@@ -46,8 +49,10 @@
     "asarUnpack": ["node_modules"],
     "provisioningProfile": "embedded.provisionprofile",
     "binaries": [
-      "Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/keytar/build/Release/keytar.node"
+      "Contents/Resources/app-x64.asar.unpacked/node_modules/better-sqlite3/prebuilds/darwin-x64.node",
+      "Contents/Resources/app-arm64.asar.unpacked/node_modules/better-sqlite3/prebuilds/darwin-arm64.node",
+      "Contents/Resources/app-arm64.asar.unpacked/node_modules/keytar/build/Release/keytar.node",
+      "Contents/Resources/app-x64.asar.unpacked/node_modules/keytar/build/Release/keytar.node"
     ],
     "artifactName": "Redis-Insight-${os}-${arch}-mas.${ext}"
   },
@@ -60,8 +65,10 @@
     "asarUnpack": ["node_modules"],
     "provisioningProfile": "dev.provisionprofile",
     "binaries": [
-      "Contents/Resources/app.asar.unpacked/node_modules/sqlite3/build/Release/node_sqlite3.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/keytar/build/Release/keytar.node"
+      "Contents/Resources/app-x64.asar.unpacked/node_modules/better-sqlite3/prebuilds/darwin-x64.node",
+      "Contents/Resources/app-arm64.asar.unpacked/node_modules/better-sqlite3/prebuilds/darwin-arm64.node",
+      "Contents/Resources/app-arm64.asar.unpacked/node_modules/keytar/build/Release/keytar.node",
+      "Contents/Resources/app-x64.asar.unpacked/node_modules/keytar/build/Release/keytar.node"
     ],
     "artifactName": "Redis-Insight-${os}-${arch}-masDev.${ext}"
   },
@@ -83,7 +90,11 @@
     "target": ["nsis"],
     "artifactName": "Redis-Insight-${os}-installer.${ext}",
     "icon": "resources/icon.ico",
-    "legalTrademarks": "Redis Inc., Redis Labs Inc."
+    "legalTrademarks": "Redis Inc., Redis Labs Inc.",
+    "signtoolOptions": {
+      "signingHashAlgorithms": ["sha256"],
+      "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+    }
   },
   "nsis": {
     "oneClick": false,
@@ -95,15 +106,15 @@
     "target": [
       {
         "target": "AppImage",
-        "arch": ["x64"]
+        "arch": ["x64", "arm64"]
       },
       {
         "target": "deb",
-        "arch": ["x64"]
+        "arch": ["x64", "arm64"]
       },
       {
         "target": "rpm",
-        "arch": ["x64"]
+        "arch": ["x64", "arm64"]
       },
       {
         "target": "snap",
@@ -125,10 +136,25 @@
     "afterInstall": "scripts/deb-after-install.sh",
     "afterRemove": "scripts/deb-before-remove.sh"
   },
-  "snap": {
-    "plugs": ["default", "password-manager-service"],
-    "confinement": "strict",
-    "stagePackages": ["default"]
+  "rpm": {
+    "fpm": ["--rpm-digest", "sha256"]
+  },
+  "snapcraft": {
+    "base": "core24",
+    "core24": {
+      "confinement": "strict",
+      "useLXD": true,
+      "stagePackages": ["default"],
+      "environment": {
+        "XDG_SESSION_TYPE": "x11"
+      },
+      "plugs": [
+        "network",
+        "home",
+        "password-manager-service",
+        "browser-support"
+      ]
+    }
   },
   "flatpak": {
     "runtimeVersion": "20.08",

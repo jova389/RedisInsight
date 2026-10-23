@@ -1,11 +1,12 @@
-import React, { useContext } from 'react'
-import { useDispatch } from 'react-redux'
+import React from 'react'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
-import styled from 'styled-components'
 import { isUndefined } from 'lodash'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { findTutorialPath, Maybe, Nullable } from 'uiSrc/utils'
-import { FeatureFlags, Pages, Theme } from 'uiSrc/constants'
+import { getTranslatedTipTitle } from 'uiSrc/utils/recommendation'
+import { FeatureFlags, Pages } from 'uiSrc/constants'
 import {
   FeatureFlagComponent,
   RecommendationBody,
@@ -15,7 +16,6 @@ import {
 } from 'uiSrc/components'
 import { Vote } from 'uiSrc/constants/recommendations'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import {
   deleteLiveRecommendations,
   updateLiveRecommendation,
@@ -28,6 +28,7 @@ import {
 
 import {
   HideIcon,
+  RediStackMinIcon,
   ShowIcon,
   SnoozeIcon,
   StarsIcon,
@@ -35,16 +36,22 @@ import {
 
 import { openTutorialByPath } from 'uiSrc/slices/panels/sidePanels'
 import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Card } from 'uiSrc/components/base/layout'
+import { Spacer } from 'uiSrc/components/base/layout'
 import {
   IconButton,
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { RiAccordion } from 'uiSrc/components/base/display/accordion/RiAccordion'
 import { Link } from 'uiSrc/components/base/link/Link'
 
 import styles from './styles.module.scss'
+import {
+  AccordionBody,
+  RecommendationContent,
+  Title,
+} from './Recommendation.styles'
+
+const TITLE_TRUNCATE_LENGTH = 30 // Note: Temporary dirty fix for RI-7474, before the full redesign of this component
 
 export interface IProps {
   id: string
@@ -58,10 +65,6 @@ export interface IProps {
   recommendationsContent: IRecommendationsStatic
 }
 
-const RecommendationContent = styled(Card)`
-  padding: var(--size-m);
-`
-
 const RecommendationTitle = ({
   redisStack,
   title,
@@ -71,7 +74,8 @@ const RecommendationTitle = ({
   title?: string
   id: string
 }) => {
-  const { theme } = useContext(ThemeContext)
+  const { t } = useTranslation()
+
   return (
     <Row
       align="center"
@@ -92,16 +96,11 @@ const RecommendationTitle = ({
             data-testid={`${id}-redis-stack-link`}
           >
             <RiTooltip
-              content="Redis Stack"
+              content={t('tips.recommendation.redisStackTooltip')}
               position="top"
               anchorClassName="flex-row"
             >
-              <RiIcon
-                type={
-                  theme === Theme.Dark
-                    ? 'RediStackDarkMinIcon'
-                    : 'RediStackLightMinIcon'
-                }
+              <RediStackMinIcon
                 className={styles.redisStackIcon}
                 data-testid={`${id}-redis-stack-icon`}
               />
@@ -127,8 +126,9 @@ const Recommendation = ({
   params,
   recommendationsContent,
 }: IProps) => {
+  const { t } = useTranslation()
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId = '' } = useParams<{ instanceId: string }>()
 
   const {
@@ -137,6 +137,7 @@ const Recommendation = ({
     liveTitle,
     content = [],
   } = recommendationsContent[name] || {}
+  const translatedTitle = getTranslatedTipTitle(name, title || liveTitle)
 
   const handleRedirect = () => {
     sendEventTelemetry({
@@ -206,16 +207,22 @@ const Recommendation = ({
   const recommendationContent = () => (
     <Col>
       {!isUndefined(tutorialId) && (
-        <SecondaryButton
-          filled
-          icon={StarsIcon}
-          iconSide="right"
-          className={styles.btn}
-          onClick={handleRedirect}
-          data-testid={`${name}-to-tutorial-btn`}
-        >
-          {tutorialId ? 'Start Tutorial' : 'Workbench'}
-        </SecondaryButton>
+        <Col align="start">
+          <Spacer size="s" />
+          <SecondaryButton
+            filled
+            icon={StarsIcon}
+            iconSide="right"
+            className={styles.btn}
+            onClick={handleRedirect}
+            data-testid={`${name}-to-tutorial-btn`}
+          >
+            {tutorialId
+              ? t('tips.recommendation.startTutorial')
+              : t('tips.recommendation.workbench')}
+          </SecondaryButton>
+          <Spacer size="m" />
+        </Col>
       )}
       <RecommendationBody
         elements={content}
@@ -251,8 +258,8 @@ const Recommendation = ({
     <Row className={styles.fullWidth} align="center" gap="s" justify="between">
       <FlexItem>
         <RiTooltip
-          title="Snooze tip"
-          content="This tip will be removed from the list and displayed again when relevant."
+          title={t('tips.recommendation.snooze.title')}
+          content={t('tips.recommendation.snooze.content')}
           position="top"
           anchorClassName="flex-row"
         >
@@ -260,19 +267,23 @@ const Recommendation = ({
             icon={SnoozeIcon}
             className={styles.snoozeBtn}
             onClick={handleDelete}
-            aria-label="snooze tip"
+            aria-label={t('tips.recommendation.snooze.aria')}
             data-testid={`${name}-delete-btn`}
           />
         </RiTooltip>
       </FlexItem>
       <FlexItem>
         <RiTooltip
-          title={`${hide ? 'Show' : 'Hide'} tip`}
-          content={`${
+          title={t(
             hide
-              ? 'This tip will be shown in the list.'
-              : 'This tip will be removed from the list and not displayed again.'
-          }`}
+              ? 'tips.recommendation.show.title'
+              : 'tips.recommendation.hide.title',
+          )}
+          content={t(
+            hide
+              ? 'tips.recommendation.show.content'
+              : 'tips.recommendation.hide.content',
+          )}
           position="top"
           anchorClassName="flex-row"
         >
@@ -280,7 +291,7 @@ const Recommendation = ({
             icon={hide ? HideIcon : ShowIcon}
             className={styles.hideBtn}
             onClick={toggleHide}
-            aria-label="hide/unhide tip"
+            aria-label={t('tips.recommendation.toggleHideAria')}
             data-testid={`toggle-hide-${name}-btn`}
           />
         </RiTooltip>
@@ -304,19 +315,25 @@ const Recommendation = ({
         label={
           <RecommendationTitle
             redisStack={redisStack}
-            title={title || liveTitle}
+            title={translatedTitle}
             id={name}
           />
         }
         data-testid={`${name}-accordion`}
         aria-label={`${name}-accordion`}
       >
-        <RecommendationContent
-          className={styles.accordionContent}
-          color="subdued"
-        >
-          {recommendationContent()}
-        </RecommendationContent>
+        <AccordionBody>
+          {/* Note: Temporary dirty fix for RI-7474, before the full redesign of this component */}
+          {(translatedTitle?.length ?? 0) > TITLE_TRUNCATE_LENGTH && (
+            <Title>{translatedTitle}</Title>
+          )}
+          <RecommendationContent
+            className={styles.accordionContent}
+            color="subdued"
+          >
+            {recommendationContent()}
+          </RecommendationContent>
+        </AccordionBody>
       </RiAccordion>
     </div>
   )

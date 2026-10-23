@@ -1,21 +1,24 @@
 import React, { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
-import cx from 'classnames'
+import { Environment } from 'apiClient'
 
 import {
   bulkActionsDeleteOverviewSelector,
   setBulkDeleteStartAgain,
   toggleBulkDeleteActionTriggered,
+  setBulkDeleteGenerateReport,
+  setBulkDeleteConfirmedThrough,
   bulkActionsDeleteSelector,
 } from 'uiSrc/slices/browser/bulkActions'
-import { keysDataSelector, keysSelector } from 'uiSrc/slices/browser/keys'
+import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
+import { keysDataSelector } from 'uiSrc/slices/browser/keys'
 import {
   getMatchType,
   sendEventTelemetry,
   TelemetryEvent,
 } from 'uiSrc/telemetry'
-import { BulkActionsType } from 'uiSrc/constants'
+import { BulkActionConfirmation, BulkActionsType } from 'uiSrc/constants'
 import { getRangeForNumber, BULK_THRESHOLD_BREAKPOINTS } from 'uiSrc/utils'
 
 import { DEFAULT_SEARCH_MATCH } from 'uiSrc/constants/api'
@@ -26,12 +29,15 @@ import {
 } from 'uiSrc/components/base/forms/buttons'
 import { RefreshIcon } from 'uiSrc/components/base/icons'
 import { Text } from 'uiSrc/components/base/text'
-import { RiPopover } from 'uiSrc/components/base'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import BulkDeleteContent from '../BulkDeleteContent'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { TypeToConfirmModal } from 'uiSrc/components/type-to-confirm-modal'
 import { isProcessedBulkAction } from '../../utils'
-
-import styles from './styles.module.scss'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import { ConfirmationPopover, RiTooltip } from 'uiSrc/components'
+import { Checkbox } from 'uiSrc/components/base/forms/checkbox/Checkbox'
+import { useTranslation } from 'uiSrc/i18n'
+import { BulkDeleteFooterContainer } from './BulkDeleteFooter.styles'
 
 export interface Props {
   onCancel: () => void
@@ -39,24 +45,39 @@ export interface Props {
 
 const BulkDeleteFooter = (props: Props) => {
   const { onCancel } = props
+  const { t } = useTranslation()
   const { instanceId = '' } = useParams<{ instanceId: string }>()
-  const { filter, search } = useSelector(keysSelector)
-  const { scanned, total } = useSelector(keysDataSelector)
-  const { loading } = useSelector(bulkActionsDeleteSelector)
-  const { status } = useSelector(bulkActionsDeleteOverviewSelector) ?? {}
+  const { scanned, total } = useAppSelector(keysDataSelector)
+  const { loading, generateReport, filter, search } = useAppSelector(
+    bulkActionsDeleteSelector,
+  )
+  const { name, host, port } = useAppSelector(connectedInstanceSelector)
+  const { status } = useAppSelector(bulkActionsDeleteOverviewSelector) ?? {}
+  const { environment } = useDatabaseEnvironment()
+  const isProduction = environment === Environment.Production
+  // Fall back to host:port when name is empty so the modal never matches an
+  // empty input (which would bypass the type-to-confirm safety check).
+  const confirmationText = name || `${host}:${port}`
 
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false)
+  const [isTypeToConfirmOpen, setIsTypeToConfirmOpen] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleDelete = () => {
     setIsPopoverOpen(false)
     dispatch(toggleBulkDeleteActionTriggered())
   }
 
-  const handleDeleteWarning = () => {
-    setIsPopoverOpen(true)
+  const handleTypeToConfirm = () => {
+    setIsTypeToConfirmOpen(false)
+    dispatch(
+      setBulkDeleteConfirmedThrough(BulkActionConfirmation.TypeToConfirm),
+    )
+    dispatch(toggleBulkDeleteActionTriggered())
+  }
 
+  const sendDeleteWarningTelemetry = () => {
     let matchValue = DEFAULT_SEARCH_MATCH
     if (search !== DEFAULT_SEARCH_MATCH && !!search) {
       matchValue = getMatchType(search)
@@ -81,6 +102,16 @@ const BulkDeleteFooter = (props: Props) => {
     })
   }
 
+  const handleDeleteWarning = () => {
+    setIsPopoverOpen(true)
+    sendDeleteWarningTelemetry()
+  }
+
+  const handleOpenTypeToConfirm = () => {
+    setIsTypeToConfirmOpen(true)
+    sendDeleteWarningTelemetry()
+  }
+
   const handleStartNew = () => {
     dispatch(setBulkDeleteStartAgain())
   }
@@ -94,36 +125,62 @@ const BulkDeleteFooter = (props: Props) => {
   }
 
   return (
-    <div className={styles.container} data-testid="bulk-actions-delete">
-      {status && <BulkDeleteContent />}
-      <div className={styles.footer}>
+    <Col data-testid="bulk-actions-delete" justify="end">
+      <BulkDeleteFooterContainer
+        align="center"
+        justify="end"
+        gap="l"
+        grow={false}
+      >
+        <Row grow={false}>
+          <Checkbox
+            checked={generateReport}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              dispatch(setBulkDeleteGenerateReport(e.target.checked))
+            }
+            label={t('browser.bulkActions.delete.downloadReport')}
+            data-testid="download-report-checkbox"
+          />
+
+          <RiTooltip
+            content={t('browser.bulkActions.delete.downloadReportTooltip')}
+            position="left"
+          >
+            <RiIcon
+              type="InfoIcon"
+              // TODO: fixes for the icon positioning
+              style={{ display: 'flex', alignItems: 'center' }}
+            />
+          </RiTooltip>
+        </Row>
+
         {!loading && (
           <SecondaryButton
             onClick={handleCancel}
-            className={styles.cancelBtn}
             data-testid="bulk-action-cancel-btn"
           >
-            {isProcessedBulkAction(status) ? 'Close' : 'Cancel'}
+            {isProcessedBulkAction(status)
+              ? t('browser.bulkActions.button.close')
+              : t('browser.bulkActions.button.cancel')}
           </SecondaryButton>
         )}
         {loading && (
           <SecondaryButton
             onClick={handleStop}
-            className={styles.cancelBtn}
             data-testid="bulk-action-stop-btn"
           >
-            Stop
+            {t('browser.bulkActions.button.stop')}
           </SecondaryButton>
         )}
 
-        {!isProcessedBulkAction(status) && (
-          <RiPopover
-            id="bulk-delete-warning-popover"
+        {!isProcessedBulkAction(status) && !isProduction && (
+          <ConfirmationPopover
             anchorPosition="upCenter"
+            ownFocus
             isOpen={isPopoverOpen}
             closePopover={() => setIsPopoverOpen(false)}
-            panelClassName={styles.panelPopover}
-            panelPaddingSize="none"
+            panelPaddingSize="m"
+            anchorClassName="deleteFieldPopover"
             button={
               <PrimaryButton
                 loading={loading}
@@ -131,36 +188,54 @@ const BulkDeleteFooter = (props: Props) => {
                 onClick={handleDeleteWarning}
                 data-testid="bulk-action-warning-btn"
               >
-                Delete
+                {t('browser.bulkActions.button.delete')}
               </PrimaryButton>
             }
-          >
-            <Text
-              color="subdued"
-              className={styles.containerPopover}
-              data-testid="bulk-action-tooltip"
-            >
-              <RiIcon
-                type="ToastDangerIcon"
-                color="danger600"
-                className={styles.popoverIcon}
-              />
-              <div className={cx(styles.popoverItem, styles.popoverItemTitle)}>
-                Are you sure you want to perform this action?
-              </div>
-              <div className={styles.popoverItem}>
-                {`All keys with ${filter ? filter?.toUpperCase() : 'all'} key type and selected pattern will be deleted.`}
-              </div>
+            title={t('browser.bulkActions.confirmTitle')}
+            message={t('browser.bulkActions.delete.confirmMessage')}
+            appendInfo={
+              <Row align="center" gap="m">
+                <RiIcon size="xl" type="ToastDangerIcon" />
+                <Text size="s">
+                  {t('browser.bulkActions.delete.confirmWarning')}
+                </Text>
+              </Row>
+            }
+            confirmButton={
               <DestructiveButton
                 size="s"
-                className={styles.deleteApproveBtn}
                 onClick={handleDelete}
                 data-testid="bulk-action-apply-btn"
               >
-                Delete
+                {t('browser.bulkActions.button.delete')}
               </DestructiveButton>
-            </Text>
-          </RiPopover>
+            }
+          />
+        )}
+        {!isProcessedBulkAction(status) && isProduction && (
+          <>
+            <PrimaryButton
+              loading={loading}
+              disabled={loading}
+              onClick={handleOpenTypeToConfirm}
+              data-testid="bulk-action-warning-btn"
+            >
+              {t('browser.bulkActions.button.delete')}
+            </PrimaryButton>
+            {isTypeToConfirmOpen && (
+              <TypeToConfirmModal
+                title={t('browser.bulkActions.delete.typeToConfirmTitle')}
+                confirmationText={confirmationText}
+                confirmButtonText={t('browser.bulkActions.button.delete')}
+                cancelButtonText={t('browser.bulkActions.button.cancel')}
+                actionDescription={t(
+                  'browser.bulkActions.delete.typeToConfirmDescription',
+                )}
+                onConfirm={handleTypeToConfirm}
+                onCancel={() => setIsTypeToConfirmOpen(false)}
+              />
+            )}
+          </>
         )}
         {isProcessedBulkAction(status) && (
           <PrimaryButton
@@ -168,11 +243,11 @@ const BulkDeleteFooter = (props: Props) => {
             onClick={handleStartNew}
             data-testid="bulk-action-start-again-btn"
           >
-            Start New
+            {t('browser.bulkActions.button.startNew')}
           </PrimaryButton>
         )}
-      </div>
-    </div>
+      </BulkDeleteFooterContainer>
+    </Col>
   )
 }
 

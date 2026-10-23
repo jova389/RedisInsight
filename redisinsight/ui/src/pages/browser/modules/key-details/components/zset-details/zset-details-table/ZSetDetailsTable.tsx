@@ -1,5 +1,5 @@
 import React, { Ref, useCallback, useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { toNumber, isNumber } from 'lodash'
 import cx from 'classnames'
 import { CellMeasurerCache } from 'react-virtualized'
@@ -23,9 +23,7 @@ import {
   KeyTypes,
   OVER_RENDER_BUFFER_COUNT,
   SortOrder,
-  TEXT_FAILED_CONVENT_FORMATTER,
   TableCellAlignment,
-  TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA,
 } from 'uiSrc/constants'
 import { SCAN_COUNT_DEFAULT } from 'uiSrc/constants/api'
 import HelpTexts from 'uiSrc/constants/help-texts'
@@ -72,10 +70,8 @@ import {
 import PopoverDelete from 'uiSrc/pages/browser/components/popover-delete/PopoverDelete'
 import { Text } from 'uiSrc/components/base/text'
 import { RiTooltip } from 'uiSrc/components'
-import {
-  AddMembersToZSetDto,
-  SearchZSetMembersResponse,
-} from 'apiSrc/modules/browser/z-set/dto'
+import { useTranslation } from 'uiSrc/i18n'
+import { AddMembersToZSetDto, SearchZSetMembersResponse } from 'apiClient'
 
 import styles from './styles.module.scss'
 
@@ -98,24 +94,27 @@ export interface Props {
 
 const ZSetDetailsTable = (props: Props) => {
   const { onRemoveKey } = props
+  const { t } = useTranslation()
 
-  const { loading, searching } = useSelector(zsetSelector)
-  const { loading: updateLoading } = useSelector(updateZsetScoreStateSelector)
+  const { loading, searching } = useAppSelector(zsetSelector)
+  const { loading: updateLoading } = useAppSelector(
+    updateZsetScoreStateSelector,
+  )
   const [sortedColumnOrder, setSortedColumnOrder] = useState(SortOrder.ASC)
-  const { name: key, length } = useSelector(selectedKeyDataSelector) ?? {
+  const { name: key, length } = useAppSelector(selectedKeyDataSelector) ?? {
     name: '',
   }
   const {
     total,
     nextCursor,
     members: loadedMembers,
-  } = useSelector(zsetDataSelector)
-  const { id: instanceId, compressor = null } = useSelector(
+  } = useAppSelector(zsetDataSelector)
+  const { id: instanceId, compressor = null } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { viewType } = useSelector(keysSelector)
-  const { viewFormat: viewFormatProp } = useSelector(selectedKeySelector)
-  const { [KeyTypes.ZSet]: ZSetSizes } = useSelector(
+  const { viewType } = useAppSelector(keysSelector)
+  const { viewFormat: viewFormatProp } = useAppSelector(selectedKeySelector)
+  const { [KeyTypes.ZSet]: ZSetSizes } = useAppSelector(
     appContextBrowserKeyDetails,
   )
 
@@ -127,7 +126,7 @@ const ZSetDetailsTable = (props: Props) => {
   const [expandedRows, setExpandedRows] = useState<number[]>([])
   const [viewFormat, setViewFormat] = useState(viewFormatProp)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const formattedLastIndexRef = useRef(OVER_RENDER_BUFFER_COUNT)
   const tableRef: Ref<any> = useRef(null)
@@ -303,9 +302,9 @@ const ZSetDetailsTable = (props: Props) => {
   const columns: ITableColumn[] = [
     {
       id: 'name',
-      label: 'Member',
+      label: t('browser.zset.column.member'),
       isSearchable: true,
-      prependSearchName: 'Member:',
+      prependSearchName: t('browser.zset.searchMemberPrefix'),
       initialSearchValue: '',
       truncateText: true,
       isResizable: true,
@@ -337,8 +336,7 @@ const ZSetDetailsTable = (props: Props) => {
 
         return (
           <Text
-            color="subdued"
-            size="s"
+            color="secondary"
             component="div"
             style={{ maxWidth: '100%', whiteSpace: 'break-spaces' }}
           >
@@ -351,8 +349,10 @@ const ZSetDetailsTable = (props: Props) => {
                 expanded={expanded}
                 title={
                   isValid
-                    ? 'Member'
-                    : TEXT_FAILED_CONVENT_FORMATTER(viewFormatProp)
+                    ? t('browser.zset.column.member')
+                    : t('browser.keyDetails.failedConvertFormatter', {
+                        format: viewFormatProp,
+                      })
                 }
                 tooltipContent={tooltipContent}
               />
@@ -363,7 +363,7 @@ const ZSetDetailsTable = (props: Props) => {
     },
     {
       id: 'score',
-      label: 'Score',
+      label: t('browser.zset.column.score'),
       minWidth: 154,
       isSortable: true,
       truncateText: true,
@@ -379,13 +379,13 @@ const ZSetDetailsTable = (props: Props) => {
         const isTruncatedValue = isTruncatedString(nameItem)
         const isEditable = isNumber(score) && !isTruncatedValue
         const editToolTipContent = !isNumber(score)
-          ? 'Use CLI or Workbench to edit the score'
-          : TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA
+          ? t('browser.zset.scoreEditDisabledTooltip')
+          : t('browser.keyDetails.truncatedActionDisabled')
 
         return (
           <EditableInput
             initialValue={score.toString()}
-            placeholder="Enter Score"
+            placeholder={t('browser.zset.scorePlaceholder')}
             field={rowIndex?.toString()}
             editToolTipContent={!isEditable ? editToolTipContent : null}
             isEditing={editing}
@@ -401,7 +401,7 @@ const ZSetDetailsTable = (props: Props) => {
             <div className="innerCellAsCell">
               {!expanded && (
                 <RiTooltip
-                  title="Score"
+                  title={t('browser.zset.column.score')}
                   className={styles.tooltip}
                   anchorClassName="truncateText"
                   position="bottom"
@@ -443,7 +443,7 @@ const ZSetDetailsTable = (props: Props) => {
                 handleButtonClick={handleRemoveIconClick}
                 testid={`zset-remove-button-${name}`}
                 appendInfo={
-                  length === 1 ? HelpTexts.REMOVE_LAST_ELEMENT('Member') : null
+                  length === 1 ? HelpTexts.REMOVE_LAST_ELEMENT() : null
                 }
               />
             </div>
@@ -497,7 +497,6 @@ const ZSetDetailsTable = (props: Props) => {
         <VirtualTable
           autoHeight
           tableRef={tableRef}
-          hideProgress
           expandable
           keyName={key}
           headerHeight={headerHeight}

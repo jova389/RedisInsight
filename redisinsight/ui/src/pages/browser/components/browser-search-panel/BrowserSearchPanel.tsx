@@ -1,16 +1,20 @@
 /* eslint-disable react/no-this-in-sfc */
 /* eslint-disable react/destructuring-assignment */
-import React, { useCallback, useState } from 'react'
-import cx from 'classnames'
-import { useDispatch, useSelector } from 'react-redux'
-import styled, { css } from 'styled-components'
+import React, { useCallback, useMemo, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+import styled from 'styled-components'
 
 import {
   FilterTableIcon,
   IconType,
   QuerySearchIcon,
 } from 'uiSrc/components/base/icons'
-import { ModuleNotLoaded, OnboardingTour, RiTooltip } from 'uiSrc/components'
+import {
+  FeatureNotAvailable,
+  ModuleNotLoaded,
+  OnboardingTour,
+  RiTooltip,
+} from 'uiSrc/components'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import { KeyViewType, SearchMode } from 'uiSrc/slices/interfaces/keys'
 import FilterKeyType from 'uiSrc/pages/browser/components/filter-key-type'
@@ -18,17 +22,23 @@ import RediSearchIndexesList from 'uiSrc/pages/browser/components/redisearch-key
 import SearchKeyList from 'uiSrc/pages/browser/components/search-key-list'
 
 import { changeSearchMode, keysSelector } from 'uiSrc/slices/browser/keys'
-import { isRedisearchAvailable } from 'uiSrc/utils'
+import { getRedisearchVersion, isRedisearchAvailable } from 'uiSrc/utils'
+import { isRedisVersionSupported } from 'uiSrc/utils/comparisons/compareVersions'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { resetBrowserTree } from 'uiSrc/slices/app/context'
 import { localStorageService } from 'uiSrc/services'
 import { BrowserStorageItem } from 'uiSrc/constants'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { RedisDefaultModules } from 'uiSrc/slices/interfaces'
-import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import { Modal } from 'uiSrc/components/base/display'
+import { Row } from 'uiSrc/components/base/layout/flex'
+import { ButtonGroup } from 'uiSrc/components/base/forms/button-group/ButtonGroup'
+import { REDISEARCH_VERSION_REQUIRED_CONTENT } from 'uiSrc/components/messages'
+import { useTranslation } from 'uiSrc/i18n'
 
 import styles from './styles.module.scss'
+
+const MIN_REDISEARCH_VERSION = '2.0.0'
 
 interface ISwitchType<T> {
   tooltipText: string
@@ -45,44 +55,42 @@ export interface Props {
   handleCreateIndexPanel: (value: boolean) => void
 }
 
-const SwitchSearchModeIconButton = styled(IconButton)<{ active: boolean }>`
-  width: 40px;
-  height: 26px;
-  border-radius: ${({ theme }) => theme.core.space.space050};
-
-  padding: ${({ theme }) => theme.core.space.space100};
-  margin: ${({ theme }) => theme.core.space.space050};
-
-  svg {
-    color: ${({ theme }) => theme.semantic.color.text.neutral700};
-
-    g > path {
-      fill: ${({ theme }) => theme.semantic.color.text.neutral700};
+const SwitchSearchModeButtonGroup = styled(ButtonGroup)`
+  button {
+    height: 32px;
+    svg {
+      height: 20px;
+      width: 20px;
     }
   }
-
-  ${({ active }) =>
-    active &&
-    css`
-      background-color: ${({ theme }) =>
-        theme.semantic.color.background.neutral400};
-    `}
 `
 
 const BrowserSearchPanel = (props: Props) => {
+  const { t } = useTranslation()
   const { handleCreateIndexPanel } = props
-  const { viewType, searchMode } = useSelector(keysSelector)
-  const { id: instanceId, modules } = useSelector(connectedInstanceSelector)
+  const { viewType, searchMode } = useAppSelector(keysSelector)
+  const { id: instanceId, modules } = useAppSelector(connectedInstanceSelector)
 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+
+  const hasRedisearch = isRedisearchAvailable(modules)
+
+  const hasMinimumRedisearchVersion = useMemo(() => {
+    if (!hasRedisearch) return false
+    const version = getRedisearchVersion(modules)
+    return version
+      ? isRedisVersionSupported(version, MIN_REDISEARCH_VERSION)
+      : false
+  }, [modules, hasRedisearch])
 
   const searchModes: ISwitchType<SearchMode>[] = [
     {
       type: SearchMode.Pattern,
-      tooltipText: 'Filter by Key Name or Pattern',
-      ariaLabel: 'Filter by Key Name or Pattern button',
+      tooltipText: t('browser.search.mode.pattern.tooltip'),
+      ariaLabel: t('browser.search.mode.pattern.aria'),
       dataTestId: 'search-mode-pattern-btn',
       isActiveView() {
         return searchMode === this.type
@@ -96,10 +104,10 @@ const BrowserSearchPanel = (props: Props) => {
     },
     {
       type: SearchMode.Redisearch,
-      tooltipText: 'Search by Values of Keys',
-      ariaLabel: 'Search by Values of Keys button',
+      tooltipText: t('browser.search.mode.redisearch.tooltip'),
+      ariaLabel: t('browser.search.mode.redisearch.aria'),
       dataTestId: 'search-mode-redisearch-btn',
-      disabled: !isRedisearchAvailable(modules),
+      disabled: !hasRedisearch || !hasMinimumRedisearchVersion,
       isActiveView() {
         return searchMode === this.type
       },
@@ -107,13 +115,24 @@ const BrowserSearchPanel = (props: Props) => {
         return QuerySearchIcon
       },
       onClick() {
-        if (this.disabled) {
+        if (!hasRedisearch) {
           showPopover()
           sendEventTelemetry({
             event: TelemetryEvent.SEARCH_MODE_CHANGE_FAILED,
             eventData: {
               databaseId: instanceId,
               view: viewType,
+              reason: 'module_not_loaded',
+            },
+          })
+        } else if (!hasMinimumRedisearchVersion) {
+          setIsVersionModalOpen(true)
+          sendEventTelemetry({
+            event: TelemetryEvent.SEARCH_MODE_CHANGE_FAILED,
+            eventData: {
+              databaseId: instanceId,
+              view: viewType,
+              reason: 'version_not_supported',
             },
           })
         } else {
@@ -153,21 +172,23 @@ const BrowserSearchPanel = (props: Props) => {
     setIsPopoverOpen(true)
   }, [])
 
+  const hideVersionModal = useCallback(() => {
+    setIsVersionModalOpen(false)
+  }, [])
+
   const SwitchModeBtn = (item: ISwitchType<SearchMode>) => (
-    <SwitchSearchModeIconButton
-      icon={item.getIconType()}
+    <ButtonGroup.Button
       aria-label={item.ariaLabel}
       onClick={() => item.onClick?.()}
       data-testid={item.dataTestId}
-      active={item.isActiveView?.()}
-    />
+      isSelected={item.isActiveView?.()}
+    >
+      <ButtonGroup.Icon icon={item.getIconType()} />
+    </ButtonGroup.Button>
   )
 
   const SearchModeSwitch = () => (
-    <div
-      className={cx(styles.searchModeSwitch)}
-      data-testid="search-mode-switcher"
-    >
+    <SwitchSearchModeButtonGroup data-testid="search-mode-switcher">
       {searchModes.map((mode) => (
         <RiTooltip
           content={mode.tooltipText}
@@ -177,7 +198,7 @@ const BrowserSearchPanel = (props: Props) => {
           {SwitchModeBtn(mode)}
         </RiTooltip>
       ))}
-    </div>
+    </SwitchSearchModeButtonGroup>
   )
 
   return (
@@ -196,7 +217,19 @@ const BrowserSearchPanel = (props: Props) => {
         }
         title={null}
       />
-      <div className={styles.searchWrapper}>
+      <Modal
+        open={isVersionModalOpen}
+        onCancel={hideVersionModal}
+        data-testid="redisearch-version-required-modal"
+        content={
+          <FeatureNotAvailable
+            onClose={hideVersionModal}
+            content={REDISEARCH_VERSION_REQUIRED_CONTENT}
+          />
+        }
+        title={null}
+      />
+      <Row className={styles.searchWrapper} gap="m" align="center">
         <OnboardingTour
           options={ONBOARDING_FEATURES.BROWSER_FILTER_SEARCH}
           anchorPosition="downLeft"
@@ -210,7 +243,7 @@ const BrowserSearchPanel = (props: Props) => {
           <RediSearchIndexesList onCreateIndex={handleCreateIndexPanel} />
         )}
         <SearchKeyList />
-      </div>
+      </Row>
     </div>
   )
 }

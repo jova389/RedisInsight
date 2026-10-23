@@ -1,17 +1,17 @@
 import React from 'react'
 
-import { RiPopover, RiTooltip } from 'uiSrc/components/base'
+import { RiTooltip } from 'uiSrc/components/base'
 import { DeleteIcon } from 'uiSrc/components/base/icons'
 import { RedisString } from 'uiSrc/slices/interfaces'
 import { isTruncatedString } from 'uiSrc/utils'
-import { TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA } from 'uiSrc/constants'
 import {
   DestructiveButton,
   EmptyButton,
   IconButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { Text } from 'uiSrc/components/base/text'
 import styles from './styles.module.scss'
+import ConfirmationPopover from 'uiSrc/components/confirmation-popover'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   header?: JSX.Element | string
@@ -28,6 +28,8 @@ export interface Props {
   appendInfo?: JSX.Element | string | null
   testid?: string
   buttonLabel?: string
+  persistent?: boolean
+  customOutsideDetector?: boolean
 }
 
 const PopoverDelete = (props: Props) => {
@@ -46,7 +48,10 @@ const PopoverDelete = (props: Props) => {
     appendInfo,
     testid = '',
     buttonLabel,
+    persistent,
+    customOutsideDetector,
   } = props
+  const { t } = useTranslation()
 
   const isDisabled = isTruncatedString(item)
 
@@ -65,7 +70,7 @@ const PopoverDelete = (props: Props) => {
   const deleteButton = buttonLabel ? (
     <EmptyButton
       icon={DeleteIcon}
-      aria-label="Remove field"
+      aria-label={t('browser.popoverDelete.removeAria')}
       disabled={isDisabled || updateLoading}
       onClick={isDisabled ? () => {} : onButtonClick}
       data-testid={testid ? `${testid}-icon` : 'remove-icon'}
@@ -76,7 +81,7 @@ const PopoverDelete = (props: Props) => {
     <IconButton
       size="M"
       icon={DeleteIcon}
-      aria-label="Remove field"
+      aria-label={t('browser.popoverDelete.removeAria')}
       disabled={isDisabled || updateLoading}
       onClick={isDisabled ? () => {} : onButtonClick}
       data-testid={testid ? `${testid}-icon` : 'remove-icon'}
@@ -85,7 +90,7 @@ const PopoverDelete = (props: Props) => {
 
   const deleteButtonWithTooltip = (
     <RiTooltip
-      content={TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA}
+      content={t('browser.keyDetails.truncatedActionDisabled')}
       anchorClassName={styles.editBtnAnchor}
       data-testid={testid ? `${testid}-tooltip` : 'remove-tooltip'}
     >
@@ -94,7 +99,7 @@ const PopoverDelete = (props: Props) => {
   )
 
   return (
-    <RiPopover
+    <ConfirmationPopover
       key={item}
       anchorPosition="leftCenter"
       ownFocus
@@ -104,28 +109,22 @@ const PopoverDelete = (props: Props) => {
       anchorClassName="deleteFieldPopover"
       button={isDisabled ? deleteButtonWithTooltip : deleteButton}
       onClick={(e) => e.stopPropagation()}
-    >
-      <div className={styles.popover}>
-        <Text size="m" component="div">
-          {!!header && (
-            <h4>
-              <b>{header}</b>
-            </h4>
-          )}
-          <Text size="s">{text}</Text>
-          {appendInfo}
-        </Text>
-        <div className={styles.popoverFooter}>
-          <DestructiveButton
-            icon={DeleteIcon}
-            onClick={() => handleDeleteItem(itemRaw || item)}
-            data-testid={testid || 'remove'}
-          >
-            Remove
-          </DestructiveButton>
-        </div>
-      </div>
-    </RiPopover>
+      title={header}
+      message={text}
+      persistent={persistent}
+      appendInfo={appendInfo}
+      confirmButton={
+        <DestructiveButton
+          size="small"
+          icon={DeleteIcon}
+          onClick={() => handleDeleteItem(itemRaw || item)}
+          data-testid={testid || 'remove'}
+        >
+          {t('browser.popoverDelete.button')}
+        </DestructiveButton>
+      }
+      customOutsideDetector={customOutsideDetector}
+    />
   )
 }
 

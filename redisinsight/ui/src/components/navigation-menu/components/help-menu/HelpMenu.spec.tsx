@@ -10,6 +10,9 @@ import {
   mockStore,
 } from 'uiSrc/utils/test-utils'
 import { setOnboarding } from 'uiSrc/slices/app/features'
+import { openWhatsNew } from 'uiSrc/slices/app/whatsNew'
+import { getLatestWhatsNewVersion } from 'uiSrc/utils'
+import { WhatsNewSource } from 'uiSrc/constants/telemetry'
 
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
@@ -41,7 +44,11 @@ beforeEach(() => {
   store.clearActions()
 })
 
-const sideBarWithHelpMenu = <SideBar isExpanded={false}><HelpMenu /></SideBar>
+const sideBarWithHelpMenu = (
+  <SideBar isExpanded={false}>
+    <HelpMenu />
+  </SideBar>
+)
 
 describe('HelpMenu', () => {
   it('should render', () => {
@@ -100,6 +107,22 @@ describe('HelpMenu', () => {
       },
     })
     ;(sendEventTelemetry as jest.Mock).mockRestore()
+  })
+
+  it("should open What's new and send telemetry on click", () => {
+    render(sideBarWithHelpMenu)
+
+    fireEvent.click(screen.getByTestId('help-menu-button'))
+    fireEvent.click(screen.getByTestId('whats-new-btn'))
+
+    expect(store.getActions()).toEqual([openWhatsNew()])
+    expect(sendEventTelemetry).toBeCalledWith({
+      event: TelemetryEvent.WHATS_NEW_OPENED,
+      eventData: {
+        source: WhatsNewSource.helpCenter,
+        version: getLatestWhatsNewVersion()?.version,
+      },
+    })
   })
 
   it('should show feature dependent items when feature flag is on', async () => {

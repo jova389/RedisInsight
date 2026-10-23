@@ -5,23 +5,25 @@ import { KeyValueCompressor } from 'uiSrc/constants'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
 import { NONE } from 'uiSrc/pages/home/constants'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { Checkbox } from 'uiSrc/components/base/forms/checkbox/Checkbox'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
+import { Text } from 'uiSrc/components/base/text/Text'
 import { useGenerateId } from 'uiSrc/components/base/utils/hooks/generate-id'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   formik: FormikProps<DbConnectionInfo>
 }
 
 const DbCompressor = (props: Props) => {
+  const { t } = useTranslation()
   const { formik } = props
 
   const optionsCompressor = [
     {
       value: NONE,
-      label: 'No decompression',
+      label: t('home.form.compressor.option.none'),
     },
     {
       value: KeyValueCompressor.GZIP,
@@ -69,7 +71,7 @@ const DbCompressor = (props: Props) => {
             <Checkbox
               id={id}
               name="showCompressor"
-              label="Enable Automatic Data Decompression"
+              label={<Text>{t('home.form.compressor.enable')}</Text>}
               checked={!!formik.values.showCompressor}
               onChange={handleChangeDbCompressorCheckbox}
               data-testid="showCompressor"
@@ -79,26 +81,23 @@ const DbCompressor = (props: Props) => {
       </Row>
 
       {formik.values.showCompressor && (
-        <>
-          <Spacer />
-          <Row gap="m">
-            <FlexItem grow>
-              <FormField label="Decompression format">
-                <RiSelect
-                  name="compressor"
-                  placeholder="Decompression format"
-                  value={formik.values.compressor ?? NONE}
-                  options={optionsCompressor}
-                  onChange={(value) => {
-                    formik.setFieldValue('compressor', value || NONE)
-                  }}
-                  data-testid="select-compressor"
-                />
-              </FormField>
-            </FlexItem>
-            <FlexItem grow />
-          </Row>
-        </>
+        <Row gap="m">
+          <FlexItem grow>
+            <FormField label={t('home.form.compressor.field.format')}>
+              <RiSelect
+                name="compressor"
+                placeholder={t('home.form.compressor.field.format')}
+                value={formik.values.compressor ?? NONE}
+                options={optionsCompressor}
+                onChange={(value) => {
+                  formik.setFieldValue('compressor', value || NONE)
+                }}
+                data-testid="select-compressor"
+              />
+            </FormField>
+          </FlexItem>
+          <FlexItem grow />
+        </Row>
       )}
     </>
   )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import {
   instancesSelector,
@@ -10,6 +10,7 @@ import { tagsSelector } from 'uiSrc/slices/instances/tags'
 import { lastConnectionFormat } from 'uiSrc/utils'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { SearchInput } from 'uiSrc/components/base/inputs'
+import { useTranslation } from 'uiSrc/i18n'
 
 export const instanceHasTags = (
   instance: Instance,
@@ -19,11 +20,12 @@ export const instanceHasTags = (
   instance.tags?.some((tag) => selectedTags.has(`${tag.key}:${tag.value}`))
 
 const SearchDatabasesList = () => {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
-  const { data: instances } = useSelector(instancesSelector)
-  const { selectedTags } = useSelector(tagsSelector)
+  const { data: instances } = useAppSelector(instancesSelector)
+  const { selectedTags } = useAppSelector(tagsSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     const isInitialRender =
@@ -45,6 +47,7 @@ const SearchDatabasesList = () => {
             item.host?.toString()?.indexOf(value) !== -1 ||
             item.port?.toString()?.indexOf(value) !== -1 ||
             (item.connectionType &&
+              CONNECTION_TYPE_DISPLAY[item.connectionType] &&
               CONNECTION_TYPE_DISPLAY[item.connectionType]
                 ?.toLowerCase()
                 ?.indexOf(value) !== -1) ||
@@ -76,10 +79,10 @@ const SearchDatabasesList = () => {
 
   return (
     <SearchInput
-      placeholder="Database List Search"
+      placeholder={t('home.databaseList.search.placeholder')}
       onChange={(value) => setValue(value.toLowerCase())}
       value={value}
-      aria-label="Search database list"
+      aria-label={t('home.databaseList.search.ariaLabel')}
       data-testid="search-database-list"
     />
   )

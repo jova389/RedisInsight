@@ -1,11 +1,13 @@
 import cx from 'classnames'
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import {
   SCAN_COUNT_DEFAULT,
   SCAN_TREE_COUNT_DEFAULT,
 } from 'uiSrc/constants/api'
+import { KeyTypes } from 'uiSrc/constants'
 import { CommandsVersions } from 'uiSrc/constants/commandsVersions'
 import { connectedInstanceOverviewSelector } from 'uiSrc/slices/instances/instances'
 import {
@@ -14,13 +16,16 @@ import {
   keysSelector,
   setFilter,
 } from 'uiSrc/slices/browser/keys'
+import { setBulkDeleteFilter } from 'uiSrc/slices/browser/bulkActions'
 import { isVersionHigherOrEquals } from 'uiSrc/utils'
 import { KeyViewType } from 'uiSrc/slices/interfaces/keys'
-import { FilterNotAvailable } from 'uiSrc/components'
+import { FeatureNotAvailable } from 'uiSrc/components'
+import { FILTER_NOT_AVAILABLE_CONTENT } from 'uiSrc/components/messages'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { resetBrowserTree } from 'uiSrc/slices/app/context'
 import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import { AdditionalRedisModule } from 'uiSrc/slices/interfaces'
+import { RootState } from 'uiSrc/slices/store'
 import { OutsideClickDetector } from 'uiSrc/components/base/utils'
 import { HealthText } from 'uiSrc/components/base/text/HealthText'
 import {
@@ -28,6 +33,7 @@ import {
   RiSelect,
 } from 'uiSrc/components/base/forms/select/RiSelect'
 import { Modal } from 'uiSrc/components/base/display'
+import { useTranslation } from 'uiSrc/i18n'
 import { FILTER_KEY_TYPE_OPTIONS } from './constants'
 
 import styles from './styles.module.scss'
@@ -41,21 +47,32 @@ export interface Props {
 
 const FilterKeyTypeSelect = styled(RiSelect)`
   height: 100%;
-  border-radius: 0;
 `
 
 const FilterKeyType = ({ modules }: Props) => {
+  const { t } = useTranslation()
   const [isSelectOpen, setIsSelectOpen] = useState<boolean>(false)
   const [typeSelected, setTypeSelected] = useState<string>('all')
   const [isVersionSupported, setIsVersionSupported] = useState<boolean>(true)
   const [isInfoPopoverOpen, setIsInfoPopoverOpen] = useState<boolean>(false)
 
-  const { version } = useSelector(connectedInstanceOverviewSelector)
-  const { filter, viewType, searchMode } = useSelector(keysSelector)
-  const features = useSelector(appFeatureFlagsFeaturesSelector)
+  const { version } = useAppSelector(connectedInstanceOverviewSelector)
+  const { filter, viewType, searchMode } = useAppSelector(keysSelector)
+  const features = useAppSelector(appFeatureFlagsFeaturesSelector)
+  // Resolve each option's optional `isEnabledSelector` against the store so
+  // the option config is the single source of truth for which key types are
+  // gated (e.g. behind dev/feature flags). `shallowEqual` keeps the filtered
+  // array stable across renders when membership doesn't change.
+  const enabledOptions = useAppSelector(
+    (state: RootState) =>
+      FILTER_KEY_TYPE_OPTIONS.filter(
+        ({ isEnabledSelector }) => isEnabledSelector?.(state) ?? true,
+      ),
+    shallowEqual,
+  )
 
   const { instanceId } = useParams<{ instanceId: string }>()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     setIsVersionSupported(
@@ -74,53 +91,68 @@ const FilterKeyType = ({ modules }: Props) => {
     value: string
     inputDisplay: JSX.Element
     dropdownDisplay: JSX.Element
-  }[] = FILTER_KEY_TYPE_OPTIONS.filter(({ featureFlag, skipIfNoModule }) => {
-    if (
-      skipIfNoModule &&
-      !modules?.some(({ name }) => name === skipIfNoModule)
-    ) {
-      return false
-    }
-    return !featureFlag || features[featureFlag]?.flag
-  }).map((item) => {
-    const { value, color, text } = item
-    return {
-      value,
-      inputDisplay: (
-        <HealthText
-          color={color}
-          data-test-subj={`filter-option-type-${value}`}
-        >
-          {text}
-        </HealthText>
-      ),
-      dropdownDisplay: (
-        <HealthText
-          color={color}
-          data-test-subj={`filter-option-type-${value}`}
-        >
-          {text}
-        </HealthText>
-      ),
-      'data-test-subj': `filter-option-type-${value}`,
-    }
-  })
+  }[] = enabledOptions
+    .filter(({ featureFlag, skipIfNoModule, minVersion }) => {
+      if (
+        skipIfNoModule &&
+        !modules?.some(({ name }) => name === skipIfNoModule)
+      ) {
+        return false
+      }
+      if (minVersion && !isVersionHigherOrEquals(version, minVersion)) {
+        return false
+      }
+      return !featureFlag || features[featureFlag]?.flag
+    })
+    .map((item) => {
+      const { value, color, text } = item
+      const label = t(text)
+      return {
+        value,
+        inputDisplay: (
+          <HealthText
+            color={color}
+            data-test-subj={`filter-option-type-${value}`}
+          >
+            {label}
+          </HealthText>
+        ),
+        dropdownDisplay: (
+          <HealthText
+            color={color}
+            data-test-subj={`filter-option-type-${value}`}
+          >
+            {label}
+          </HealthText>
+        ),
+        'data-test-subj': `filter-option-type-${value}`,
+      }
+    })
 
   options.unshift({
     value: ALL_KEY_TYPES_VALUE,
     inputDisplay: (
       <div className={styles.dropdownOption} data-testid="all-key-types-option">
-        All Key Types
+        {t('browser.filter.allKeyTypes')}
       </div>
     ),
-    dropdownDisplay: <span>All Key Types</span>,
+    dropdownDisplay: <span>{t('browser.filter.allKeyTypes')}</span>,
   })
 
   const onChangeType = (initValue: string) => {
     const value = initValue || ALL_KEY_TYPES_VALUE
+    const filterValue = value === ALL_KEY_TYPES_VALUE ? null : value
     setTypeSelected(value)
     setIsSelectOpen(false)
-    dispatch(setFilter(value === ALL_KEY_TYPES_VALUE ? null : value))
+    if (filterValue === KeyTypes.VectorSet) {
+      sendEventTelemetry({
+        event: TelemetryEvent.VECTOR_SET_KEY_TYPE_FILTERED,
+        eventData: { databaseId: instanceId },
+      })
+    }
+    dispatch(setFilter(filterValue))
+    // Sync filter to bulk delete state (for when bulk actions panel is open)
+    dispatch(setBulkDeleteFilter(filterValue as KeyTypes))
     if (viewType === KeyViewType.Tree) {
       dispatch(resetBrowserTree())
     }
@@ -167,7 +199,10 @@ const FilterKeyType = ({ modules }: Props) => {
           className={styles.unsupportedInfoModal}
           data-testid="filter-not-available-modal"
           content={
-            <FilterNotAvailable onClose={() => setIsInfoPopoverOpen(false)} />
+            <FeatureNotAvailable
+              onClose={() => setIsInfoPopoverOpen(false)}
+              content={FILTER_NOT_AVAILABLE_CONTENT}
+            />
           }
           title={null}
         />

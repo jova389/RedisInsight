@@ -62,6 +62,19 @@ export enum Encoding {
   HEX = 'HEX',
 }
 
+export enum Environment {
+  Unspecified = 'unspecified',
+  Production = 'production',
+  Development = 'development',
+}
+
+// IP protocol used to resolve the host: auto (dual-stack), IPv4, or IPv6.
+export enum RedisConnectionFamily {
+  Auto = 'auto',
+  IPv4 = 'ipv4',
+  IPv6 = 'ipv6',
+}
+
 @Entity('database_instance')
 export class DatabaseEntity {
   @Expose()
@@ -235,6 +248,11 @@ export class DatabaseEntity {
   cloudDetails: CloudDatabaseDetailsEntity;
 
   @Expose()
+  @Column({ nullable: true, type: 'text' })
+  @DataAsJsonString()
+  providerDetails: string;
+
+  @Expose()
   @OneToOne(() => DatabaseSettingsEntity, (dbSettings) => dbSettings.database, {
     eager: true,
     onDelete: 'CASCADE',
@@ -285,4 +303,12 @@ export class DatabaseEntity {
   @Expose()
   @Column({ nullable: true, default: Encoding.UNICODE })
   keyNameFormat: string;
+
+  @Expose()
+  @Column({ nullable: false, default: Environment.Unspecified })
+  environment: Environment;
+
+  @Expose()
+  @Column({ nullable: false, default: RedisConnectionFamily.Auto })
+  connectionFamily: RedisConnectionFamily;
 }

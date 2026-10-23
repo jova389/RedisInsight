@@ -1,11 +1,8 @@
-import { createBrowserHistory } from 'history'
-
-import type { ReduxStore } from 'uiSrc/slices/store'
+import type { AppDispatch, ReduxStore } from 'uiSrc/slices/store'
 
 // Re-export all types and exports from the real store to avoid circular dependencies during tests
 
 export type { RootState, AppDispatch, ReduxStore } from 'uiSrc/slices/store'
-export const history = createBrowserHistory()
 
 // Lazy reference to avoid circular dependencies
 // The store will be set by the store module itself after it's created
@@ -25,7 +22,9 @@ const getState: ReduxStore['getState'] = () => {
   return storeRef.getState()
 }
 
-const dispatch: ReduxStore['dispatch'] = (action: any) => {
+// `action: any` because TS can't infer a single parameter type when
+// implementing an overloaded call signature like `AppDispatch`.
+export const dispatch: AppDispatch = (action: any) => {
   if (!storeRef) {
     throw new Error(
       'Store not initialized. Make sure store-dynamic is imported after store creation.',

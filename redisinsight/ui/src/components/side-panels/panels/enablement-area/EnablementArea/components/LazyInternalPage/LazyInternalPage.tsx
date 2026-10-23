@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { startCase } from 'lodash'
-import { useHistory } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import axios, { AxiosError } from 'axios'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+import { AxiosError } from 'axios'
 
 import { getApiErrorMessage, isStatusSuccessful, Nullable } from 'uiSrc/utils'
 import { resourcesService } from 'uiSrc/services'
+import { ApiEndpoints, FeatureFlags } from 'uiSrc/constants'
 import { IS_ABSOLUTE_PATH } from 'uiSrc/constants/regex'
 import { IEnablementAreaItem } from 'uiSrc/slices/interfaces'
+import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import { workbenchTutorialsSelector } from 'uiSrc/slices/workbench/wb-tutorials'
 import { workbenchCustomTutorialsSelector } from 'uiSrc/slices/workbench/wb-custom-tutorials'
 
@@ -18,7 +19,6 @@ import {
   setExplorePanelSearch,
   setExplorePanelScrollTop,
 } from 'uiSrc/slices/panels/sidePanels'
-import FormatSelector from 'uiSrc/services/formatter/FormatSelector'
 import InternalPage from '../InternalPage'
 import {
   getFileInfo,
@@ -60,21 +60,23 @@ const LazyInternalPage = ({
   manifestPath,
   search,
 }: Props) => {
-  const history = useHistory()
   const {
     itemScrollTop,
     data: contentContext,
     url,
-  } = useSelector(explorePanelSelector)
-  const { loading: tutorialsLoading } = useSelector(workbenchTutorialsSelector)
-  const { loading: customTutorialsLoading } = useSelector(
+  } = useAppSelector(explorePanelSelector)
+  const { loading: tutorialsLoading } = useAppSelector(
+    workbenchTutorialsSelector,
+  )
+  const { loading: customTutorialsLoading } = useAppSelector(
     workbenchCustomTutorialsSelector,
   )
+  const { [FeatureFlags.customTutorials]: customTutorialsFeature } =
+    useAppSelector(appFeatureFlagsFeaturesSelector)
   const [isLoading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [pageData, setPageData] = useState<IPageData>(DEFAULT_PAGE_DATA)
-  const dispatch = useDispatch()
-  const fetchService = IS_ABSOLUTE_PATH.test(path) ? axios : resourcesService
+  const dispatch = useAppDispatch()
 
   const scrollTopRef = useRef(0)
 
@@ -105,12 +107,22 @@ const LazyInternalPage = ({
     setPageData({ ...DEFAULT_PAGE_DATA, ...pageInfo, relatedPages })
 
     try {
-      const formatter = FormatSelector.selectFor(pageInfo.extension)
+      if (IS_ABSOLUTE_PATH.test(path)) {
+        throw new Error('External content is not allowed')
+      }
+
+      // Custom tutorials are deprecated (RED-194229)
+      if (
+        !customTutorialsFeature?.flag &&
+        path?.startsWith(ApiEndpoints.CUSTOM_TUTORIALS_PATH)
+      ) {
+        throw new Error('Custom tutorials are disabled')
+      }
+
       let content = contentContext
 
-      // if we have already downloaded content we take it from store
       if (url !== path || !contentContext) {
-        const { data, status } = await fetchService.get<string>(path)
+        const { data, status } = await resourcesService.get<string>(path)
         if (isStatusSuccessful(status)) {
           content = data
           dispatch(setExplorePanelContent({ data, url: path }))
@@ -118,15 +130,14 @@ const LazyInternalPage = ({
       }
 
       dispatch(setExplorePanelSearch(search))
-      const contentData = await formatter.format(
-        { data: content, path },
-        { history },
-      )
-      setPageData((prevState) => ({ ...prevState, content: contentData }))
+      setPageData((prevState) => ({ ...prevState, content: content ?? '' }))
       setLoading(false)
     } catch (error) {
       setLoading(false)
-      const errorMessage: string = getApiErrorMessage(error as AxiosError)
+      const errorMessage: string =
+        error instanceof Error && !(error as AxiosError).response
+          ? error.message
+          : getApiErrorMessage(error as AxiosError)
       dispatch(resetExplorePanelSearch())
       dispatch(setExplorePanelContent({ data: null, url: null }))
       setError(errorMessage)

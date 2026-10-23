@@ -54,6 +54,14 @@ import { KeyNameFormatAdded1742303245547 } from './1742303245547-key-name-format
 import { CascadeTags1743432519891 } from './1743432519891-cascade-tags';
 import { EncryptTags1743606395647 } from './1743606395647-encrypt-tags';
 import { UpdateProviderNames1755086732238 } from './1755086732238-update-provider-names';
+import { ProviderDetails1769785218000 } from './1769785218000-provider-details';
+import { QueryLibrary1771500000000 } from './1771500000000-query-library';
+import { DatabaseIsProduction1778758000000 } from './1778758000000-database-isProduction';
+import { Environment1779000000000 } from './1779000000000-database-environment';
+import { DropDatabaseIsProduction1779000000001 } from './1779000000001-drop-database-isProduction';
+import { DatabaseConnectionFamily1784000000000 } from './1784000000000-database-connection-family';
+import { PipelineDraft1784100000000 } from './1784100000000-pipeline-draft';
+import { AzureVerifyServerCert1785100000000 } from './1785100000000-azure-verify-server-cert';
 
 export default [
   initialMigration1614164490968,
@@ -112,4 +120,12 @@ export default [
   CascadeTags1743432519891,
   EncryptTags1743606395647,
   UpdateProviderNames1755086732238,
+  ProviderDetails1769785218000,
+  QueryLibrary1771500000000,
+  DatabaseIsProduction1778758000000,
+  Environment1779000000000,
+  DropDatabaseIsProduction1779000000001,
+  DatabaseConnectionFamily1784000000000,
+  PipelineDraft1784100000000,
+  AzureVerifyServerCert1785100000000,
 ];

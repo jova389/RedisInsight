@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
+import { Environment } from 'apiClient'
 import {
   initialKeyInfo,
   keysSelector,
@@ -20,24 +21,27 @@ import {
   DestructiveButton,
   IconButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { Text } from 'uiSrc/components/base/text'
-import { RiPopover } from 'uiSrc/components/base'
-import styles from './styles.module.scss'
+import { ConfirmationPopover } from 'uiSrc/components'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   onDelete: (key: RedisResponseBuffer) => void
 }
 
 const KeyDetailsHeaderDelete = ({ onDelete }: Props) => {
+  const { t } = useTranslation()
   const {
     type,
     nameString: keyProp,
     name: keyBuffer,
-  } = useSelector(selectedKeyDataSelector) ?? initialKeyInfo
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { viewType } = useSelector(keysSelector)
+  } = useAppSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { viewType } = useAppSelector(keysSelector)
 
   const [isPopoverDeleteOpen, setIsPopoverDeleteOpen] = useState(false)
+  const { environment } = useDatabaseEnvironment()
+  const bypassConfirmation = environment === Environment.Development
 
   const tooltipContent = formatLongName(keyProp || '')
 
@@ -46,7 +50,6 @@ const KeyDetailsHeaderDelete = ({ onDelete }: Props) => {
   }
 
   const showPopoverDelete = () => {
-    setIsPopoverDeleteOpen((isPopoverDeleteOpen) => !isPopoverDeleteOpen)
     sendEventTelemetry({
       event: getBasedOnViewTypeEvent(
         viewType,
@@ -59,10 +62,15 @@ const KeyDetailsHeaderDelete = ({ onDelete }: Props) => {
         keyType: type,
       },
     })
+    if (bypassConfirmation && keyBuffer) {
+      onDelete(keyBuffer)
+      return
+    }
+    setIsPopoverDeleteOpen((isPopoverDeleteOpen) => !isPopoverDeleteOpen)
   }
 
   return (
-    <RiPopover
+    <ConfirmationPopover
       key={keyProp}
       anchorPosition="leftCenter"
       ownFocus
@@ -72,33 +80,25 @@ const KeyDetailsHeaderDelete = ({ onDelete }: Props) => {
       button={
         <IconButton
           icon={DeleteIcon}
-          aria-label="Delete Key"
+          aria-label={t('browser.keyDetails.delete.aria')}
           className="deleteKeyBtn"
           onClick={showPopoverDelete}
           data-testid="delete-key-btn"
         />
       }
-    >
-      <div className={styles.popoverDeleteContainer}>
-        <Text size="m" component="div">
-          <h4 style={{ wordBreak: 'break-all' }}>
-            <b>{tooltipContent}</b>
-          </h4>
-          <Text size="s">will be deleted.</Text>
-        </Text>
-        <div className={styles.popoverFooter}>
-          <DestructiveButton
-            size="small"
-            icon={DeleteIcon}
-            onClick={() => onDelete(keyBuffer!)}
-            className={styles.popoverDeleteBtn}
-            data-testid="delete-key-confirm-btn"
-          >
-            Delete
-          </DestructiveButton>
-        </div>
-      </div>
-    </RiPopover>
+      title={tooltipContent}
+      message={t('browser.keyDetails.delete.message')}
+      confirmButton={
+        <DestructiveButton
+          size="small"
+          icon={DeleteIcon}
+          onClick={() => onDelete(keyBuffer!)}
+          data-testid="delete-key-confirm-btn"
+        >
+          {t('browser.keyDetails.delete.button')}
+        </DestructiveButton>
+      }
+    />
   )
 }
 

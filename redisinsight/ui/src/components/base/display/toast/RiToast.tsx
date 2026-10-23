@@ -4,25 +4,23 @@ import {
   toast,
   ToastContentParams,
   ToastOptions,
+  ToastVariant,
 } from '@redis-ui/components'
-import styled from 'styled-components'
-import { CommonProps, Theme } from 'uiSrc/components/base/theme/types'
-import { CancelIcon } from 'uiSrc/components/base/icons'
-import { ColorText } from 'uiSrc/components/base/text'
+import { ToastOptions as RcToastOptions } from 'react-toastify'
+
+import { CommonProps } from 'uiSrc/components/base/theme/types'
+import { ColorText, Text } from 'uiSrc/components/base/text'
+import { ColorType } from 'uiSrc/components/base/text/text.styles'
 
 type RiToastProps = React.ComponentProps<typeof Toast>
 export const RiToast = (props: RiToastProps) => <Toast {...props} />
 
-const StyledMessage = styled.div<{ theme: Theme }>`
-  margin-bottom: ${({ theme }) => theme.core.space.space100};
-`
-
-type RiToastType = ToastContentParams &
+export type RiToastType = ToastContentParams &
   CommonProps & {
     onClose?: VoidFunction
   }
 export const riToast = (
-  { onClose, actions, message, ...content }: RiToastType,
+  { onClose, message, ...content }: RiToastType,
   options?: ToastOptions | undefined,
 ) => {
   const toastContent: ToastContentParams = {
@@ -30,43 +28,32 @@ export const riToast = (
   }
 
   if (typeof message === 'string') {
-    let color = options?.variant
+    let color: ColorType = options?.variant
     if (color === 'informative') {
-      // @ts-ignore
       color = 'subdued'
     }
     toastContent.message = (
-      <ColorText color={color}>
-        <StyledMessage>{message}</StyledMessage>
-      </ColorText>
+      <Text size="M" variant="semiBold" component="span">
+        <ColorText color={color} component="span">
+          {message}
+        </ColorText>
+      </Text>
     )
   } else {
     toastContent.message = message
   }
 
-  if (onClose) {
-    toastContent.showCloseButton = false
-    toastContent.actions = {
-      ...actions,
-      secondary: {
-        label: '',
-        icon: CancelIcon,
-        closes: true,
-        onClick: onClose,
-      },
-    }
-  }
-  if (actions && !onClose) {
-    toastContent.showCloseButton = false
-    toastContent.actions = actions
-  }
-  const toastOptions: ToastOptions = {
+  const toastOptions: ToastOptions & RcToastOptions = {
     ...options,
     delay: 100,
     closeOnClick: false,
+    onClose,
   }
   return toast(<RiToast {...toastContent} />, toastOptions)
 }
 riToast.Variant = toast.Variant
 riToast.Position = toast.Position
 riToast.dismiss = toast.dismiss
+riToast.isActive = toast.isActive
+
+export type { ToastVariant }

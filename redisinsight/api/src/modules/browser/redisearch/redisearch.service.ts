@@ -1,10 +1,5 @@
 import { isUndefined, toNumber, uniq } from 'lodash';
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import ERROR_MESSAGES from 'src/constants/error-messages';
 import { catchRedisSearchError } from 'src/utils';
 import { ClientMetadata } from 'src/common/models';
@@ -22,13 +17,13 @@ import { BrowserHistoryMode, RedisString } from 'src/common/constants';
 import { CreateBrowserHistoryDto } from 'src/modules/browser/browser-history/dto';
 import { BrowserHistoryService } from 'src/modules/browser/browser-history/browser-history.service';
 import { DatabaseClientFactory } from 'src/modules/database/providers/database.client.factory';
+import { QueryLibraryService } from 'src/modules/query-library/query-library.service';
 import {
   RedisClient,
   RedisClientCommandArgument,
-  RedisClientConnectionType,
-  RedisClientNodeRole,
 } from 'src/modules/redis/client';
 import { convertIndexInfoReply } from '../utils/redisIndexInfo';
+import { getShards } from '../utils';
 import { IndexDeleteRequestBodyDto } from './dto/index.delete.dto';
 
 @Injectable()
@@ -40,6 +35,7 @@ export class RedisearchService {
   constructor(
     private databaseClientFactory: DatabaseClientFactory,
     private browserHistory: BrowserHistoryService,
+    private queryLibraryService: QueryLibraryService,
   ) {}
 
   /**
@@ -54,7 +50,7 @@ export class RedisearchService {
     try {
       const client: RedisClient =
         await this.databaseClientFactory.getOrCreateClient(clientMetadata);
-      const nodes = (await this.getShards(client)) as RedisClient[];
+      const nodes = await getShards(client);
 
       const res = await Promise.all(
         nodes.map(async (node) => node.sendCommand(['FT._LIST'])),
@@ -104,12 +100,18 @@ export class RedisearchService {
           );
         }
       } catch (error) {
-        if (!error.message?.toLowerCase()?.includes('unknown index name')) {
+        const noIndexMessages = ['unknown index name', 'no such index'];
+
+        if (
+          !noIndexMessages.some((keyword) =>
+            error.message?.toLowerCase().includes(keyword),
+          )
+        ) {
           throw error;
         }
       }
 
-      const nodes = (await this.getShards(client)) as RedisClient[];
+      const nodes = await getShards(client);
 
       const commandArgs: any[] = [index, 'ON', type];
 
@@ -286,6 +288,22 @@ export class RedisearchService {
         replyEncoding: 'utf8',
       });
 
+      try {
+        const indexName =
+          index instanceof Buffer ? index.toString('utf8') : String(index);
+        await this.queryLibraryService.deleteByIndex(
+          clientMetadata.sessionMetadata,
+          clientMetadata.databaseId,
+          indexName,
+        );
+      } catch (e) {
+        this.logger.error(
+          'Failed to cleanup query library items after index deletion',
+          e,
+          clientMetadata,
+        );
+      }
+
       this.logger.debug(
         'Successfully deleted redisearch index ',
         clientMetadata,
@@ -299,19 +317,5 @@ export class RedisearchService {
 
       throw catchRedisSearchError(error);
     }
-  }
-
-  /**
-   * Get array of shards (client per each master node)
-   * for STANDALONE will return array with a single shard
-   * @param client
-   * @private
-   */
-  private async getShards(client: RedisClient): Promise<RedisClient[]> {
-    if (client.getConnectionType() === RedisClientConnectionType.CLUSTER) {
-      return client.nodes(RedisClientNodeRole.PRIMARY);
-    }
-
-    return [client];
   }
 }

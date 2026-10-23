@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import cx from 'classnames'
 
 import { setReJSONDataAction } from 'uiSrc/slices/browser/rejson'
@@ -13,6 +13,11 @@ import {
   Nullable,
 } from 'uiSrc/utils'
 import FieldMessage from 'uiSrc/components/field-message/FieldMessage'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
 
 import { JSONScalarProps } from '../interfaces'
 import {
@@ -45,7 +50,9 @@ const RejsonScalar = (props: JSONScalarProps) => {
   const [editing, setEditing] = useState<boolean>(false)
   const [deleting, setDeleting] = useState<string>('')
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+  const { t } = useTranslation()
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   useEffect(() => {
     setChangedValue(stringifyScalarValue(value))
@@ -58,20 +65,29 @@ const RejsonScalar = (props: JSONScalarProps) => {
 
   const onApplyValue = (value: string) => {
     if (!isValidJSON(value)) {
-      setError(JSONErrors.valueJSONFormat)
+      setError(t(JSONErrors.valueJSONFormat))
       return
     }
 
-    dispatch<any>(
-      setReJSONDataAction(
-        selectedKey,
-        path,
-        String(value),
-        true,
-        undefined,
-        () => setEditing(false),
-      ),
-    )
+    requestConfirmation({
+      title: t('browser.keyDetails.editable.confirmTitle'),
+      actionDescription: t('browser.rejson.editConfirmMessage'),
+      confirmButtonText: t('browser.keyDetails.editable.confirmButton'),
+      commandId: BrowserConfirmationCommandId.EditRejsonValue,
+      disableConfirmationInput: true,
+      onConfirm: () => {
+        dispatch<any>(
+          setReJSONDataAction(
+            selectedKey,
+            path,
+            String(value),
+            true,
+            undefined,
+            () => setEditing(false),
+          ),
+        )
+      },
+    })
   }
 
   return (
@@ -101,15 +117,15 @@ const RejsonScalar = (props: JSONScalarProps) => {
                         height: `24px`,
                       },
                       input: {
-                        height: `24px !important`
+                        height: `24px !important`,
                       },
                       actionsContainer: {
-                        height: `24px`
-                      }
+                        height: `24px`,
+                      },
                     }}
                     initialValue={changedValue}
                     controlsPosition="right"
-                    placeholder="Enter JSON value"
+                    placeholder={t('browser.rejson.jsonValuePlaceholder')}
                     fieldName="stringValue"
                     expandable
                     isInvalid={!!error}

@@ -43,17 +43,7 @@ import {
   setBrowserSelectedKey,
 } from 'uiSrc/slices/app/context'
 
-import { CreateListWithExpireDto } from 'apiSrc/modules/browser/list/dto'
-import { SetStringWithExpireDto } from 'apiSrc/modules/browser/string/dto'
-import { CreateZSetWithExpireDto } from 'apiSrc/modules/browser/z-set/dto'
-import { CreateHashWithExpireDto } from 'apiSrc/modules/browser/hash/dto'
-import { CreateRejsonRlWithExpireDto } from 'apiSrc/modules/browser/rejson-rl/dto'
-import { CreateSetWithExpireDto } from 'apiSrc/modules/browser/set/dto'
-import {
-  GetKeyInfoResponse,
-  GetKeysWithDetailsResponse,
-} from 'apiSrc/modules/browser/keys/dto'
-import { CreateStreamDto } from 'apiSrc/modules/browser/stream/dto'
+import { CreateVectorSetWithExpireDto } from 'uiSrc/slices/interfaces/vectorSet'
 
 import { fetchString } from './string'
 import {
@@ -62,6 +52,8 @@ import {
   refreshZsetMembersAction,
 } from './zset'
 import { fetchSetMembers, refreshSetMembersAction } from './set'
+import { fetchVectorSetElements } from './vectorSet'
+import { refreshArray } from './array'
 import { fetchReJSON, setEditorType, setIsWithinThreshold } from './rejson'
 import {
   setHashInitialState,
@@ -103,10 +95,22 @@ import {
 import { AppDispatch, RootState } from '../store'
 import { StreamViewType } from '../interfaces/stream'
 import { EditorType, RedisResponseBuffer, RedisString } from '../interfaces'
+import {
+  CreateListWithExpireDto,
+  SetStringWithExpireDto,
+  CreateZSetWithExpireDto,
+  CreateHashWithExpireDto,
+  CreateRejsonRlWithExpireDto,
+  CreateSetWithExpireDto,
+  CreateArrayWithExpireDto,
+  GetKeyInfoResponse,
+  GetKeysWithDetailsResponse,
+  CreateStreamDto,
+} from 'apiClient'
 
 const riConfig = getConfig()
 
-const defaultViewFormat = KeyValueFormat.Unicode
+export const defaultViewFormat = KeyValueFormat.Unicode
 
 export const initialState: KeysStore = {
   loading: false,
@@ -122,7 +126,7 @@ export const initialState: KeysStore = {
     SearchMode.Pattern,
   viewType:
     localStorageService?.get(BrowserStorageItem.browserViewType) ??
-    KeyViewType.Browser,
+    KeyViewType.Tree,
   data: {
     total: 0,
     scanned: 0,
@@ -162,6 +166,9 @@ export const initialKeyInfo = {
   type: KeyTypes.String,
   size: 1,
   length: 0,
+  quantType: undefined,
+  vectorDim: undefined,
+  count: undefined,
 }
 
 const getInitialSelectedKeyState = (state: KeysStore) => ({
@@ -241,9 +248,17 @@ const keysSlice = createSlice({
       }
     },
     refreshKeyInfoSuccess: (state, { payload }) => {
+      // Replace `data` outright (mirroring `loadKeyInfoSuccess`) rather
+      // than spreading the payload over the previous data. The merge
+      // form preserved any field absent from the new payload, which
+      // leaked type-specific fields when an underlying key was
+      // overwritten as a different type — e.g. an array key's `count`
+      // (or a vector set's `vectorDim` / `quantType`) would survive
+      // into the refreshed header for a String/List/etc. key, since
+      // those payloads omit the field entirely.
       state.selectedKey = {
         ...state.selectedKey,
-        data: { ...state.selectedKey.data, ...payload },
+        data: { ...payload, nameString: bufferToString(payload.name) },
         refreshing: false,
       }
     },
@@ -298,6 +313,57 @@ const keysSlice = createSlice({
         total: Math.max(state.data.total - 1, 0),
         scanned: state.data.scanned - 1,
       }
+    },
+    deleteKeysByPattern: (
+      state,
+      {
+        payload,
+      }: PayloadAction<{
+        pattern: string
+        deletedCount: number
+        filterType?: Nullable<KeyTypes>
+      }>,
+    ) => {
+      const { pattern, deletedCount, filterType } = payload
+
+      // Only handle simple prefix patterns (e.g., "folder:*")
+      const isSimplePrefix =
+        pattern.endsWith('*') &&
+        !pattern.slice(0, -1).includes('*') &&
+        !pattern.includes('?')
+
+      if (!isSimplePrefix) return
+
+      const prefix = pattern.slice(0, -1)
+
+      // Skip local key removal for '*' pattern (all keys) - let user refresh instead
+      if (!prefix) {
+        state.data.total = Math.max(state.data.total - deletedCount, 0)
+        return
+      }
+      const encoder = new TextEncoder()
+      const prefixBytes = encoder.encode(prefix)
+
+      const bufferStartsWith = (
+        bufferData: number[],
+        prefixBytes: Uint8Array,
+      ): boolean => {
+        if (bufferData.length < prefixBytes.length) return false
+        for (let i = 0; i < prefixBytes.length; i++) {
+          if (bufferData[i] !== prefixBytes[i]) return false
+        }
+        return true
+      }
+
+      state.data.keys = state.data.keys.filter((key: any) => {
+        const bufferData = key.name?.data
+        if (!bufferData) return true
+        if (!bufferStartsWith(bufferData, prefixBytes)) return true
+        if (filterType && key.type !== filterType) return true
+        return false
+      })
+
+      state.data.total = Math.max(state.data.total - deletedCount, 0)
     },
 
     // edit TTL or Key actions
@@ -432,7 +498,7 @@ const keysSlice = createSlice({
         ...initialState,
         viewType:
           localStorageService?.get(BrowserStorageItem.browserViewType) ??
-          KeyViewType.Browser,
+          KeyViewType.Tree,
         searchMode:
           localStorageService?.get(BrowserStorageItem.browserSearchMode) ??
           SearchMode.Pattern,
@@ -521,6 +587,7 @@ export const {
   deleteSelectedKeySuccess,
   deleteSelectedKeyFailure,
   deletePatternKeyFromList,
+  deleteKeysByPattern,
   deleteKey,
   deleteKeySuccess,
   deleteKeyFailure,
@@ -830,6 +897,9 @@ export function fetchKeyInfo(
           )
         }
       }
+      if (data.type === KeyTypes.VectorSet) {
+        dispatch<any>(fetchVectorSetElements({ key, resetData }))
+      }
     } catch (_err) {
       const error = _err as AxiosError
       const errorMessage = getApiErrorMessage(error)
@@ -875,6 +945,7 @@ export function refreshKeyInfoAction(key: RedisResponseBuffer) {
       if (status && isStatusNotFoundError(status)) {
         dispatch(resetKeyInfo())
         dispatch(deleteKeyFromList(key))
+        dispatch(setBrowserSelectedKey(null))
       }
     }
   }
@@ -982,6 +1053,15 @@ export function addListKey(
 }
 
 // Asynchronous thunk action
+export function addArrayKey(
+  data: CreateArrayWithExpireDto,
+  onSuccessAction?: () => void,
+  onFailAction?: () => void,
+) {
+  return addTypedKey(data, KeyTypes.Array, onSuccessAction, onFailAction)
+}
+
+// Asynchronous thunk action
 export function addReJSONKey(
   data: CreateRejsonRlWithExpireDto,
   onSuccessAction?: () => void,
@@ -997,6 +1077,17 @@ export function addStreamKey(
   onFailAction?: () => void,
 ) {
   return addTypedKey(data, KeyTypes.Stream, onSuccessAction, onFailAction)
+}
+
+// Asynchronous thunk action
+// Vector set create uses POST /vector-set (create-only; VADD against a new key).
+// The element PUT endpoint reuses the same path for adding to an existing key.
+export function addVectorSetKey(
+  data: CreateVectorSetWithExpireDto,
+  onSuccessAction?: () => void,
+  onFailAction?: () => void,
+) {
+  return addTypedKey(data, KeyTypes.VectorSet, onSuccessAction, onFailAction)
 }
 
 // Asynchronous thunk action
@@ -1492,6 +1583,14 @@ export function refreshKey(
       }
       case KeyTypes.Stream: {
         dispatch(refreshStream(key, resetData))
+        break
+      }
+      case KeyTypes.VectorSet: {
+        dispatch(fetchVectorSetElements({ key, resetData }))
+        break
+      }
+      case KeyTypes.Array: {
+        dispatch(refreshArray(key))
         break
       }
       default:

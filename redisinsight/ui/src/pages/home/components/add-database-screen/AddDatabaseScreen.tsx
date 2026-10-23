@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { useFormik } from 'formik'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router'
 import { toNumber } from 'lodash'
-import { Nullable, parseRedisUrl } from 'uiSrc/utils'
 
+import { Nullable, parseRedisUrl } from 'uiSrc/utils'
 import { AddDbType, DEFAULT_TIMEOUT } from 'uiSrc/pages/home/constants'
 import { Instance } from 'uiSrc/slices/interfaces'
 import {
@@ -22,11 +22,13 @@ import {
 } from 'uiSrc/components/base/forms/buttons'
 import { InfoIcon } from 'uiSrc/components/base/icons'
 import { RiTooltip } from 'uiSrc/components'
+import { Trans, useTranslation } from 'uiSrc/i18n'
 import ConnectivityOptions from './components/connectivity-options'
 import ConnectionUrl from './components/connection-url'
 import { Values } from './constants'
+import { CustomHorizontalRule } from './AddDatabaseScreen.styles'
 
-import styles from './styles.module.scss'
+import { ScrollableWrapper } from '../ManualConnection.styles'
 
 export interface Props {
   onSelectOption: (type: AddDbType, db: Nullable<Record<string, any>>) => void
@@ -50,20 +52,20 @@ const getPayload = (connectionUrl: string, returnOnError = false) => {
   }
 }
 
-const ConnectionUrlError = (
-  <>
-    The connection URL format provided is not supported.
-    <br />
-    Try adding a database using a connection form.
-  </>
-)
-
 const AddDatabaseScreen = (props: Props) => {
+  const { t } = useTranslation()
   const { onSelectOption, onClose } = props
   const [isInvalid, setIsInvalid] = useState<Boolean>(false)
-  const { loadingChanging: isLoading } = useSelector(instancesSelector)
 
-  const dispatch = useDispatch()
+  const connectionUrlError = (
+    <Trans
+      i18nKey="addDatabase.connectionUrl.error"
+      components={{ br: <br /> }}
+    />
+  )
+  const { loadingChanging: isLoading } = useAppSelector(instancesSelector)
+
+  const dispatch = useAppDispatch()
   const history = useHistory()
 
   const validate = (values: Values) => {
@@ -103,7 +105,7 @@ const AddDatabaseScreen = (props: Props) => {
   })
 
   return (
-    <div className="eui-yScroll">
+    <ScrollableWrapper>
       <form onSubmit={formik.handleSubmit} data-testid="form">
         <Row responsive>
           <FlexItem grow>
@@ -113,13 +115,13 @@ const AddDatabaseScreen = (props: Props) => {
             />
           </FlexItem>
         </Row>
-
-        <Row responsive justify="between" style={{ padding: 4 }}>
+        <Spacer size="xxl" />
+        <Row responsive justify="between" align="center">
           <FlexItem>
             <RiTooltip
               position="top"
               anchorClassName="euiToolTip__btn-disabled"
-              content={isInvalid ? <span>{ConnectionUrlError}</span> : null}
+              content={isInvalid ? <span>{connectionUrlError}</span> : null}
             >
               <EmptyButton
                 size="small"
@@ -130,7 +132,7 @@ const AddDatabaseScreen = (props: Props) => {
                 loading={isLoading}
                 data-testid="btn-test-connection"
               >
-                Test Connection
+                {t('addDatabase.button.testConnection')}
               </EmptyButton>
             </RiTooltip>
           </FlexItem>
@@ -138,27 +140,26 @@ const AddDatabaseScreen = (props: Props) => {
             <Row responsive gap="l">
               <FlexItem>
                 <SecondaryButton
-                  size="small"
                   onClick={() => handleProceedForm(AddDbType.manual)}
                   data-testid="btn-connection-settings"
                 >
-                  Connection Settings
+                  {t('addDatabase.button.connectionSettings')}
                 </SecondaryButton>
               </FlexItem>
               <FlexItem>
                 <RiTooltip
                   position="top"
                   anchorClassName="euiToolTip__btn-disabled"
-                  content={isInvalid ? <span>{ConnectionUrlError}</span> : null}
+                  content={isInvalid ? <span>{connectionUrlError}</span> : null}
                 >
                   <PrimaryButton
-                    size="small"
                     type="submit"
                     disabled={!!isInvalid}
+                    loading={isLoading}
                     icon={isInvalid ? InfoIcon : undefined}
                     data-testid="btn-submit"
                   >
-                    Add Database
+                    {t('addDatabase.button.addDatabase')}
                   </PrimaryButton>
                 </RiTooltip>
               </FlexItem>
@@ -167,13 +168,13 @@ const AddDatabaseScreen = (props: Props) => {
         </Row>
       </form>
       <Spacer />
-      <div className={styles.hr}>Or</div>
+      <CustomHorizontalRule>{t('addDatabase.divider.or')}</CustomHorizontalRule>
       <Spacer />
       <ConnectivityOptions
         onClickOption={handleProceedForm}
         onClose={onClose}
       />
-    </div>
+    </ScrollableWrapper>
   )
 }
 

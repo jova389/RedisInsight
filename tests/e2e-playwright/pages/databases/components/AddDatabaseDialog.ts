@@ -1,0 +1,346 @@
+import { Page, Locator } from '@playwright/test';
+import { AddDatabaseConfig, Environment, TlsConfig } from '../../../types';
+
+/**
+ * Component Page Object for the Add Database Dialog
+ * Handles all interactions with the add database form
+ */
+export class AddDatabaseDialog {
+  readonly page: Page;
+
+  // Dialog controls
+  readonly connectionUrlInput: Locator;
+  readonly connectionSettingsButton: Locator;
+  readonly addDatabaseButton: Locator;
+
+  // Connection settings form fields
+  readonly databaseAliasInput: Locator;
+  readonly hostInput: Locator;
+  readonly portInput: Locator;
+  readonly usernameInput: Locator;
+  readonly passwordInput: Locator;
+  readonly addRedisDatabaseButton: Locator;
+  readonly cancelButton: Locator;
+  readonly closeButton: Locator;
+  readonly testConnectionButton: Locator;
+  readonly dialog: Locator;
+
+  // Read-only endpoint info (shown in edit mode instead of editable fields
+  // for cloud/managed databases)
+  readonly dbInfoHost: Locator;
+  readonly dbInfoPort: Locator;
+
+  // Additional settings
+  readonly timeoutInput: Locator;
+  readonly selectLogicalDatabaseCheckbox: Locator;
+  readonly databaseIndexInput: Locator;
+  readonly forceStandaloneCheckbox: Locator;
+  readonly environmentSelect: Locator;
+
+  // Tabs
+  readonly generalTab: Locator;
+  readonly securityTab: Locator;
+  readonly decompressionTab: Locator;
+
+  // Security tab
+  readonly useTlsCheckbox: Locator;
+
+  // TLS settings
+  readonly verifyTlsCertCheckbox: Locator;
+  readonly caCertDropdown: Locator;
+  readonly caCertNameInput: Locator;
+  readonly caCertTextarea: Locator;
+  readonly requiresClientAuthCheckbox: Locator;
+  readonly clientCertNameInput: Locator;
+  readonly clientCertTextarea: Locator;
+  readonly clientPrivateKeyTextarea: Locator;
+
+  // SNI settings
+  readonly sniCheckbox: Locator;
+  readonly sniServernameInput: Locator;
+
+  // SSH settings
+  readonly useSshCheckbox: Locator;
+  readonly sshHostInput: Locator;
+  readonly sshPortInput: Locator;
+  readonly sshUsernameInput: Locator;
+  readonly sshPasswordInput: Locator;
+
+  // Decompression & Formatters tab
+  readonly enableDecompressionCheckbox: Locator;
+  readonly compressorDropdown: Locator;
+  readonly keyNameFormatDropdown: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+
+    // Dialog controls
+    this.dialog = page.getByRole('dialog', { name: /add database|edit database|connection settings/i });
+    this.connectionUrlInput = page.getByPlaceholder(/redis:\/\//i);
+    this.connectionSettingsButton = page.getByTestId('btn-connection-settings');
+    this.addDatabaseButton = page.getByRole('button', {
+      name: 'Add database',
+      exact: true,
+    });
+    this.closeButton = page.getByRole('button', { name: 'close' });
+    this.cancelButton = page.getByRole('button', { name: 'Cancel' });
+    this.testConnectionButton = page.getByRole('button', { name: 'Test Connection' });
+
+    // Read-only endpoint info
+    this.dbInfoHost = page.getByTestId('db-info-host');
+    this.dbInfoPort = page.getByTestId('db-info-port');
+
+    // Connection settings form
+    this.databaseAliasInput = page.getByPlaceholder('Enter Database Alias');
+    this.hostInput = page.getByPlaceholder('Enter Hostname / IP address / Connection URL');
+    this.portInput = page.getByRole('spinbutton', { name: /port/i });
+    this.usernameInput = page.getByPlaceholder('Enter Username');
+    this.passwordInput = page.getByPlaceholder('Enter Password');
+    this.addRedisDatabaseButton = page.getByTestId('btn-submit');
+
+    // Additional settings
+    this.timeoutInput = page.getByRole('spinbutton', { name: /timeout/i });
+    this.selectLogicalDatabaseCheckbox = page.getByTestId('showDb');
+    this.databaseIndexInput = page.getByRole('spinbutton', { name: /database index/i });
+    this.forceStandaloneCheckbox = page.getByTestId('forceStandalone');
+    this.environmentSelect = page.getByTestId('select-environment');
+
+    // Tabs
+    this.generalTab = page.getByRole('tab', { name: 'General' });
+    this.securityTab = page.getByRole('tab', { name: 'Security' });
+    this.decompressionTab = page.getByRole('tab', { name: 'Decompression & Formatters' });
+
+    // Security tab
+    this.useTlsCheckbox = page.getByTestId('tls');
+
+    // TLS settings
+    this.verifyTlsCertCheckbox = page.getByRole('checkbox', { name: /verify tls certificate/i });
+    this.caCertDropdown = page.getByTestId('select-ca-cert');
+    this.caCertNameInput = page.getByTestId('qa-ca-cert');
+    this.caCertTextarea = page.getByTestId('new-ca-cert');
+    this.requiresClientAuthCheckbox = page.getByTestId('tls-required-checkbox');
+    // Note: testid has typo in source code (tsl instead of tls)
+    this.clientCertNameInput = page.getByTestId('new-tsl-cert-pair-name');
+    this.clientCertTextarea = page.getByTestId('new-tls-client-cert');
+    this.clientPrivateKeyTextarea = page.getByTestId('new-tls-client-cert-key');
+
+    // SNI settings
+    this.sniCheckbox = page.getByTestId('sni');
+    this.sniServernameInput = page.getByTestId('sni-servername');
+
+    // SSH settings
+    this.useSshCheckbox = page.getByTestId('use-ssh');
+    this.sshHostInput = page.getByTestId('sshHost');
+    this.sshPortInput = page.getByTestId('sshPort');
+    this.sshUsernameInput = page.getByTestId('sshUsername');
+    this.sshPasswordInput = page.getByTestId('sshPassword');
+
+    // Decompression & Formatters tab
+    this.enableDecompressionCheckbox = page.getByRole('checkbox', { name: /enable automatic data decompression/i });
+    this.compressorDropdown = page.getByTestId('select-compressor');
+    this.keyNameFormatDropdown = page.getByRole('combobox', { name: /key name format/i });
+  }
+
+  async openConnectionSettings(): Promise<void> {
+    await this.connectionSettingsButton.click();
+  }
+
+  async fillForm(config: AddDatabaseConfig): Promise<void> {
+    await this.databaseAliasInput.fill(config.name);
+    await this.hostInput.fill(config.host);
+    await this.portInput.fill(config.port.toString());
+
+    if (config.username) {
+      await this.usernameInput.fill(config.username);
+    }
+
+    if (config.password) {
+      await this.passwordInput.fill(config.password);
+    }
+
+    if (config.environment) {
+      await this.selectEnvironment(config.environment);
+    }
+  }
+
+  /**
+   * Select an environment in the connection form's Environment dropdown.
+   *
+   * Each `Environment` enum value (`unspecified` | `production` | `development`)
+   * is rendered by the form as its capitalized counterpart in
+   * `ENVIRONMENT_OPTIONS` — derive the option label directly from the value.
+   */
+  async selectEnvironment(environment: Environment): Promise<void> {
+    const label = environment.charAt(0).toUpperCase() + environment.slice(1);
+    await this.environmentSelect.click();
+    await this.page.getByRole('option', { name: label, exact: true }).click();
+  }
+
+  async submit(): Promise<void> {
+    await this.addRedisDatabaseButton.click();
+  }
+
+  async addDatabase(config: AddDatabaseConfig): Promise<void> {
+    await this.openConnectionSettings();
+    await this.fillForm(config);
+    await this.submit();
+  }
+
+  async addDatabaseByUrl(url: string): Promise<void> {
+    await this.connectionUrlInput.fill(url);
+    await this.addDatabaseButton.click();
+  }
+
+  async cancel(): Promise<void> {
+    await this.cancelButton.click();
+  }
+
+  async close(): Promise<void> {
+    await this.closeButton.click();
+  }
+
+  async isVisible(): Promise<boolean> {
+    return this.dialog.isVisible();
+  }
+
+  async testConnection(): Promise<void> {
+    await this.testConnectionButton.click();
+  }
+
+  /**
+   * Wait for dialog to close
+   */
+  async waitForHidden(): Promise<void> {
+    await this.dialog.waitFor({ state: 'hidden' });
+  }
+
+  /**
+   * Enable logical database selection with specified index
+   */
+  async setLogicalDatabase(index: number): Promise<void> {
+    const isChecked = await this.selectLogicalDatabaseCheckbox.isChecked();
+    if (!isChecked) {
+      await this.selectLogicalDatabaseCheckbox.click();
+    }
+    await this.databaseIndexInput.fill(index.toString());
+  }
+
+  /**
+   * Configure timeout setting
+   */
+  async setTimeout(seconds: number): Promise<void> {
+    await this.timeoutInput.fill(seconds.toString());
+  }
+
+  /**
+   * Enable force standalone connection
+   */
+  async setForceStandalone(enabled: boolean): Promise<void> {
+    const isChecked = await this.forceStandaloneCheckbox.isChecked();
+    if (enabled !== isChecked) {
+      await this.forceStandaloneCheckbox.click();
+    }
+  }
+
+  /**
+   * Go to decompression tab and enable decompression with a specific format
+   */
+  async enableDecompression(format: string = 'GZIP'): Promise<void> {
+    await this.decompressionTab.click();
+    const isChecked = await this.enableDecompressionCheckbox.isChecked();
+    if (!isChecked) {
+      await this.enableDecompressionCheckbox.click();
+    }
+    await this.selectCompressor(format);
+  }
+
+  /**
+   * Select a compressor format from the dropdown
+   */
+  async selectCompressor(format: string): Promise<void> {
+    await this.compressorDropdown.click();
+    await this.page.getByRole('option', { name: format }).click();
+  }
+
+  /**
+   * Configure TLS settings on the Security tab
+   * @param tlsConfig TLS configuration options
+   */
+  async configureTls(tlsConfig: TlsConfig): Promise<void> {
+    // Go to Security tab
+    await this.securityTab.click();
+
+    // Enable TLS
+    const isTlsChecked = await this.useTlsCheckbox.isChecked();
+    if (tlsConfig.enabled && !isTlsChecked) {
+      await this.useTlsCheckbox.click();
+    }
+
+    if (!tlsConfig.enabled) {
+      return;
+    }
+
+    // Configure verify server cert if specified
+    if (tlsConfig.verifyServerCert !== undefined) {
+      const isVerifyChecked = await this.verifyTlsCertCheckbox.isChecked();
+      if (tlsConfig.verifyServerCert !== isVerifyChecked) {
+        await this.verifyTlsCertCheckbox.click();
+      }
+    }
+
+    // Configure CA Certificate if provided
+    if (tlsConfig.caCert) {
+      await this.caCertDropdown.click();
+      await this.page.getByRole('option', { name: 'Add new CA certificate' }).click();
+      await this.caCertNameInput.fill(tlsConfig.caCert.name);
+      await this.caCertTextarea.fill(tlsConfig.caCert.certificate);
+    }
+
+    // Configure Client Certificate if provided (mutual TLS)
+    if (tlsConfig.clientCert) {
+      // First check the "Requires TLS Client Authentication" checkbox
+      const isClientAuthChecked = await this.requiresClientAuthCheckbox.isChecked();
+      if (!isClientAuthChecked) {
+        await this.requiresClientAuthCheckbox.click();
+      }
+
+      // Client cert dropdown should already show "Add new certificate"
+      await this.clientCertNameInput.fill(tlsConfig.clientCert.name);
+      await this.clientCertTextarea.fill(tlsConfig.clientCert.certificate);
+      await this.clientPrivateKeyTextarea.fill(tlsConfig.clientCert.key);
+    }
+  }
+
+  /**
+   * Configure SSH tunnel on the Security tab
+   */
+  async configureSsh(sshConfig: { host: string; port: number; username: string; password?: string }): Promise<void> {
+    await this.securityTab.click();
+
+    const isSshChecked = await this.useSshCheckbox.isChecked();
+    if (!isSshChecked) {
+      await this.useSshCheckbox.click();
+    }
+
+    await this.sshHostInput.fill(sshConfig.host);
+    await this.sshPortInput.fill(sshConfig.port.toString());
+    await this.sshUsernameInput.fill(sshConfig.username);
+
+    if (sshConfig.password) {
+      await this.sshPasswordInput.fill(sshConfig.password);
+    }
+  }
+
+  /**
+   * Enable SNI on the Security tab (TLS must be enabled first)
+   */
+  async enableSni(servername: string): Promise<void> {
+    await this.securityTab.click();
+
+    const isSniChecked = await this.sniCheckbox.isChecked();
+    if (!isSniChecked) {
+      await this.sniCheckbox.click();
+    }
+    await this.sniServernameInput.fill(servername);
+  }
+}

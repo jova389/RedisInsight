@@ -1,4 +1,4 @@
-import { AdditionalRedisModule } from 'apiSrc/modules/database/models/additional.redis.module'
+import { AdditionalRedisModule } from 'apiClient'
 import { TelemetryEvent } from './events'
 
 export interface ITelemetryIdentify {
@@ -52,7 +52,9 @@ export interface IModuleSummary {
 }
 
 export type RedisModulesKeyType = keyof typeof RedisModules
-export interface IRedisModulesSummary
-  extends Record<keyof typeof RedisModules, IModuleSummary> {
+export interface IRedisModulesSummary extends Record<
+  keyof typeof RedisModules,
+  IModuleSummary
+> {
   customModules: AdditionalRedisModule[]
 }

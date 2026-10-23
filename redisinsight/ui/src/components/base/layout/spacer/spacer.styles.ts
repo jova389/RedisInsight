@@ -9,13 +9,12 @@ export type ThemeSpacingKey = Extract<
   keyof Theme['core']['space'],
   `space${string}`
 >
-// Allow direct theme spacing values
-export type ThemeSpacingValue = Theme['core']['space'][ThemeSpacingKey]
 
 export type SpacerProps = CommonProps &
   HTMLAttributes<HTMLDivElement> & {
     children?: ReactNode
-    size?: SpacerSize | ThemeSpacingKey | ThemeSpacingValue
+    size?: SpacerSize | ThemeSpacingKey | string
+    direction?: 'horizontal' | 'vertical'
   }
 
 export const spacerStyles: Record<SpacerSize, ReturnType<typeof css>> = {
@@ -40,24 +39,39 @@ export const spacerStyles: Record<SpacerSize, ReturnType<typeof css>> = {
   `,
 }
 
-const isThemeSpacingKey = (
-  size: SpacerSize | ThemeSpacingKey | ThemeSpacingValue,
-  theme: Theme,
-): size is ThemeSpacingKey =>
-  typeof size === 'string' && size in theme.core.space
-
 const getSpacingValue = (
-  size: SpacerSize | ThemeSpacingKey | ThemeSpacingValue,
+  size: SpacerSize | ThemeSpacingKey | string,
   theme: Theme,
 ): string | ReturnType<typeof css> => {
-  if (isThemeSpacingKey(size, theme)) {
-    return theme?.core?.space?.[size] || '0'
+  // Check if it's a theme spacing key
+  if (size in theme.core.space) {
+    return theme.core.space[size as ThemeSpacingKey]
   }
 
-  return spacerStyles[size as SpacerSize]
+  // Check if it's a legacy spacer size
+  if (size in spacerStyles) {
+    return spacerStyles[size as SpacerSize]
+  }
+
+  // Custom string value (e.g., '7.2rem', '72px')
+  return size
 }
 
-export const StyledSpacer = styled.div<SpacerProps>`
+type StyledSpacerType = Omit<SpacerProps, 'direction'> & {
+  $direction: SpacerProps['direction']
+}
+
+export const StyledSpacer = styled.div<StyledSpacerType>`
   flex-shrink: 0;
-  height: ${({ size = 'l', theme }) => getSpacingValue(size, theme)};
+  ${({ $direction = 'vertical', size = 'l', theme }) => {
+    const spacingValue = getSpacingValue(size, theme)
+
+    return $direction === 'horizontal'
+      ? css`
+          width: ${spacingValue};
+        `
+      : css`
+          height: ${spacingValue};
+        `
+  }}
 `

@@ -1,0 +1,126 @@
+import React from 'react'
+import i18n from 'uiSrc/i18n'
+import { ColumnDef, Row, Table } from 'uiSrc/components/base/layout/table'
+import { IndexDetailsColumn, IndexField } from './IndexDetails.types'
+
+import { FieldNameCell } from './components/FieldNameCell/FieldNameCell'
+import { FieldValueCell } from './components/FieldValueCell/FieldValueCell'
+import { FieldTypeCell } from './components/FieldTypeCell/FieldTypeCell'
+import { FieldActionsCell } from './components/FieldActionsCell/FieldActionsCell'
+import { ColumnHeader } from './components/ColumnHeader/ColumnHeader'
+import { FieldNameTooltip } from './components/FieldNameCell/FieldNameTooltip'
+import { FieldValueTooltip } from './components/FieldValueCell/FieldValueTooltip'
+import { FieldTypeTooltip } from './components/FieldTypeCell/FieldTypeTooltip'
+import { CreateIndexOnboardingPopover } from '../create-index-onboarding'
+import { CreateIndexOnboardingStep } from '../create-index-onboarding/CreateIndexOnboarding.constants'
+
+export const SELECTION_COLUMN: ColumnDef<IndexField> = {
+  id: IndexDetailsColumn.Selection,
+  size: 40,
+  sizeUnit: 'px',
+  isHeaderCustom: true,
+  enableSorting: false,
+  enableResizing: false,
+  header: Table.HeaderMultiRowSelectionButton,
+  cell: ({ row }) => <Table.RowSelectionButton row={row} />,
+}
+
+export const NAME_COLUMN: ColumnDef<IndexField> = {
+  id: IndexDetailsColumn.Name,
+  accessorKey: IndexDetailsColumn.Name,
+  size: 300,
+  enableSorting: false,
+  header: () => (
+    <CreateIndexOnboardingPopover
+      step={CreateIndexOnboardingStep.FieldName}
+      anchorPosition="upCenter"
+    >
+      <ColumnHeader
+        label={i18n.t('vectorSearch.indexDetails.fieldName')}
+        tooltip={<FieldNameTooltip />}
+      />
+    </CreateIndexOnboardingPopover>
+  ),
+  cell: ({ row }: { row: Row<IndexField> }) => (
+    <FieldNameCell field={row.original} />
+  ),
+}
+
+export const VALUE_COLUMN: ColumnDef<IndexField> = {
+  id: IndexDetailsColumn.Value,
+  accessorKey: IndexDetailsColumn.Value,
+  size: 500,
+  enableSorting: false,
+  header: () => (
+    <CreateIndexOnboardingPopover
+      step={CreateIndexOnboardingStep.SampleValue}
+      anchorPosition="upCenter"
+    >
+      <ColumnHeader
+        label={i18n.t('vectorSearch.indexDetails.fieldSampleValue')}
+        tooltip={<FieldValueTooltip />}
+      />
+    </CreateIndexOnboardingPopover>
+  ),
+  cell: ({ row }: { row: Row<IndexField> }) => (
+    <FieldValueCell field={row.original} />
+  ),
+}
+
+export const TYPE_COLUMN_READONLY: ColumnDef<IndexField> = {
+  id: IndexDetailsColumn.Type,
+  accessorKey: IndexDetailsColumn.Type,
+  size: 270,
+  sizeUnit: 'px',
+  enableSorting: false,
+  header: () => (
+    <CreateIndexOnboardingPopover
+      step={CreateIndexOnboardingStep.IndexingType}
+      anchorPosition="downCenter"
+    >
+      <ColumnHeader
+        label={i18n.t('vectorSearch.indexDetails.indexingType')}
+        tooltip={<FieldTypeTooltip />}
+      />
+    </CreateIndexOnboardingPopover>
+  ),
+  cell: ({ row }: { row: Row<IndexField> }) => (
+    <FieldTypeCell field={row.original} />
+  ),
+}
+
+export const TYPE_COLUMN_EDITABLE: ColumnDef<IndexField> = {
+  id: IndexDetailsColumn.Type,
+  accessorKey: IndexDetailsColumn.Type,
+  size: 270,
+  sizeUnit: 'px',
+  enableSorting: false,
+  header: () => (
+    <CreateIndexOnboardingPopover
+      step={CreateIndexOnboardingStep.IndexingType}
+      anchorPosition="downCenter"
+    >
+      <ColumnHeader
+        label={i18n.t('vectorSearch.indexDetails.suggestedIndexingType')}
+        tooltip={<FieldTypeTooltip />}
+      />
+    </CreateIndexOnboardingPopover>
+  ),
+  cell: ({ row }: { row: Row<IndexField> }) => (
+    <FieldTypeCell field={row.original} />
+  ),
+}
+
+export const createActionsColumn = (
+  onFieldEdit?: (field: IndexField) => void,
+): ColumnDef<IndexField> => ({
+  id: IndexDetailsColumn.Actions,
+  enableSorting: false,
+  enableResizing: false,
+  size: 40,
+  sizeUnit: 'px',
+  header: '',
+  cell: ({ row }: { row: Row<IndexField> }) => (
+    <FieldActionsCell field={row.original} onEdit={onFieldEdit} />
+  ),
+})

@@ -22,19 +22,40 @@ on:
         description: SSH Debug
         type: boolean
         default: false
-
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Backend build to run tests over
+        type: string
+        default: 'local'
+      redis_client:
+        description: Library to use for redis connection
+        type: string
+        default: 'ioredis'
+      report:
+        description: Send report for test run to slack
+        type: boolean
+        default: false
+      short_rte_list:
+        description: Use short rte list
+        type: boolean
+        default: false
+      debug:
+        description: SSH Debug
+        type: boolean
+        default: false
 env:
-  SLACK_AUDIT_REPORT_KEY: ${{ secrets.SLACK_AUDIT_REPORT_KEY }}
-  SLACK_AUDIT_REPORT_CHANNEL: ${{ secrets.SLACK_AUDIT_REPORT_CHANNEL }}
   TEST_MEDIUM_DB_DUMP: ${{ secrets.TEST_MEDIUM_DB_DUMP }}
   TEST_BIG_DB_DUMP: ${{ secrets.TEST_BIG_DB_DUMP }}
   REPORT_NAME: 'report-it'
+  #  Disabled RTE for now. Need to prepare reasonable dataset to not take so much time for tests.
+  #  "oss-st-big": "OSS Standalone v6 and all modules and predefined amount of data inside (~3-4M)",
   ITESTS_NAMES: |
     {
       "oss-st-5": "OSS Standalone v5",
       "oss-st-5-pass": "OSS Standalone v5 with admin pass required",
       "oss-st-6": "OSS Standalone v6 and all modules",
-      "oss-st-big": "OSS Standalone v6 and all modules and predefined amount of data inside (~3-4M)",
+      "oss-st-8": "OSS Standalone v8.8",
       "mods-preview": "OSS Standalone and all preview modules",
       "oss-st-6-tls": "OSS Standalone v6 with TLS enabled",
       "oss-st-6-tls-auth": "OSS Standalone v6 with TLS auth required",
@@ -49,6 +70,7 @@ env:
   ITESTS_NAMES_SHORT: |
     {
       "mods-preview": "OSS Standalone and all preview modules",
+      "oss-st-8": "OSS Standalone v8.8",
       "oss-st-5-pass": "OSS Standalone v5 with admin pass required",
       "oss-st-6-tls-auth": "OSS Standalone v6 with TLS auth required",
       "oss-clu-tls": "OSS Cluster with TLS enabled",
@@ -93,7 +115,7 @@ jobs:
       matrix:
         rte: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       # SSH Debug
       - name: Enable SSH
@@ -104,7 +126,7 @@ jobs:
 
       - name: Download Docker Artifacts
         if: inputs.build == 'docker'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: docker-builds
           path: ./release
@@ -132,9 +154,18 @@ jobs:
           cp ./redisinsight/api/test/test-runs/coverage/test-run-result.xml ./itest/results/${{ matrix.rte }}.result.xml
           cp ./redisinsight/api/test/test-runs/coverage/test-run-coverage.json ./itest/coverages/${{ matrix.rte }}.coverage.json
 
+      - name: Process test results
+        if: always()
+        run: |
+          mkdir -p itest/coverages && mkdir -p itest/results
+
+          cp ./redisinsight/api/test/test-runs/coverage/test-run-result.json ./itest/results/${{ matrix.rte }}.result.json
+          cp ./redisinsight/api/test/test-runs/coverage/test-run-result.xml ./itest/results/${{ matrix.rte }}.result.xml
+          cp ./redisinsight/api/test/test-runs/coverage/test-run-coverage.json ./itest/coverages/${{ matrix.rte }}.coverage.json
+
       - name: Upload coverage files as artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverages-${{ matrix.rte }}
           path: ./itest/coverages
@@ -200,7 +231,7 @@ jobs:
           fi
 
       - name: Generate test results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         id: test-reporter
         if: always()
         with:
@@ -209,7 +240,7 @@ jobs:
           reporter: java-junit
           list-tests: 'failed'
           list-suites: 'failed'
-          fail-on-error: 'false'
+          fail-on-error: 'true'
 
       - name: Add link to report in the workflow summary
         if: always()
@@ -222,19 +253,22 @@ jobs:
     name: Final coverage
     needs: run-tests
     if: always()
+    permissions:
+      actions: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Merge coverage artifacts
         id: merge-artifacts
-        uses: actions/upload-artifact/merge@v4
+        uses: actions/upload-artifact/merge@v7
         with:
           name: coverages-artifacts
           pattern: coverages-*
           delete-merged: true
 
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverages-artifacts
           path: ./coverages
@@ -249,13 +283,14 @@ jobs:
           cp integration-coverage.txt $GITHUB_WORKSPACE/integration-coverage.txt
 
       - name: Upload integration-coverage as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-coverage
           path: integration-coverage.txt
 
       - name: Delete Artifact
-        uses: actions/github-script@v7
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.actions.deleteArtifact({

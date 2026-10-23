@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import {
   updateUserConfigSettingsAction,
@@ -14,14 +14,21 @@ import {
 } from 'uiSrc/components/base/forms/select/RiSelect'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { Title } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 
 const ThemeSettings = () => {
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
   const [selectedTheme, setSelectedTheme] = useState<string>(DEFAULT_THEME)
-  const options = THEMES
+  const options = THEMES.map((option) => ({
+    ...option,
+    inputDisplay: t(
+      `settings.general.theme.option.${option.value.toLowerCase()}` as never,
+    ),
+  }))
   const themeContext = useContext(ThemeContext)
   const { theme, changeTheme } = themeContext
-  const { config } = useSelector(userSettingsSelector)
+  const { config } = useAppSelector(userSettingsSelector)
   const previousThemeRef = useRef<string>(theme)
 
   useEffect(() => {
@@ -50,9 +57,9 @@ const ThemeSettings = () => {
 
   return (
     <form>
-      <Title size="XS">Color Theme</Title>
+      <Title size="XS">{t('settings.general.theme.title')}</Title>
       <Spacer size="m" />
-      <FormField label="Specifies the color theme to be used in Redis Insight:">
+      <FormField label={t('settings.general.theme.label')}>
         <RiSelect
           valueRender={defaultValueRender}
           options={options}

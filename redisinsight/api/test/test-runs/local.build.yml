@@ -13,7 +13,7 @@ services:
       dockerfile: ./test/test-runs/test.Dockerfile
     tty: true
     volumes:
-      - ../../${COV_FOLDER}:/usr/src/app/coverage
+      - ${COV_FOLDER}:/usr/src/app/coverage
       - ${COV_FOLDER}:/root/.redisinsight-v2.0
     depends_on:
       - redis
@@ -29,7 +29,7 @@ services:
 
   # dummy service to prevent docker validation errors
   app:
-    image: node:20.14-alpine
+    image: node:22.22.0-alpine
 
 networks:
   default:

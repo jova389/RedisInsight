@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 import { isString, partialRight } from 'lodash'
 import { keysDataSelector } from 'uiSrc/slices/browser/keys'
@@ -42,7 +42,7 @@ import { InsightsPanelTabs, SidePanels } from 'uiSrc/slices/interfaces/insights'
 import { EXTERNAL_LINKS } from 'uiSrc/constants/links'
 import { FeatureFlags } from 'uiSrc/constants'
 import { isAnyFeatureEnabled } from 'uiSrc/utils/features'
-
+import { Link } from 'uiSrc/components/base/link/Link'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import styles from './styles.module.scss'
 
@@ -67,10 +67,10 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserPage,
     title: 'Browser',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
-      const { total } = useSelector(keysDataSelector)
+      const { total } = useAppSelector(keysDataSelector)
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         total
@@ -99,7 +99,7 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserTreeView,
     title: 'Tree view',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const telemetryArgs: TelemetryArgs = [
@@ -120,19 +120,19 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserFilterSearch,
     title: 'Filter and search',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const {
         [FeatureFlags.databaseChat]: databaseChatFeature,
         [FeatureFlags.documentationChat]: documentationChatFeature,
-      } = useSelector(appFeatureFlagsFeaturesSelector)
+      } = useAppSelector(appFeatureFlagsFeaturesSelector)
       const isAnyChatAvailable = isAnyFeatureEnabled([
         databaseChatFeature,
         documentationChatFeature,
       ])
 
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.BrowserFilters,
@@ -162,11 +162,11 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserCopilot,
     title: 'Try Redis Copilot',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
 
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.BrowserCopilot,
@@ -189,19 +189,19 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserCLI,
     title: 'CLI',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const {
         [FeatureFlags.databaseChat]: databaseChatFeature,
         [FeatureFlags.documentationChat]: documentationChatFeature,
-      } = useSelector(appFeatureFlagsFeaturesSelector)
+      } = useAppSelector(appFeatureFlagsFeaturesSelector)
       const isAnyChatAvailable = isAnyFeatureEnabled([
         databaseChatFeature,
         documentationChatFeature,
       ])
 
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.BrowserCLI,
@@ -231,10 +231,10 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserCommandHelper,
     title: 'Command Helper',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.BrowserCommandHelper,
@@ -265,11 +265,11 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.BrowserProfiler,
     title: 'Profiler',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
 
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const history = useHistory()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
@@ -299,6 +299,46 @@ const ONBOARDING_FEATURES = {
           dispatch(resetCliHelperSettings())
           dispatch(setMonitorInitialState())
 
+          history.push(Pages.vectorSearch(connectedInstanceId))
+
+          sendNextTelemetryEvent(...telemetryArgs)
+        },
+      }
+    },
+  },
+  VECTOR_SEARCH_PAGE: {
+    step: OnboardingSteps.VectorSearchPage,
+    title: 'Search',
+    Inner: () => {
+      const { id: connectedInstanceId = '' } = useAppSelector(
+        connectedInstanceSelector,
+      )
+
+      const dispatch = useAppDispatch()
+      const history = useHistory()
+      const telemetryArgs: TelemetryArgs = [
+        connectedInstanceId,
+        OnboardingStepName.VectorSearchIntro,
+      ]
+
+      return {
+        content: (
+          <>
+            This is Search, where you can index your data and query it using
+            Redis Search. Run full-text search, vector similarity, and filtered
+            queries right from the UI.
+            <Spacer size="xs" />
+            Load sample data to create your first index and run sample queries
+            to see results instantly.
+          </>
+        ),
+        onSkip: () => sendClosedTelemetryEvent(...telemetryArgs),
+        onBack: () => {
+          history.push(Pages.browser(connectedInstanceId))
+          dispatch(showMonitor())
+          sendBackTelemetryEvent(...telemetryArgs)
+        },
+        onNext: () => {
           history.push(Pages.workbench(connectedInstanceId))
           sendNextTelemetryEvent(...telemetryArgs)
         },
@@ -309,12 +349,12 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.WorkbenchPage,
     title: 'Try Workbench!',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const [firstIndex, setFirstIndex] = useState<Nullable<string>>(null)
 
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const history = useHistory()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
@@ -342,21 +382,23 @@ const ONBOARDING_FEATURES = {
             and working with commands in editor mode.
             <Spacer size="xs" />
             Workbench visualizes complex{' '}
-            <a
+            <Link
               href={EXTERNAL_LINKS.redisStack}
               target="_blank"
               rel="noreferrer"
+              variant="inline"
             >
               Redis Stack
-            </a>{' '}
+            </Link>{' '}
             data models such as documents, graphs, and time series. Or you{' '}
-            <a
+            <Link
               href="https://github.com/RedisInsight/Packages"
               target="_blank"
               rel="noreferrer"
+              variant="inline"
             >
               can build your own visualization
-            </a>
+            </Link>
             .
             {isString(firstIndex) && (
               <>
@@ -394,8 +436,8 @@ const ONBOARDING_FEATURES = {
         ),
         onSkip: () => sendClosedTelemetryEvent(...telemetryArgs),
         onBack: () => {
-          history.push(Pages.browser(connectedInstanceId))
-          dispatch(showMonitor())
+          history.push(Pages.vectorSearch(connectedInstanceId))
+
           sendBackTelemetryEvent(...telemetryArgs)
         },
         onNext: () => {
@@ -410,7 +452,7 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.Tutorials,
     title: 'Explore and learn more',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const telemetryArgs: TelemetryArgs = [
@@ -419,7 +461,7 @@ const ONBOARDING_FEATURES = {
       ]
 
       const history = useHistory()
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
 
       return {
         content:
@@ -442,11 +484,11 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.CustomTutorials,
     title: 'Upload your tutorials',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const history = useHistory()
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.ExploreCustomTutorials,
@@ -459,13 +501,14 @@ const ONBOARDING_FEATURES = {
             building custom Redis Insight tutorials.
             <Spacer size="xs" />
             Use our{' '}
-            <a
+            <Link
               href={EXTERNAL_LINKS.guidesRepo}
               target="_blank"
               rel="noreferrer"
+              variant="inline"
             >
               instructions
-            </a>{' '}
+            </Link>{' '}
             to describe your implementations of Redis for other users to follow
             and interact with in the context of a connected Redis database
           </>
@@ -484,11 +527,11 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.AnalyticsOverview,
     title: 'Cluster Overview',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const history = useHistory()
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.ClusterOverview,
@@ -519,11 +562,11 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.AnalyticsDatabaseAnalysis,
     title: 'Database Analysis',
     Inner: () => {
-      const { data } = useSelector(dbAnalysisSelector)
-      const { id: connectedInstanceId = '', connectionType } = useSelector(
+      const { data } = useAppSelector(dbAnalysisSelector)
+      const { id: connectedInstanceId = '', connectionType } = useAppSelector(
         connectedInstanceSelector,
       )
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const history = useHistory()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
@@ -571,7 +614,7 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.AnalyticsRecommendations,
     title: 'Database Tips',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const history = useHistory()
@@ -596,12 +639,12 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.AnalyticsSlowLog,
     title: 'Slow Log',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
-      const { data } = useSelector(dbAnalysisSelector)
+      const { data } = useAppSelector(dbAnalysisSelector)
       const history = useHistory()
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.SlowLog,
@@ -642,7 +685,7 @@ const ONBOARDING_FEATURES = {
     step: OnboardingSteps.PubSubPage,
     title: 'Pub/Sub',
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const history = useHistory()
@@ -683,11 +726,11 @@ const ONBOARDING_FEATURES = {
       </>
     ),
     Inner: () => {
-      const { id: connectedInstanceId = '' } = useSelector(
+      const { id: connectedInstanceId = '' } = useAppSelector(
         connectedInstanceSelector,
       )
       const history = useHistory()
-      const dispatch = useDispatch()
+      const dispatch = useAppDispatch()
       const telemetryArgs: TelemetryArgs = [
         connectedInstanceId,
         OnboardingStepName.Finish,

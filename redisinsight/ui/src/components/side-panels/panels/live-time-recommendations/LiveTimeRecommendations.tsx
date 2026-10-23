@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
 import { remove } from 'lodash'
 import styled from 'styled-components'
 
+import { Trans, useTranslation } from 'uiSrc/i18n'
 import { FeatureFlags, DEFAULT_DELIMITER, Pages } from 'uiSrc/constants'
-import {
-  ANALYZE_CLUSTER_TOOLTIP_MESSAGE,
-  ANALYZE_TOOLTIP_MESSAGE,
-} from 'uiSrc/constants/recommendations'
 import {
   recommendationsSelector,
   fetchRecommendationsAction,
@@ -39,9 +36,11 @@ import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import Recommendation from './components/recommendation'
 import WelcomeScreen from './components/welcome-screen'
 import PopoverRunAnalyze from './components/popover-run-analyze'
-import styles from './styles.module.scss'
 import { Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout'
+import { Link } from 'uiSrc/components/base/link/Link'
+
+import styles from './styles.module.scss'
 
 const FooterLink = styled.button<{
   onClick?: () => void
@@ -59,23 +58,52 @@ const FooterLink = styled.button<{
   }
 `
 
+const AnalysisLink = ({
+  isShowPopover,
+  setIsShowPopover,
+  onApproveClick,
+  popoverContent,
+  children,
+}: {
+  isShowPopover: boolean
+  setIsShowPopover: (value: boolean) => void
+  onApproveClick: () => void
+  popoverContent: string
+  children?: React.ReactNode
+}) => (
+  <PopoverRunAnalyze
+    isShowPopover={isShowPopover}
+    setIsShowPopover={setIsShowPopover}
+    onApproveClick={onApproveClick}
+    popoverContent={popoverContent}
+  >
+    <FooterLink
+      onClick={() => setIsShowPopover(true)}
+      data-testid="footer-db-analysis-link"
+    >
+      {children}
+    </FooterLink>
+  </PopoverRunAnalyze>
+)
+
 const LiveTimeRecommendations = () => {
-  const { provider, connectionType } = useSelector(connectedInstanceSelector)
+  const { t } = useTranslation()
+  const { provider, connectionType } = useAppSelector(connectedInstanceSelector)
   const {
     loading,
     data: { recommendations },
     content: recommendationsContent,
-  } = useSelector(recommendationsSelector)
+  } = useAppSelector(recommendationsSelector)
   const {
     showHiddenRecommendations: isShowHidden,
     treeViewDelimiter = [DEFAULT_DELIMITER],
-  } = useSelector(appContextDbConfig)
+  } = useAppSelector(appContextDbConfig)
 
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const [isShowApproveRun, setIsShowApproveRun] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const history = useHistory()
 
   const isShowHiddenDisplayed = recommendations.filter((r) => r.hide).length > 0
@@ -154,24 +182,22 @@ const LiveTimeRecommendations = () => {
   }
 
   const renderHeader = () => (
-    <div className={styles.actions}>
-      <Row align="center" gap="s">
-        <ColorText variant="semiBold" className={styles.boldText}>
-          Our Tips
-        </ColorText>
+    <Row align="center" justify="between" className={styles.actions}>
+      <Row align="center" gap="m">
+        <ColorText variant="semiBold">{t('tips.panel.title')}</ColorText>
         <RiTooltip
           position="bottom"
           className={styles.tooltip}
+          anchorClassName={styles.tooltipAnchor}
           content={
             <Text size="s">
-              Tips will help you improve your database.
+              {t('tips.panel.infoTooltip')}
               <Spacer size="s" />
-              New tips appear while you work with your database, including how
-              to improve performance and optimize memory usage.
+              {t('tips.newTipsInfo')}
               <FeatureFlagComponent name={FeatureFlags.envDependent}>
                 <>
                   <Spacer size="s" />
-                  Eager for more tips? Run Database Analysis to get started.
+                  {t('tips.eagerForMoreTips')}
                 </>
               </FeatureFlagComponent>
             </Text>
@@ -180,24 +206,26 @@ const LiveTimeRecommendations = () => {
           <RiIcon
             className={styles.infoIcon}
             type="InfoIcon"
-            size="s"
+            size="m"
             data-testid="recommendations-info-icon"
           />
         </RiTooltip>
         <FeatureFlagComponent name={FeatureFlags.envDependent}>
-          <a
+          <Link
+            variant="inline"
+            size="M"
             href={EXTERNAL_LINKS.githubRepo}
             target="_blank"
             data-testid="github-repo-btn"
           >
             <RiIcon
               className={styles.githubIcon}
-              aria-label="redis insight github repository"
+              aria-label={t('tips.panel.githubRepoAria')}
               type="GithubIcon"
               size="m"
               data-testid="github-repo-icon"
             />
-          </a>
+          </Link>
         </FeatureFlagComponent>
       </Row>
 
@@ -205,15 +233,15 @@ const LiveTimeRecommendations = () => {
         <Checkbox
           id="showHidden"
           name="showHidden"
-          label="Show hidden"
+          label={t('tips.panel.showHidden')}
           checked={isShowHidden}
           className={styles.hideCheckbox}
           onChange={(e) => onChangeShowHidden(e.target.checked)}
           data-testid="checkbox-show-hidden"
-          aria-label="checkbox show hidden"
+          aria-label={t('tips.panel.checkboxShowHiddenAria')}
         />
       )}
-    </div>
+    </Row>
   )
 
   return (
@@ -237,25 +265,23 @@ const LiveTimeRecommendations = () => {
               type="MessageInfoIcon"
             />
             <Text className={styles.text}>
-              {'Run '}
-              <PopoverRunAnalyze
-                isShowPopover={isShowApproveRun}
-                setIsShowPopover={setIsShowApproveRun}
-                onApproveClick={handleClickDbAnalysisLink}
-                popoverContent={
-                  connectionType === ConnectionType.Cluster
-                    ? ANALYZE_CLUSTER_TOOLTIP_MESSAGE
-                    : ANALYZE_TOOLTIP_MESSAGE
-                }
-              >
-                <FooterLink
-                  onClick={() => setIsShowApproveRun(true)}
-                  data-testid="footer-db-analysis-link"
-                >
-                  Database Analysis
-                </FooterLink>
-              </PopoverRunAnalyze>
-              {' to get more tips'}
+              <Trans
+                i18nKey="tips.panel.footer"
+                components={{
+                  analysisLink: (
+                    <AnalysisLink
+                      isShowPopover={isShowApproveRun}
+                      setIsShowPopover={setIsShowApproveRun}
+                      onApproveClick={handleClickDbAnalysisLink}
+                      popoverContent={t(
+                        connectionType === ConnectionType.Cluster
+                          ? 'tips.runAnalysis.tooltipCluster'
+                          : 'tips.runAnalysis.tooltip',
+                      )}
+                    />
+                  ),
+                }}
+              />
             </Text>
           </div>
         </FeatureFlagComponent>

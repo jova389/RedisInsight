@@ -1,13 +1,12 @@
 import React from 'react'
 
-import { Text } from 'uiSrc/components/base/text'
 import {
   DestructiveButton,
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { RiPopover } from 'uiSrc/components/base'
 import { HorizontalSpacer } from 'uiSrc/components/base/layout'
-import styles from './styles.module.scss'
+import ConfirmationPopover from 'uiSrc/components/confirmation-popover'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   id: string
@@ -25,23 +24,33 @@ const AckPopover = (props: Props) => {
     showPopover = () => {},
     acknowledge = () => {},
   } = props
+  const { t } = useTranslation()
   return (
-    <RiPopover
+    <ConfirmationPopover
       key={id}
+      title={id}
+      message={t('browser.stream.ack.message')}
       anchorPosition="leftCenter"
       ownFocus
       isOpen={isOpen}
       closePopover={closePopover}
       panelPaddingSize="m"
       anchorClassName="ackMessagePopover"
-      panelClassName={styles.popoverWrapper}
+      confirmButton={
+        <DestructiveButton
+          size="s"
+          onClick={() => acknowledge(id)}
+          data-testid="acknowledge-submit"
+        >
+          {t('browser.stream.ack.confirm')}
+        </DestructiveButton>
+      }
       button={
         <>
           <SecondaryButton
             size="s"
-            aria-label="Acknowledge pending message"
+            aria-label={t('browser.stream.ack.aria')}
             onClick={showPopover}
-            className={styles.ackBtn}
             data-testid="acknowledge-btn"
           >
             ACK
@@ -49,24 +58,7 @@ const AckPopover = (props: Props) => {
           <HorizontalSpacer size="s" />
         </>
       }
-    >
-      <div className={styles.popover}>
-        <Text size="m">
-          <b>{id}</b>
-          <br />
-          will be acknowledged and removed from the pending messages list
-        </Text>
-        <div className={styles.popoverFooter}>
-          <DestructiveButton
-            size="s"
-            onClick={() => acknowledge(id)}
-            data-testid="acknowledge-submit"
-          >
-            Acknowledge
-          </DestructiveButton>
-        </div>
-      </div>
-    </RiPopover>
+    />
   )
 }
 

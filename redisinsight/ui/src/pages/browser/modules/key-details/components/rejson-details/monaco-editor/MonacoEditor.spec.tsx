@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen } from 'uiSrc/utils/test-utils'
 import { configureStore } from '@reduxjs/toolkit'
 import { Provider } from 'react-redux'
 
@@ -9,6 +9,10 @@ const mockStore = configureStore({
   reducer: () => ({
     browser: {
       rejson: {},
+      keys: {},
+    },
+    connections: {
+      instances: { connectedInstance: {} },
     },
     app: {
       features: {
@@ -47,4 +51,10 @@ it('should preserve large numbers in Monaco editor', async () => {
   const editor = await screen.findByTestId('json-data-editor')
 
   expect(editor.textContent).toContain(`${bigNumber}`)
+})
+
+it('should render a copy button for the editor value', () => {
+  renderWithRedux(<MonacoEditor data={{ a: 1 } as any} {...commonProps} />)
+
+  expect(screen.getByTestId('copy-json-editor-value-btn')).toBeInTheDocument()
 })

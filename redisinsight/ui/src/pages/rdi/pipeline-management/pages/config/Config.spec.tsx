@@ -1,6 +1,5 @@
 import React from 'react'
 import { cloneDeep } from 'lodash'
-import { AxiosError } from 'axios'
 import {
   rdiPipelineSelector,
   setChangedFile,
@@ -25,7 +24,10 @@ import {
   TelemetryEvent,
 } from 'uiSrc/telemetry'
 import { FileChangeType } from 'uiSrc/slices/interfaces'
-import { addErrorNotification } from 'uiSrc/slices/app/notifications'
+import {
+  addErrorNotification,
+  type IAddInstanceErrorPayload,
+} from 'uiSrc/slices/app/notifications'
 import Config from './Config'
 
 jest.mock('uiSrc/telemetry', () => ({
@@ -90,7 +92,7 @@ describe('Config', () => {
 
     render(<Config />)
 
-    expect(sendPageViewTelemetry).toBeCalledWith({
+    expect(sendPageViewTelemetry).toHaveBeenCalledWith({
       name: TelemetryPageView.RDI_CONFIG,
       eventData: {
         rdiInstanceId: 'rdiInstanceId',
@@ -215,7 +217,7 @@ describe('Config', () => {
             ),
           },
         },
-      } as AxiosError),
+      } as IAddInstanceErrorPayload),
     ]
 
     expect(store.getActions().slice(0, expectedActions.length)).toEqual(
@@ -237,7 +239,7 @@ describe('Config', () => {
     expect(screen.getByTestId('rdi-config-loading')).toBeInTheDocument()
   })
 
-  it('should render loader on btn', () => {
+  it('should not render loader on btn for pipeline loading', () => {
     const rdiPipelineSelectorMock = jest.fn().mockReturnValue({
       loading: true,
     })
@@ -248,11 +250,12 @@ describe('Config', () => {
     const { getByTestId } = render(<Config />)
 
     // check is btn has loader
-    const child = getByTestId('rdi-test-connection-btn').children[0].children[0]
-    expect(child.tagName.toLowerCase()).toEqual('svg')
+    const child = getByTestId('rdi-test-connection-btn')
+    const icon = child.querySelector('svg')
+    expect(icon).not.toBeInTheDocument()
   })
 
-  it('should render loader on btn', () => {
+  it('should render loader on btn when testing connection', () => {
     const rdiTestConnectionsSelectorMock = jest.fn().mockReturnValue({
       loading: true,
     })
@@ -263,8 +266,8 @@ describe('Config', () => {
     const { getByTestId } = render(<Config />)
 
     // check is btn has loader
-    const child = getByTestId('rdi-test-connection-btn').children[0].children[0]
-    expect(child.tagName.toLowerCase()).toEqual('svg')
+    const child = getByTestId('rdi-test-connection-btn')
+    expect(child.querySelector('svg')).toBeTruthy()
   })
 
   it('should send telemetry event when clicking Test Connection button', async () => {

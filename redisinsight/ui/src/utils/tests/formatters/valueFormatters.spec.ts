@@ -1,7 +1,9 @@
+import React from 'react'
 import { format } from 'date-fns'
 import { encode } from 'msgpackr'
 import { serialize } from 'php-serialize'
 import { DATETIME_FORMATTER_DEFAULT, KeyValueFormat } from 'uiSrc/constants'
+import { MarkdownViewer } from 'uiSrc/components/markdown-viewer'
 import {
   anyToBuffer,
   bufferToSerializedFormat,
@@ -163,6 +165,37 @@ describe('bufferToSerializedFormat', () => {
         ).toEqual(val)
       })
     })
+
+    // php-serialize v5.1+ returns BigInt for integers outside JS safe range.
+    // Regression: JSON.stringify throws on BigInt, which previously caused
+    // the editor to fall back to the raw serialized string.
+    describe('should handle BigInt values from large integers', () => {
+      const testValues = [
+        {
+          input: stringToBuffer('i:9999999999999999999;'),
+          expected: '9999999999999999999',
+        },
+        {
+          input: stringToBuffer('i:-9999999999999999999;'),
+          expected: '-9999999999999999999',
+        },
+        {
+          input: stringToBuffer(
+            'a:2:{s:5:"small";i:42;s:7:"big_int";i:9999999999999999999;}',
+          ),
+          expected: '{"small":42,"big_int":9999999999999999999}',
+        },
+      ]
+
+      test.each(testValues)(
+        'preserves precision for %j',
+        ({ input, expected }) => {
+          expect(bufferToSerializedFormat(KeyValueFormat.PHP, input)).toEqual(
+            expected,
+          )
+        },
+      )
+    })
   })
 })
 
@@ -246,6 +279,34 @@ describe('stringToSerializedBufferFormat', () => {
         expect(stringToSerializedBufferFormat(KeyValueFormat.PHP, val)).toEqual(
           stringToBuffer(val),
         )
+      })
+    })
+
+    // Regression: plain JSON.parse converts integers outside the JS safe
+    // range to imprecise numbers (e.g. 9999999999999999999 → 1e19),
+    // silently corrupting values on save.
+    describe('should preserve BigInt precision on save', () => {
+      const testValues = [
+        {
+          input: '9999999999999999999',
+          expected: stringToBuffer('i:9999999999999999999;'),
+        },
+        {
+          input: '-9999999999999999999',
+          expected: stringToBuffer('i:-9999999999999999999;'),
+        },
+        {
+          input: '{"small":42,"big_int":9999999999999999999}',
+          expected: stringToBuffer(
+            'a:2:{s:5:"small";i:42;s:7:"big_int";i:9999999999999999999;}',
+          ),
+        },
+      ]
+
+      test.each(testValues)('round-trips %j', ({ input, expected }) => {
+        expect(
+          stringToSerializedBufferFormat(KeyValueFormat.PHP, input),
+        ).toEqual(expected)
       })
     })
   })
@@ -351,6 +412,39 @@ describe('formattingBuffer', () => {
           expected,
         )
       })
+    })
+  })
+
+  describe(KeyValueFormat.Markdown, () => {
+    const source = '# Title'
+    const input = stringToBuffer(source)
+
+    it('should render a MarkdownViewer element when expanded', () => {
+      const { value, isValid } = formattingBuffer(
+        input,
+        KeyValueFormat.Markdown,
+        { expanded: true },
+      )
+
+      expect(isValid).toEqual(true)
+      expect(React.isValidElement(value)).toEqual(true)
+      expect(React.isValidElement(value) && value.type).toEqual(MarkdownViewer)
+    })
+
+    it('should render a MarkdownViewer element even when not expanded', () => {
+      const { value, isValid } = formattingBuffer(
+        input,
+        KeyValueFormat.Markdown,
+      )
+
+      expect(isValid).toEqual(true)
+      expect(React.isValidElement(value) && value.type).toEqual(MarkdownViewer)
+    })
+
+    it('should return the raw markdown source inside a tooltip', () => {
+      expect(
+        formattingBuffer(input, KeyValueFormat.Markdown, { tooltip: true }),
+      ).toEqual({ value: source, isValid: true })
     })
   })
 })

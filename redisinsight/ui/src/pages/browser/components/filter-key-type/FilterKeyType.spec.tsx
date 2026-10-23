@@ -2,7 +2,7 @@ import { cloneDeep, set } from 'lodash'
 import React from 'react'
 import {
   cleanup,
-  clearStoreActions,
+  expectActionsToContain,
   fireEvent,
   initialStateDefault,
   mockedStore,
@@ -12,11 +12,13 @@ import {
   userEvent,
 } from 'uiSrc/utils/test-utils'
 import { loadKeys, setFilter } from 'uiSrc/slices/browser/keys'
+import { setBulkDeleteFilter } from 'uiSrc/slices/browser/bulkActions'
 import { connectedInstanceOverviewSelector } from 'uiSrc/slices/instances/instances'
 import { FeatureFlags, KeyTypes } from 'uiSrc/constants'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { RedisDefaultModules } from 'uiSrc/slices/interfaces'
 import FilterKeyType from './FilterKeyType'
+import { resetBrowserTree } from 'uiSrc/slices/app/context'
 
 let store: typeof mockedStore
 
@@ -28,6 +30,11 @@ jest.mock('uiSrc/telemetry', () => ({
   sendEventTelemetry: jest.fn(),
 }))
 
+jest.mock('uiSrc/slices/app/features', () => ({
+  ...jest.requireActual('uiSrc/slices/app/features'),
+  isDevelopment: false,
+}))
+
 jest.mock('uiSrc/slices/instances/instances', () => ({
   ...jest.requireActual('uiSrc/slices/instances/instances'),
   connectedInstanceOverviewSelector: jest.fn().mockReturnValue({
@@ -35,6 +42,9 @@ jest.mock('uiSrc/slices/instances/instances', () => ({
   }),
   connectedInstanceSelector: jest.fn().mockReturnValue({ id: '123' }),
 }))
+
+const connectedInstanceOverviewSelectorMock =
+  connectedInstanceOverviewSelector as jest.Mock
 
 beforeEach(() => {
   cleanup()
@@ -61,20 +71,44 @@ describe('FilterKeyType', () => {
     expect(queryByTestId(unsupportedAnchorId)).not.toBeInTheDocument()
   })
 
-  it('"setFilter" and "loadKeys" should be called after select "Hash" type', async () => {
+  it('"setFilter", "setBulkDeleteFilter" and "loadKeys" should be called after select "Hash" type', async () => {
     const { findByText } = render(<FilterKeyType />)
 
     await userEvent.click(screen.getByTestId(filterSelectId))
     await userEvent.click(await findByText('Hash'))
 
-    const expectedActions = [setFilter(KeyTypes.Hash), loadKeys()]
-    expect(clearStoreActions(store.getActions())).toEqual(
-      clearStoreActions(expectedActions),
+    const expectedActions = [
+      setFilter(KeyTypes.Hash),
+      setBulkDeleteFilter(KeyTypes.Hash),
+      resetBrowserTree(),
+      loadKeys(),
+    ]
+
+    expectActionsToContain(store.getActions(), expectedActions)
+  })
+
+  it('"setBulkDeleteFilter" should be called with null when selecting "All Key Types"', async () => {
+    const initialStoreState = set(
+      cloneDeep(initialStateDefault),
+      'browser.keys.filter',
+      KeyTypes.Hash,
     )
+
+    const testStore = mockStore(initialStoreState)
+    const { findByText } = render(<FilterKeyType />, {
+      store: testStore,
+    })
+
+    await userEvent.click(screen.getByTestId(filterSelectId))
+    await userEvent.click(await findByText('All Key Types'))
+
+    const expectedActions = [setFilter(null), setBulkDeleteFilter(null)]
+
+    expectActionsToContain(testStore.getActions(), expectedActions)
   })
 
   it('should be disabled filter with database redis version < 6.0', () => {
-    connectedInstanceOverviewSelector.mockImplementationOnce(() => ({
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
       version: '5.1',
     }))
     render(<FilterKeyType />)
@@ -84,7 +118,7 @@ describe('FilterKeyType', () => {
   })
 
   it('should be info box with database redis version < 6.0', () => {
-    connectedInstanceOverviewSelector.mockImplementationOnce(() => ({
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
       version: '5.1',
     }))
     render(<FilterKeyType />)
@@ -98,8 +132,10 @@ describe('FilterKeyType', () => {
   it('should send telemetry event with redis v < 6.0 after click on anchor', async () => {
     const sendEventTelemetryMock = jest.fn()
 
-    sendEventTelemetry.mockImplementation(() => sendEventTelemetryMock)
-    connectedInstanceOverviewSelector.mockImplementationOnce(() => ({
+    ;(sendEventTelemetry as jest.Mock).mockImplementation(
+      () => sendEventTelemetryMock,
+    )
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
       version: '5.1',
     }))
 
@@ -157,5 +193,76 @@ describe('FilterKeyType', () => {
 
     const graphElement = queryByText('Graph')
     expect(graphElement).not.toBeInTheDocument()
+  })
+
+  it('should show Vector Set when redis version >= 8.0', async () => {
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
+      version: '8.0.0',
+    }))
+    const { queryByText } = render(<FilterKeyType />)
+
+    await userEvent.click(screen.getByTestId(filterSelectId))
+
+    expect(queryByText('Vector Set')).toBeInTheDocument()
+  })
+
+  it('should hide Vector Set when redis version < 8.0', async () => {
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
+      version: '7.4.0',
+    }))
+    const { queryByText } = render(<FilterKeyType />)
+
+    await userEvent.click(screen.getByTestId(filterSelectId))
+
+    expect(queryByText('Vector Set')).not.toBeInTheDocument()
+  })
+
+  it('should show Array when array feature flag is enabled and redis version >= 8.8', async () => {
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
+      version: '8.8.0',
+    }))
+    const initialStoreState = set(
+      cloneDeep(initialStateDefault),
+      `app.features.featureFlags.features.${FeatureFlags.array}`,
+      { flag: true },
+    )
+    const { queryByText } = render(<FilterKeyType />, {
+      store: mockStore(initialStoreState),
+    })
+
+    await userEvent.click(screen.getByTestId(filterSelectId))
+
+    expect(queryByText('Array')).toBeInTheDocument()
+  })
+
+  it('should hide Array when array feature flag is disabled', () => {
+    // Ensure the version gate is satisfied so the assertion truly
+    // exercises the feature-flag path and not the version path.
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
+      version: '8.8.0',
+    }))
+    const { queryByText } = render(<FilterKeyType />)
+
+    fireEvent.click(screen.getByTestId(filterSelectId))
+
+    expect(queryByText('Array')).not.toBeInTheDocument()
+  })
+
+  it('should hide Array when redis version < 8.8 even if feature flag is enabled', async () => {
+    connectedInstanceOverviewSelectorMock.mockImplementationOnce(() => ({
+      version: '8.0.0',
+    }))
+    const initialStoreState = set(
+      cloneDeep(initialStateDefault),
+      `app.features.featureFlags.features.${FeatureFlags.array}`,
+      { flag: true },
+    )
+    const { queryByText } = render(<FilterKeyType />, {
+      store: mockStore(initialStoreState),
+    })
+
+    await userEvent.click(screen.getByTestId(filterSelectId))
+
+    expect(queryByText('Array')).not.toBeInTheDocument()
   })
 })

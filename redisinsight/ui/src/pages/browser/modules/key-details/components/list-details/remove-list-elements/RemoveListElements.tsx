@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import cx from 'classnames'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { toNumber } from 'lodash'
 
 import { Text } from 'uiSrc/components/base/text'
@@ -29,8 +28,8 @@ import {
   connectedInstanceSelector,
 } from 'uiSrc/slices/instances/instances'
 
-import { AddListFormConfig as config } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { getAddListFormConfig } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import {
   DestructiveButton,
@@ -41,60 +40,70 @@ import { DeleteIcon } from 'uiSrc/components/base/icons'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
-import { RiPopover } from 'uiSrc/components/base'
+import { RiPopover, RiTooltip } from 'uiSrc/components/base'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import { DeleteListElementsDto } from 'apiSrc/modules/browser/list/dto'
+import {
+  DeleteListElementsDto,
+  Environment,
+  ListElementDestination,
+} from 'apiClient'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { Trans, useTranslation, escapeTrans } from 'uiSrc/i18n'
 
 import {
   HEAD_DESTINATION,
-  ListElementDestination,
   TAIL_DESTINATION,
 } from '../add-list-elements/AddListElements'
 
 import styles from './styles.module.scss'
 import { Panel } from 'uiSrc/components/panel'
+import { EntryContent } from 'uiSrc/pages/browser/modules/key-details/components/common/AddKeysContainer.styled'
 
 export interface Props {
   closePanel: (isCancelled?: boolean) => void
   onRemoveKey: () => void
 }
 
-const optionsDestinations = [
-  {
-    value: TAIL_DESTINATION,
-    label: 'Remove from tail',
-  },
-  {
-    value: HEAD_DESTINATION,
-    label: 'Remove from head',
-  },
-]
-
 const RemoveListElements = (props: Props) => {
   const { closePanel, onRemoveKey } = props
+  const { t } = useTranslation()
+  const config = getAddListFormConfig(t)
+
+  const optionsDestinations = [
+    {
+      value: TAIL_DESTINATION,
+      label: t('browser.list.remove.fromTail'),
+    },
+    {
+      value: HEAD_DESTINATION,
+      label: t('browser.list.remove.fromHead'),
+    },
+  ]
 
   const [count, setCount] = useState<string>('')
   const [destination, setDestination] =
     useState<ListElementDestination>(TAIL_DESTINATION)
   const [isFormValid, setIsFormValid] = useState<boolean>(true)
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false)
-  const [isInfoPopoverOpen, setIsInfoPopoverOpen] = useState<boolean>(false)
+
   const [canRemoveMultiple, setCanRemoveMultiple] = useState<boolean>(true)
-  const { name: selectedKey = '', length } = useSelector(
+  const { name: selectedKey = '', length } = useAppSelector(
     selectedKeyDataSelector,
   ) ?? {
     name: undefined,
     length: 0,
   }
-  const { version: databaseVersion = '' } = useSelector(
+  const { version: databaseVersion = '' } = useAppSelector(
     connectedInstanceOverviewSelector,
   )
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { viewType } = useSelector(keysSelector)
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { viewType } = useAppSelector(keysSelector)
+  const { environment } = useDatabaseEnvironment()
+  const bypassConfirmation = environment === Environment.Development
 
   const countInput = useRef<HTMLInputElement>(null)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     // ComponentDidMount
@@ -122,7 +131,6 @@ const RemoveListElements = (props: Props) => {
   }
 
   const showPopover = () => {
-    setIsPopoverOpen((isPopoverOpen) => !isPopoverOpen)
     sendEventTelemetry({
       event: getBasedOnViewTypeEvent(
         viewType,
@@ -134,6 +142,11 @@ const RemoveListElements = (props: Props) => {
         keyType: KeyTypes.List,
       },
     })
+    if (bypassConfirmation) {
+      submitData()
+      return
+    }
+    setIsPopoverOpen((isPopoverOpen) => !isPopoverOpen)
   }
 
   const closePopover = () => {
@@ -180,18 +193,34 @@ const RemoveListElements = (props: Props) => {
           disabled={!isFormValid}
           data-testid="remove-elements-btn"
         >
-          Remove
+          {t('browser.list.remove.button')}
         </PrimaryButton>
       }
     >
       <div className={styles.popover}>
         <Text size="m" component="div">
           <h4 style={{ marginTop: 0 }}>
-            <b>{count}</b> Element(s)
+            <Trans
+              i18nKey="browser.list.remove.elementsCount"
+              count={toNumber(count)}
+              components={{ bold: <b /> }}
+            />
           </h4>
           <Text size="s">
-            will be removed from the {destination.toLowerCase()} of{' '}
-            <b>{formatNameShort(bufferToString(selectedKey))}</b>
+            <Trans
+              i18nKey="browser.list.remove.willBeRemoved"
+              count={toNumber(count)}
+              values={{
+                destination:
+                  destination === TAIL_DESTINATION
+                    ? t('browser.list.remove.directionTail')
+                    : t('browser.list.remove.directionHead'),
+                keyName: escapeTrans(
+                  formatNameShort(bufferToString(selectedKey)),
+                ),
+              }}
+              components={{ bold: <b /> }}
+            />
           </Text>
           {(!length || length <= +count) && (
             <div className={styles.appendInfo}>
@@ -199,61 +228,48 @@ const RemoveListElements = (props: Props) => {
                 type="ToastDangerIcon"
                 style={{ marginRight: '1rem', marginTop: '4px' }}
               />
-              <Text size="s">
-                If you remove all Elements, the whole Key will be deleted.
-              </Text>
+              <Text size="s">{t('browser.list.remove.deleteWarning')}</Text>
             </div>
           )}
         </Text>
         <Spacer />
-        <DestructiveButton
-          size="small"
-          onClick={submitData}
-          icon={DeleteIcon}
-          className={styles.popoverDeleteBtn}
-          data-testid="remove-submit"
-        >
-          Remove
-        </DestructiveButton>
+        <Row justify="end">
+          <DestructiveButton
+            size="small"
+            onClick={submitData}
+            icon={DeleteIcon}
+            data-testid="remove-submit"
+          >
+            {t('browser.list.remove.button')}
+          </DestructiveButton>
+        </Row>
       </div>
     </RiPopover>
   )
 
-  const InfoBoxPopover = () => (
-    <RiPopover
-      panelClassName={cx('popoverLikeTooltip')}
-      anchorPosition="leftCenter"
-      isOpen={isInfoPopoverOpen}
-      closePopover={() => setIsInfoPopoverOpen(false)}
-      button={
-        <RiIcon
-          className={styles.infoIcon}
-          type="InfoIcon"
-          onClick={() =>
-            setIsInfoPopoverOpen((isPopoverOpen) => !isPopoverOpen)
-          }
-          style={{ cursor: 'pointer' }}
-          data-testid="info-tooltip-icon"
-        />
-      }
+  const InfoBoxTooltip = () => (
+    <RiTooltip
+      interactive
+      position="left"
+      content={HelpTexts.REMOVING_MULTIPLE_ELEMENTS_NOT_SUPPORT}
     >
-      <div className={styles.popover}>
-        {HelpTexts.REMOVING_MULTIPLE_ELEMENTS_NOT_SUPPORT}
-      </div>
-    </RiPopover>
+      <RiIcon
+        className={styles.infoIcon}
+        type="InfoIcon"
+        style={{ cursor: 'pointer' }}
+        data-testid="info-tooltip-icon"
+      />
+    </RiTooltip>
   )
 
   return (
-    <>
-      <div className={styles.content}>
+    <Col gap="m">
+      <EntryContent gap="m">
         <FlexItem grow>
-          <Row align="center">
+          <Row align="start" gap="m" className={styles.formFieldsRow}>
             <FlexItem style={{ minWidth: '220px' }}>
               <FormField>
                 <RiSelect
-                  style={{
-                    height: 43,
-                  }}
                   value={destination}
                   options={optionsDestinations}
                   onChange={(value) =>
@@ -263,45 +279,49 @@ const RemoveListElements = (props: Props) => {
                 />
               </FormField>
             </FlexItem>
-            <FlexItem grow style={{ width: '100%' }}>
-              <FormField
-                additionalText={!canRemoveMultiple ? InfoBoxPopover() : <></>}
-              >
-                <TextInput
-                  name={config.count.name}
-                  id={config.count.name}
-                  maxLength={200}
-                  placeholder={config.count.placeholder}
-                  value={count}
-                  data-testid="count-input"
-                  autoComplete="off"
-                  onChange={handleCountChange}
-                  ref={countInput}
-                  disabled={!canRemoveMultiple}
-                />
-              </FormField>
-            </FlexItem>
+            <Row grow>
+              <FlexItem grow>
+                <FormField>
+                  <TextInput
+                    name={config.count.name}
+                    id={config.count.name}
+                    maxLength={200}
+                    placeholder={config.count.placeholder}
+                    value={count}
+                    data-testid="count-input"
+                    autoComplete="off"
+                    onChange={handleCountChange}
+                    ref={countInput}
+                    disabled={!canRemoveMultiple}
+                  />
+                </FormField>
+              </FlexItem>
+
+              {!canRemoveMultiple && (
+                <FlexItem>
+                  <InfoBoxTooltip />
+                </FlexItem>
+              )}
+            </Row>
           </Row>
         </FlexItem>
-      </div>
-      <>
-        <Panel justify="end" gap="xl">
-          <FlexItem>
-            <div>
-              <SecondaryButton
-                onClick={() => closePanel(true)}
-                data-testid="cancel-elements-btn"
-              >
-                Cancel
-              </SecondaryButton>
-            </div>
-          </FlexItem>
-          <FlexItem>
-            <div>{RemoveButton()}</div>
-          </FlexItem>
-        </Panel>
-      </>
-    </>
+      </EntryContent>
+      <Panel justify="end" gap="xl">
+        <FlexItem>
+          <div>
+            <SecondaryButton
+              onClick={() => closePanel(true)}
+              data-testid="cancel-elements-btn"
+            >
+              {t('browser.list.remove.cancel')}
+            </SecondaryButton>
+          </div>
+        </FlexItem>
+        <FlexItem>
+          <div>{RemoveButton()}</div>
+        </FlexItem>
+      </Panel>
+    </Col>
   )
 }
 

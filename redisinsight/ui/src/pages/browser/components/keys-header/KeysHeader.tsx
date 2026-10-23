@@ -1,15 +1,11 @@
 /* eslint-disable react/destructuring-assignment */
 /* eslint-disable react/no-this-in-sfc */
-import cx from 'classnames'
-import React, { Ref, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { Ref, useEffect, useRef, useState } from 'react'
+import { ParseKeys } from 'i18next'
+import { Environment } from 'apiClient'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import AutoSizer from 'react-virtualized-auto-sizer'
-import {
-  IconType,
-  ColumnsIcon,
-  EqualIcon,
-  FoldersIcon,
-} from 'uiSrc/components/base/icons'
+import { IconType, EqualIcon, FoldersIcon } from 'uiSrc/components/base/icons'
 import KeysSummary from 'uiSrc/components/keys-summary'
 import {
   SCAN_COUNT_DEFAULT,
@@ -48,17 +44,26 @@ import { incrementOnboardStepAction } from 'uiSrc/slices/app/features'
 import { AutoRefresh, OnboardingTour } from 'uiSrc/components'
 import { RiPopover, RiTooltip } from 'uiSrc/components/base'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
-import { BrowserColumns, KeyValueFormat } from 'uiSrc/constants'
-
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { setConnectivityError } from 'uiSrc/slices/app/connectivity'
 import {
-  IconButton,
-  SecondaryButton,
-} from 'uiSrc/components/base/forms/buttons'
+  BrowserColumns,
+  BrowserStorageItem,
+  KeyValueFormat,
+  SortOrder,
+} from 'uiSrc/constants'
+import { ISortedColumn } from 'uiSrc/components/virtual-table/interfaces'
+
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { setConnectivityError } from 'uiSrc/slices/app/connectivity'
 import { Checkbox } from 'uiSrc/components/base/forms/checkbox/Checkbox'
+import { ButtonGroup } from 'uiSrc/components/base/forms/button-group/ButtonGroup'
+import { ToggleButton } from 'uiSrc/components/base/forms/buttons'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { Text } from 'uiSrc/components/base/text'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { localStorageService } from 'uiSrc/services'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
+import * as S from './KeysHeader.styles'
 
 const HIDE_REFRESH_LABEL_WIDTH = 640
 
@@ -68,7 +73,6 @@ interface ISwitchType<T> {
   disabled?: boolean
   ariaLabel: string
   dataTestId: string
-  getClassName: () => string
   onClick: () => void
   isActiveView: () => boolean
   getIconType: () => IconType
@@ -81,7 +85,31 @@ export interface Props {
   isSearched: boolean
   loadKeys: (type?: KeyViewType) => void
   handleScanMoreClick: (config: any) => void
+  sortedColumn?: ISortedColumn | null
+  onChangeSorting?: (column: string | null, order: SortOrder | null) => void
 }
+
+const SORTABLE_COLUMNS: {
+  id: string
+  label: ParseKeys
+  requiresColumn: BrowserColumns | null
+}[] = [
+  {
+    id: 'nameString',
+    label: 'browser.keyList.column.key',
+    requiresColumn: null as BrowserColumns | null,
+  },
+  {
+    id: 'ttl',
+    label: 'browser.keyList.column.ttl',
+    requiresColumn: BrowserColumns.TTL,
+  },
+  {
+    id: 'size',
+    label: 'browser.keyList.column.size',
+    requiresColumn: BrowserColumns.Size,
+  },
+]
 
 const KeysHeader = (props: Props) => {
   const {
@@ -91,20 +119,48 @@ const KeysHeader = (props: Props) => {
     loadKeys,
     handleScanMoreClick,
     nextCursor,
+    sortedColumn,
+    onChangeSorting,
   } = props
+  const { t } = useTranslation()
 
-  const { id: instanceId, keyNameFormat } = useSelector(
+  const { id: instanceId, keyNameFormat } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { viewType, searchMode, isFiltered } = useSelector(keysSelector)
-  const { shownColumns } = useSelector(appContextDbConfig)
-  const { selectedIndex } = useSelector(redisearchSelector)
+  const { viewType, searchMode, isFiltered } = useAppSelector(keysSelector)
+  const { shownColumns } = useAppSelector(appContextDbConfig)
+  const { selectedIndex } = useAppSelector(redisearchSelector)
+  const { environment } = useDatabaseEnvironment()
 
   const [columnsConfigShown, setColumnsConfigShown] = useState(false)
 
   const rootDivRef: Ref<HTMLDivElement> = useRef(null)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+
+  useEffect(() => {
+    if (environment !== Environment.Production || !instanceId) return
+
+    // Hide the Size column by default on production connections that the
+    // user hasn't configured yet. setBrowserShownColumns persists under
+    // the `browserShownColumns` key (BrowserStorageItem.browserShownColumns)
+    // — must check the same key, not `shownColumns`, otherwise the effect
+    // would re-fire after a user explicitly toggles Size on and clobber
+    // their preference.
+    const storedConfig = localStorageService.get(
+      BrowserStorageItem.dbConfig + instanceId,
+    )
+    const hasUserConfigured =
+      storedConfig?.[BrowserStorageItem.browserShownColumns] !== undefined
+    if (!hasUserConfigured) {
+      dispatch(
+        setBrowserShownColumns(
+          shownColumns.filter((col) => col !== BrowserColumns.Size),
+        ),
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [environment, instanceId])
 
   // TODO: Check if encoding can be reused from BE and FE
   const format = keyNameFormat as unknown as KeyValueFormat
@@ -113,14 +169,11 @@ const KeysHeader = (props: Props) => {
   const viewTypes: ISwitchType<KeyViewType>[] = [
     {
       type: KeyViewType.Browser,
-      tooltipText: 'List View',
-      ariaLabel: 'List view button',
+      tooltipText: t('browser.keysHeader.view.listTooltip'),
+      ariaLabel: t('browser.keysHeader.view.listAria'),
       dataTestId: 'view-type-browser-btn',
       isActiveView() {
         return viewType === this.type
-      },
-      getClassName() {
-        return cx(styles.viewTypeBtn, { [styles.active]: this.isActiveView() })
       },
       getIconType() {
         return EqualIcon
@@ -132,16 +185,13 @@ const KeysHeader = (props: Props) => {
     {
       type: KeyViewType.Tree,
       tooltipText: isTreeViewDisabled
-        ? 'Tree View is unavailable when the HEX key name format is selected.'
-        : 'Tree View',
-      ariaLabel: 'Tree view button',
+        ? t('browser.keysHeader.view.treeDisabledTooltip')
+        : t('browser.keysHeader.view.treeTooltip'),
+      ariaLabel: t('browser.keysHeader.view.treeAria'),
       dataTestId: 'view-type-list-btn',
       disabled: isTreeViewDisabled,
       isActiveView() {
         return viewType === this.type
-      },
-      getClassName() {
-        return cx(styles.viewTypeBtn, { [styles.active]: this.isActiveView() })
       },
       getIconType() {
         return FoldersIcon
@@ -277,6 +327,16 @@ const KeysHeader = (props: Props) => {
         : hidden.push(BrowserColumns.Size)
     }
 
+    // Clear sort if the column being hidden is currently the sorted column
+    if (!status) {
+      const sortedColDef = SORTABLE_COLUMNS.find(
+        (c) => c.requiresColumn === columnType,
+      )
+      if (sortedColDef && sortedColumn?.column === sortedColDef.id) {
+        onChangeSorting?.(null, null)
+      }
+    }
+
     dispatch(setBrowserShownColumns(newColumns))
     sendEventTelemetry({
       event: TelemetryEvent.SHOW_BROWSER_COLUMN_CLICKED,
@@ -289,79 +349,78 @@ const KeysHeader = (props: Props) => {
   }
 
   const ViewSwitch = () => (
-    <div className={styles.viewTypeSwitch} data-testid="view-type-switcher">
-      <OnboardingTour options={ONBOARDING_FEATURES.BROWSER_TREE_VIEW}>
-        <>
-          {viewTypes.map((view) => (
-            <RiTooltip
-              content={view.tooltipText}
-              position="top"
-              key={view.tooltipText}
+    <OnboardingTour options={ONBOARDING_FEATURES.BROWSER_TREE_VIEW}>
+      <ButtonGroup data-testid="view-type-switcher">
+        {viewTypes.map((view) => (
+          <RiTooltip
+            content={view.tooltipText}
+            position="top"
+            key={view.tooltipText}
+          >
+            <S.ViewSwitchButton
+              aria-label={view.ariaLabel}
+              onClick={() => view.onClick()}
+              isSelected={view.isActiveView()}
+              data-testid={view.dataTestId}
+              disabled={view.disabled || false}
             >
-              <IconButton
-                size="S"
-                className={view.getClassName()}
-                icon={view.getIconType()}
-                aria-label={view.ariaLabel}
-                onClick={() => view.onClick()}
-                data-testid={view.dataTestId}
-                disabled={view.disabled || false}
-              />
-            </RiTooltip>
-          ))}
-        </>
-      </OnboardingTour>
-    </div>
+              <ButtonGroup.Icon icon={view.getIconType()} />
+            </S.ViewSwitchButton>
+          </RiTooltip>
+        ))}
+      </ButtonGroup>
+    </OnboardingTour>
   )
 
   return (
     <div className={styles.content} ref={rootDivRef}>
       <AutoSizer disableHeight>
-        {({ width }) => (
-          <div style={{ width }}>
-            <div className={styles.bottom}>
-              <div className={styles.keysSummary}>
-                <KeysSummary
-                  items={keysState.keys}
-                  totalItemsCount={keysState.total}
-                  scanned={
-                    isSearched ||
-                    (isFiltered && searchMode === SearchMode.Pattern) ||
-                    viewType === KeyViewType.Tree
-                      ? keysState.scanned
-                      : 0
-                  }
-                  loading={loading}
-                  showScanMore={
-                    !(
-                      searchMode === SearchMode.Redisearch &&
-                      keysState.maxResults &&
-                      keysState.keys.length >= keysState.maxResults
-                    )
-                  }
-                  scanMoreStyle={scanMoreStyle}
-                  loadMoreItems={handleScanMore}
-                  nextCursor={nextCursor}
-                />
-              </div>
-              <div className={styles.keysControlsWrapper}>
-                <AutoRefresh
-                  disabled={
-                    searchMode === SearchMode.Redisearch && !selectedIndex
-                  }
-                  disabledRefreshButtonMessage="Select an index to refresh keys."
-                  iconSize="S"
-                  postfix="keys"
-                  loading={loading}
-                  lastRefreshTime={keysState.lastRefreshTime}
-                  displayText={(width || 0) > HIDE_REFRESH_LABEL_WIDTH}
-                  containerClassName={styles.refreshContainer}
-                  onRefresh={handleRefreshKeys}
-                  onEnableAutoRefresh={handleEnableAutoRefresh}
-                  onChangeAutoRefreshRate={handleChangeAutoRefreshRate}
-                  testid="keys"
-                />
-                <div className={styles.columnsButtonPopup}>
+        {({ width }: { width: number }) => (
+          <Row justify="between" style={{ width }}>
+            <FlexItem>
+              <KeysSummary
+                items={keysState.keys}
+                totalItemsCount={keysState.total}
+                scanned={
+                  isSearched ||
+                  (isFiltered && searchMode === SearchMode.Pattern) ||
+                  viewType === KeyViewType.Tree
+                    ? keysState.scanned
+                    : 0
+                }
+                loading={loading}
+                showScanMore={
+                  !(
+                    searchMode === SearchMode.Redisearch &&
+                    keysState.maxResults &&
+                    keysState.keys.length >= keysState.maxResults
+                  )
+                }
+                scanMoreStyle={scanMoreStyle}
+                loadMoreItems={handleScanMore}
+                nextCursor={nextCursor}
+              />
+            </FlexItem>
+            <FlexItem>
+              <Row gap="l">
+                <FlexItem>
+                  <AutoRefresh
+                    disabled={
+                      searchMode === SearchMode.Redisearch && !selectedIndex
+                    }
+                    disabledRefreshButtonMessage="Select an index to refresh keys."
+                    iconSize="S"
+                    postfix="keys"
+                    loading={loading}
+                    lastRefreshTime={keysState.lastRefreshTime}
+                    displayText={(width || 0) > HIDE_REFRESH_LABEL_WIDTH}
+                    onRefresh={handleRefreshKeys}
+                    onEnableAutoRefresh={handleEnableAutoRefresh}
+                    onChangeAutoRefreshRate={handleChangeAutoRefreshRate}
+                    testid="keys"
+                  />
+                </FlexItem>
+                <FlexItem>
                   <RiPopover
                     ownFocus={false}
                     anchorPosition="downLeft"
@@ -370,69 +429,156 @@ const KeysHeader = (props: Props) => {
                     panelClassName={styles.popoverWrapper}
                     closePopover={() => setColumnsConfigShown(false)}
                     button={
-                      <SecondaryButton
-                        size="small"
-                        icon={ColumnsIcon}
-                        onClick={toggleColumnsConfigVisibility}
+                      <ToggleButton
+                        onPressedChange={toggleColumnsConfigVisibility}
                         className={styles.columnsButton}
                         data-testid="btn-columns-actions"
-                        aria-label="columns"
+                        aria-label={t('browser.keysHeader.columnsAria')}
+                        pressed={columnsConfigShown}
                       >
-                        <span className={styles.columnsButtonText}>
-                          Columns
-                        </span>
-                      </SecondaryButton>
+                        <RiIcon size="m" type="ColumnsIcon" />
+                        <Text size="s">{t('browser.keysHeader.columns')}</Text>
+                      </ToggleButton>
                     }
                   >
-                    <Row align="center" gap="m">
-                      <FlexItem grow>
+                    <Col gap="m">
+                      <FlexItem>
+                        <Row align="center" gap="m">
+                          <FlexItem grow>
+                            <Checkbox
+                              id="show-key-size"
+                              name="show-key-size"
+                              label={t('browser.keysHeader.keySize')}
+                              checked={shownColumns.includes(
+                                BrowserColumns.Size,
+                              )}
+                              onChange={(e) =>
+                                changeColumnsShown(
+                                  e.target.checked,
+                                  BrowserColumns.Size,
+                                )
+                              }
+                              data-testid="show-key-size"
+                              className={styles.checkbox}
+                            />
+                          </FlexItem>
+                          <FlexItem>
+                            <RiTooltip
+                              content={t('browser.keysHeader.keySizeTooltip')}
+                              position="top"
+                              anchorClassName="flex-row"
+                            >
+                              <RiIcon
+                                className={styles.infoIcon}
+                                type="InfoIcon"
+                                size="m"
+                                style={{ cursor: 'pointer' }}
+                                data-testid="key-size-info-icon"
+                              />
+                            </RiTooltip>
+                          </FlexItem>
+                        </Row>
+                      </FlexItem>
+                      <FlexItem>
                         <Checkbox
-                          id="show-key-size"
-                          name="show-key-size"
-                          label="Key size"
-                          checked={shownColumns.includes(BrowserColumns.Size)}
+                          id="show-ttl"
+                          name="show-ttl"
+                          label={t('browser.keysHeader.ttl')}
+                          checked={shownColumns.includes(BrowserColumns.TTL)}
                           onChange={(e) =>
                             changeColumnsShown(
                               e.target.checked,
-                              BrowserColumns.Size,
+                              BrowserColumns.TTL,
                             )
                           }
-                          data-testid="show-key-size"
-                          className={styles.checkbox}
+                          data-testid="show-ttl"
                         />
                       </FlexItem>
-                      <FlexItem grow>
-                        <RiTooltip
-                          content="Hide the key size to avoid performance issues when working with large keys."
-                          position="top"
-                          anchorClassName="flex-row"
-                        >
-                          <RiIcon
-                            className={styles.infoIcon}
-                            type="InfoIcon"
-                            size="m"
-                            style={{ cursor: 'pointer' }}
-                            data-testid="key-size-info-icon"
-                          />
-                        </RiTooltip>
-                      </FlexItem>
-                    </Row>
-                    <Checkbox
-                      id="show-ttl"
-                      name="show-ttl"
-                      label="TTL"
-                      checked={shownColumns.includes(BrowserColumns.TTL)}
-                      onChange={(e) =>
-                        changeColumnsShown(e.target.checked, BrowserColumns.TTL)
-                      }
-                      data-testid="show-ttl"
-                    />
+                      {viewType === KeyViewType.Browser && (
+                        <>
+                          <FlexItem>
+                            <S.SortDivider />
+                          </FlexItem>
+                          <FlexItem>
+                            <Text size="s" style={{ marginBottom: 4 }}>
+                              {t('browser.keysHeader.sortBy')}
+                            </Text>
+                            <Col gap="s">
+                              {SORTABLE_COLUMNS.filter(
+                                (col) =>
+                                  col.requiresColumn === null ||
+                                  shownColumns.includes(col.requiresColumn),
+                              ).map((col) => (
+                                <Row
+                                  key={col.id}
+                                  align="center"
+                                  justify="between"
+                                >
+                                  <FlexItem grow>
+                                    <Text size="s">{t(col.label)}</Text>
+                                  </FlexItem>
+                                  <Row gap="xs" grow={false}>
+                                    <FlexItem>
+                                      <S.SortButton
+                                        $isActive={
+                                          sortedColumn?.column === col.id &&
+                                          sortedColumn?.order === SortOrder.ASC
+                                        }
+                                        onClick={() =>
+                                          sortedColumn?.column === col.id &&
+                                          sortedColumn?.order === SortOrder.ASC
+                                            ? onChangeSorting?.(null, null)
+                                            : onChangeSorting?.(
+                                                col.id,
+                                                SortOrder.ASC,
+                                              )
+                                        }
+                                        data-testid={`sort-asc-${col.id}`}
+                                        title={t('browser.keysHeader.sortAsc', {
+                                          column: t(col.label),
+                                        })}
+                                      >
+                                        <RiIcon type="ArrowUpIcon" size="s" />
+                                      </S.SortButton>
+                                    </FlexItem>
+                                    <FlexItem>
+                                      <S.SortButton
+                                        $isActive={
+                                          sortedColumn?.column === col.id &&
+                                          sortedColumn?.order === SortOrder.DESC
+                                        }
+                                        onClick={() =>
+                                          sortedColumn?.column === col.id &&
+                                          sortedColumn?.order === SortOrder.DESC
+                                            ? onChangeSorting?.(null, null)
+                                            : onChangeSorting?.(
+                                                col.id,
+                                                SortOrder.DESC,
+                                              )
+                                        }
+                                        data-testid={`sort-desc-${col.id}`}
+                                        title={t(
+                                          'browser.keysHeader.sortDesc',
+                                          { column: t(col.label) },
+                                        )}
+                                      >
+                                        <RiIcon type="ArrowDownIcon" size="s" />
+                                      </S.SortButton>
+                                    </FlexItem>
+                                  </Row>
+                                </Row>
+                              ))}
+                            </Col>
+                          </FlexItem>
+                        </>
+                      )}
+                    </Col>
                   </RiPopover>
-                </div>
-                {ViewSwitch()}
-              </div>
-            </div>
-          </div>
+                </FlexItem>
+                <FlexItem>{ViewSwitch()}</FlexItem>
+              </Row>
+            </FlexItem>
+          </Row>
         )}
       </AutoSizer>
     </div>

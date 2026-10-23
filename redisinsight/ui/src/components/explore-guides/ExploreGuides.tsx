@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
 import { guideLinksSelector } from 'uiSrc/slices/content/guide-links'
 
@@ -10,19 +10,19 @@ import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { openTutorialByPath } from 'uiSrc/slices/panels/sidePanels'
 import { findTutorialPath } from 'uiSrc/utils'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import styles from './styles.module.scss'
+import { SecondaryButton } from 'uiSrc/components/base/forms/buttons'
+import * as S from './ExploreGuides.styles'
 
 const ExploreGuides = () => {
-  const { data } = useSelector(guideLinksSelector)
-  const { provider } = useSelector(connectedInstanceSelector)
+  const { data } = useAppSelector(guideLinksSelector)
+  const { provider } = useAppSelector(connectedInstanceSelector)
 
   const { instanceId = '' } = useParams<{ instanceId: string }>()
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleLinkClick = (tutorialId: string) => {
     sendEventTelemetry({
@@ -41,37 +41,35 @@ const ExploreGuides = () => {
 
   return (
     <div data-testid="explore-guides">
-      <Title color="primary" size="S">
-        <span>Here&apos;s a good starting point</span>
-      </Title>
+      <S.CenteredTitle color="primary" size="S">
+        Here&apos;s a good starting point
+      </S.CenteredTitle>
       <Spacer size="s" />
-      <Text color="primary">
+      <Text color="primary" textAlign="center">
         Explore the amazing world of Redis with our interactive guides
       </Text>
       <Spacer size="xl" />
       {!!data.length && (
-        <div className={styles.guides}>
+        <S.Guides gap="l" wrap justify="center">
           {data.map(({ title, tutorialId, icon }) => (
-            <div
-              key={title}
-              role="button"
+            <SecondaryButton
+              key={tutorialId}
+              inverted
               tabIndex={0}
-              onKeyDown={() => {}}
               onClick={() => handleLinkClick(tutorialId)}
-              className={styles.btn}
               data-testid={`guide-button-${tutorialId}`}
             >
               {icon in GUIDE_ICONS && (
                 <RiIcon
-                  className={styles.icon}
                   type={GUIDE_ICONS[icon]}
                   data-testid={`guide-icon-${icon}`}
+                  color="inherit"
                 />
               )}
               {title}
-            </div>
+            </SecondaryButton>
           ))}
-        </div>
+        </S.Guides>
       )}
     </div>
   )

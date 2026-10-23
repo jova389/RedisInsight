@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useFormik } from 'formik'
 
 import { TimezoneOption, timezoneOptions } from 'uiSrc/constants'
@@ -12,14 +12,16 @@ import {
   defaultValueRender,
   RiSelect,
 } from 'uiSrc/components/base/forms/select/RiSelect'
+import { useTranslation } from 'uiSrc/i18n'
 
 interface InitialValuesType {
   timezone: TimezoneOption
 }
 
 const TimezoneForm = () => {
-  const config = useSelector(userSettingsConfigSelector)
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const config = useAppSelector(userSettingsConfigSelector)
+  const dispatch = useAppDispatch()
 
   const getInitialValues: InitialValuesType = useMemo(
     () => ({ timezone: config?.timezone || TimezoneOption.Local }),
@@ -62,19 +64,21 @@ const TimezoneForm = () => {
 
   return (
     <form onSubmit={formik.handleSubmit} data-testid="format-timezone-form">
-      <div>
-        <RiSelect
-          style={{ width: 240 }}
-          options={timezoneOptions.map((option) => ({
-            ...option,
-            'data-test-subj': `zone-option-${option.value}`,
-          }))}
-          value={formik.values.timezone}
-          valueRender={defaultValueRender}
-          onChange={(option) => onTimezoneChange(option)}
-          data-test-subj="select-timezone"
-        />
-      </div>
+      <RiSelect
+        style={{ width: 240 }}
+        options={timezoneOptions.map((option) => ({
+          ...option,
+          inputDisplay:
+            option.value === TimezoneOption.Local
+              ? t('settings.general.datetime.timezone.local')
+              : option.inputDisplay,
+          'data-test-subj': `zone-option-${option.value}`,
+        }))}
+        value={formik.values.timezone}
+        valueRender={defaultValueRender}
+        onChange={(option) => onTimezoneChange(option)}
+        data-test-subj="select-timezone"
+      />
     </form>
   )
 }

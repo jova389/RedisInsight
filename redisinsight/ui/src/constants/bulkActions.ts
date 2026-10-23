@@ -9,6 +9,12 @@ export enum BulkActionsServerEvent {
 export enum BulkActionsType {
   Delete = 'delete',
   Upload = 'upload',
+  Unlink = 'unlink',
+}
+
+export enum BulkActionConfirmation {
+  Standard = 'standard',
+  TypeToConfirm = 'type-to-confirm',
 }
 
 export enum BulkActionsStatus {

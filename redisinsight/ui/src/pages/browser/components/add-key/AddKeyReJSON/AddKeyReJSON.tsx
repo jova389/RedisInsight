@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import { Maybe, stringToBuffer } from 'uiSrc/utils'
@@ -11,10 +11,10 @@ import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { ActionFooter } from 'uiSrc/pages/browser/components/action-footer'
-import { CreateRejsonRlWithExpireDto } from 'apiSrc/modules/browser/rejson-rl/dto'
+import { CreateRejsonRlWithExpireDto } from 'apiClient'
 
-import { AddJSONFormConfig as config } from '../constants/fields-config'
-
+import { useTranslation } from 'uiSrc/i18n'
+import { getAddJSONFormConfig } from '../constants/fields-config'
 
 export interface Props {
   keyName: string
@@ -24,11 +24,13 @@ export interface Props {
 
 const AddKeyReJSON = (props: Props) => {
   const { keyName = '', keyTTL, onCancel } = props
-  const { loading } = useSelector(addKeyStateSelector)
+  const { t } = useTranslation()
+  const config = getAddJSONFormConfig(t)
+  const { loading } = useAppSelector(addKeyStateSelector)
   const [ReJSONValue, setReJSONValue] = useState<string>('')
   const [isFormValid, setIsFormValid] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId } = useParams<{ instanceId: string }>()
 
   useEffect(() => {
@@ -74,7 +76,7 @@ const AddKeyReJSON = (props: Props) => {
 
   return (
     <form onSubmit={onFormSubmit}>
-      <FormField label={config.value.label}>
+      <FormField label={config.value.label} required={config.value.isRequire}>
         <>
           <MonacoJson
             value={ReJSONValue}
@@ -97,7 +99,7 @@ const AddKeyReJSON = (props: Props) => {
       <ActionFooter
         onCancel={() => onCancel(true)}
         onAction={submitData}
-        actionText="Add Key"
+        actionText={t('browser.addKey.button.submit')}
         loading={loading}
         disabled={!isFormValid}
         actionTestId="add-key-json-btn"

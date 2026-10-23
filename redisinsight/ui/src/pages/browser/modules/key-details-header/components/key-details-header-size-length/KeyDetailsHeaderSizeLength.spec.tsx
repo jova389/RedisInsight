@@ -10,6 +10,7 @@ import {
 } from 'uiSrc/utils/test-utils'
 import * as keysSlice from 'uiSrc/slices/browser/keys'
 import { KeyTypes } from 'uiSrc/constants'
+import { selectedArrayKeyInfoFactory } from 'uiSrc/mocks/factories/browser/array/arrayElement.factory'
 import { Props, KeyDetailsHeaderSizeLength } from './KeyDetailsHeaderSizeLength'
 
 let store: typeof mockedStore
@@ -82,5 +83,120 @@ describe('KeyDetailsHeaderSizeLength', () => {
     expect(screen.getByTestId('key-length-text')).toHaveTextContent(
       'Top-level values: 5',
     )
+  })
+
+  it('should render quant type when provided', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce({
+      type: KeyTypes.VectorSet,
+      size: 1024,
+      length: 5,
+      quantType: 'int8',
+    })
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.getByTestId('key-quant-type-text')).toHaveTextContent(
+      'Quant type: int8',
+    )
+  })
+
+  it('should render vector dim when provided', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce({
+      type: KeyTypes.VectorSet,
+      size: 1024,
+      length: 5,
+      vectorDim: 300,
+    })
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.getByTestId('key-vector-dim-text')).toHaveTextContent(
+      'Vector dim: 300',
+    )
+  })
+
+  it('should not render quant type when not provided', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce({
+      type: KeyTypes.VectorSet,
+      size: 1024,
+      length: 5,
+    })
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.queryByTestId('key-quant-type-text')).not.toBeInTheDocument()
+  })
+
+  it('should not render vector dim when not provided', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce({
+      type: KeyTypes.VectorSet,
+      size: 1024,
+      length: 5,
+    })
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.queryByTestId('key-vector-dim-text')).not.toBeInTheDocument()
+  })
+
+  it('should render vector dim when value is 0', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce({
+      type: KeyTypes.VectorSet,
+      size: 1024,
+      length: 5,
+      vectorDim: 0,
+    })
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.getByTestId('key-vector-dim-text')).toHaveTextContent(
+      'Vector dim: 0',
+    )
+  })
+
+  it('should render count when provided (Array key type)', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce(
+      selectedArrayKeyInfoFactory.build({ count: '7' }),
+    )
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.getByTestId('key-count-text')).toHaveTextContent('Count: 7')
+  })
+
+  it('should not render count when not provided', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce(
+      selectedArrayKeyInfoFactory.build({ count: undefined }),
+    )
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.queryByTestId('key-count-text')).not.toBeInTheDocument()
+  })
+
+  it('should render count when value is 0', () => {
+    mockSelectedKeyDataSelector.mockReturnValueOnce(
+      selectedArrayKeyInfoFactory.build({ count: '0' }),
+    )
+
+    render(
+      <KeyDetailsHeaderSizeLength {...instance(mockedProps)} width={1920} />,
+    )
+
+    expect(screen.getByTestId('key-count-text')).toHaveTextContent('Count: 0')
   })
 })

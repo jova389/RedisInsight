@@ -1,6 +1,5 @@
-import cx from 'classnames'
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { BuildType } from 'uiSrc/constants/env'
 import { appInfoSelector } from 'uiSrc/slices/app/info'
@@ -12,22 +11,40 @@ import {
 import { getRouterLinkProps } from 'uiSrc/services'
 import { Pages } from 'uiSrc/constants'
 import { Link } from 'uiSrc/components/base/link/Link'
-import LogoSVG from 'uiSrc/assets/img/logo_small.svg?react'
-import styles from '../../styles.module.scss'
+import { RedisLogoDarkMinIcon } from 'uiSrc/components/base/icons'
+import styled from 'styled-components'
 
 type Props = {
   isRdiWorkspace: boolean
 }
 
+const RedisLogoIcon = styled.span`
+  height: 60px;
+  width: 100%;
+  @media only screen and (min-width: 768px) {
+    height: 72px;
+  }
+  svg {
+    width: 30px;
+    height: 34px;
+  }
+`
+
 export const RedisLogo = ({ isRdiWorkspace }: Props) => {
-  const { envDependent } = useSelector(appFeatureFlagsFeaturesSelector)
-  const { server } = useSelector(appInfoSelector)
+  const { envDependent } = useAppSelector(appFeatureFlagsFeaturesSelector)
+  const { server } = useAppSelector(appInfoSelector)
 
   if (!envDependent?.flag) {
     return (
-      <span className={cx(styles.iconNavItem, styles.homeIcon)}>
-        <SideBarItemIcon aria-label="Redis Insight Homepage" icon={LogoSVG} />
-      </span>
+      <RedisLogoIcon>
+        <SideBarItemIcon
+          height="50px"
+          width="50px"
+          aria-label="Redis Insight Homepage"
+          icon={RedisLogoDarkMinIcon}
+          centered
+        />
+      </RedisLogoIcon>
     )
   }
 
@@ -49,7 +66,7 @@ export const RedisLogo = ({ isRdiWorkspace }: Props) => {
         }}
         style={{ marginBlock: '2rem', marginInline: 'auto' }}
       >
-        <SideBarItemIcon icon={LogoSVG} />
+        <SideBarItemIcon icon={RedisLogoDarkMinIcon} />
       </SideBarItem>
     </Link>
   )

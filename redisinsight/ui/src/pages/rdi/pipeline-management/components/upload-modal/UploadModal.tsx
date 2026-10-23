@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import React, { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import { validatePipeline } from 'uiSrc/components/yaml-validator'
@@ -15,17 +15,29 @@ import {
   setPipelineJobs,
 } from 'uiSrc/slices/rdi/pipeline'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
+import { useTranslation } from 'uiSrc/i18n'
 import UploadDialog from './components/upload-dialog/UploadDialog'
 
+const UPLOAD_VALIDATION_ERRORS = {
+  noConfig: 'config.yaml is missing',
+  noJobs: 'No jobs folder found',
+}
+
+const UPLOAD_ERROR_LABEL_KEYS: Record<string, string> = {
+  [UPLOAD_VALIDATION_ERRORS.noConfig]: 'rdi.pipeline.upload.errorNoConfig',
+  [UPLOAD_VALIDATION_ERRORS.noJobs]: 'rdi.pipeline.upload.errorNoJobs',
+}
+
 export interface Props {
-  children?: React.ReactElement
+  trigger?: React.ReactElement
   onUploadedPipeline?: () => void
   visible?: boolean
   onClose?: () => void
 }
 
 const UploadModal = (props: Props) => {
-  const { children, visible, onUploadedPipeline, onClose } = props
+  const { t } = useTranslation()
+  const { trigger, visible, onUploadedPipeline, onClose } = props
 
   const [isModalVisible, setIsModalVisible] = useState(visible)
   const [file, setFile] = useState<File>()
@@ -37,16 +49,18 @@ const UploadModal = (props: Props) => {
     config: pipelineConfig,
     jobs: pipelineJobs,
     schema,
-  } = useSelector(rdiPipelineSelector)
+    monacoJobsSchema,
+    jobNameSchema,
+  } = useAppSelector(rdiPipelineSelector)
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const validateZip = (zip: JSZip) => {
     // check if config.yaml exists
     if (zip.file('config.yaml') === null) {
-      throw new Error('config.yaml is missing')
+      throw new Error(UPLOAD_VALIDATION_ERRORS.noConfig)
     }
 
     // check if job files exist
@@ -54,7 +68,7 @@ const UploadModal = (props: Props) => {
       filename.startsWith('jobs/'),
     )
     if (!jobFiles.length) {
-      throw new Error('No jobs folder found')
+      throw new Error(UPLOAD_VALIDATION_ERRORS.noJobs)
     }
   }
 
@@ -67,6 +81,7 @@ const UploadModal = (props: Props) => {
     })
 
     setIsModalVisible(true)
+    trigger?.props?.onClick?.()
   }
 
   const handleConfirmModal = async () => {
@@ -111,7 +126,13 @@ const UploadModal = (props: Props) => {
 
       if (config && schema && jobs?.length) {
         const { result, configValidationErrors, jobsValidationErrors } =
-          validatePipeline({ config, schema, jobs })
+          validatePipeline({
+            config,
+            schema,
+            jobs,
+            monacoJobsSchema,
+            jobNameSchema,
+          })
 
         dispatch(setConfigValidationErrors(configValidationErrors))
         dispatch(setJobsValidationErrors(jobsValidationErrors))
@@ -141,7 +162,8 @@ const UploadModal = (props: Props) => {
         },
       })
 
-      setError(errorMessage)
+      const labelKey = UPLOAD_ERROR_LABEL_KEYS[errorMessage]
+      setError(labelKey ? t(labelKey as never) : errorMessage)
     }
   }
 
@@ -156,8 +178,8 @@ const UploadModal = (props: Props) => {
     setFile(file)
   }
 
-  const button = children
-    ? React.cloneElement(children, {
+  const button = trigger
+    ? React.cloneElement(trigger, {
         disabled: loading,
         onClick: handleUploadClick,
       })

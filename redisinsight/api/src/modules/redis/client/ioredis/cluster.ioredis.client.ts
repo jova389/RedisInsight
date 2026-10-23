@@ -34,19 +34,27 @@ export class ClusterIoredisClient extends IoredisClient {
           });
 
           if (natAddressString) {
-            const [, natHost, natPort] = natAddressString.match(/(.+):(\d+)$/);
-            natAddress = {
-              natHost,
-              natPort: +natPort,
-            };
+            const natMatch = natAddressString.match(/(.+):(\d+)$/);
+            if (natMatch) {
+              const [, natHost, natPort] = natMatch;
+              natAddress = {
+                natHost,
+                natPort: +natPort,
+              };
+            }
           }
         }
 
-        return new StandaloneIoredisClient(this.clientMetadata, node, {
-          host: node.options.host,
-          port: node.options.port,
-          ...natAddress,
-        });
+        return new StandaloneIoredisClient(
+          this.clientMetadata,
+          node,
+          {
+            host: node.options.host,
+            port: node.options.port,
+            ...natAddress,
+          },
+          this.database,
+        );
       });
   }
 }

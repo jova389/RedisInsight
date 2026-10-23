@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { useParams } from 'react-router-dom'
 import { selectedKeySelector } from 'uiSrc/slices/browser/keys'
@@ -16,6 +16,7 @@ import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import { TelemetryEvent, sendEventTelemetry } from 'uiSrc/telemetry'
 import Divider from 'uiSrc/components/divider/Divider'
 import { Checkbox } from 'uiSrc/components/base/forms/checkbox/Checkbox'
+import { useTranslation } from 'uiSrc/i18n'
 import AddHashFields from './add-hash-fields/AddHashFields'
 import { HashDetailsTable } from './hash-details-table'
 import { KeyDetailsSubheader } from '../key-details-subheader/KeyDetailsSubheader'
@@ -32,12 +33,13 @@ export interface Props extends KeyDetailsHeaderProps {
 const HashDetails = (props: Props) => {
   const keyType = KeyTypes.Hash
   const { onRemoveKey, onOpenAddItemPanel, onCloseAddItemPanel } = props
+  const { t } = useTranslation()
 
-  const { loading } = useSelector(selectedKeySelector)
-  const { version } = useSelector(connectedInstanceOverviewSelector)
+  const { loading } = useAppSelector(selectedKeySelector)
+  const { version } = useAppSelector(connectedInstanceOverviewSelector)
   const { instanceId } = useParams<{ instanceId: string }>()
   const { [FeatureFlags.hashFieldExpiration]: hashFieldExpirationFeature } =
-    useSelector(appFeatureFlagsFeaturesSelector)
+    useAppSelector(appFeatureFlagsFeaturesSelector)
 
   const [isAddItemPanelOpen, setIsAddItemPanelOpen] = useState<boolean>(false)
   const [showTtl, setShowTtl] = useState<boolean>(true)
@@ -76,21 +78,16 @@ const HashDetails = (props: Props) => {
           <Checkbox
             id="showTtl"
             name="showTtl"
-            label="Show TTL"
-            className={styles.showTtlCheckbox}
+            label={t('browser.hash.showTtl')}
             checked={showTtl}
             onChange={(e) => handleSelectShow(e.target.checked)}
             data-testid="test-check-ttl"
           />
-          <Divider
-            className={styles.divider}
-            colorVariable="separatorColor"
-            orientation="vertical"
-          />
+          <Divider className={styles.divider} orientation="vertical" />
         </>
       )}
       <AddItemsAction
-        title="Add Fields"
+        title={t('browser.hash.addFields')}
         width={width}
         openAddItemPanel={openAddItemPanel}
       />

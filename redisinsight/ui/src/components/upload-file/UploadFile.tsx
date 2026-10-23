@@ -3,6 +3,7 @@ import React from 'react'
 import { Text } from 'uiSrc/components/base/text'
 import { EmptyButton } from 'uiSrc/components/base/forms/buttons'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -14,15 +15,14 @@ export interface Props {
 
 const UploadFile = (props: Props) => {
   const { onFileChange, onClick, accept, id = 'upload-input-file' } = props
+  const { t } = useTranslation()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        onFileChange(e?.target?.result as string)
-      }
-      reader.readAsText(e.target.files[0])
-      // reset input value after reading file
+    if (e.target.files && e.target.files.length > 0) {
+      const fileBlob = e.target.files[0]
+      fileBlob.text().then((text) => {
+        onFileChange(text)
+      })
       e.target.value = ''
     }
   }
@@ -36,7 +36,7 @@ const UploadFile = (props: Props) => {
       >
         {/* todo: 'folderOpen', replace with redis-ui once available */}
         <RiIcon className={styles.icon} type="KnowledgeBaseIcon" />
-        <Text className={styles.label}>Upload</Text>
+        <Text className={styles.label}>{t('browser.addKey.upload.label')}</Text>
         <input
           type="file"
           id={id}
@@ -48,7 +48,7 @@ const UploadFile = (props: Props) => {
             onClick?.()
           }}
           className={styles.fileDrop}
-          aria-label="Select file"
+          aria-label={t('browser.addKey.upload.aria')}
         />
       </label>
     </EmptyButton>

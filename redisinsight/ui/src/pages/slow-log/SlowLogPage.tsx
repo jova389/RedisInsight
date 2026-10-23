@@ -1,9 +1,10 @@
 import { minBy, toNumber } from 'lodash'
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { AutoSizer } from 'react-virtualized'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { DEFAULT_SLOWLOG_MAX_LEN, DurationUnits } from 'uiSrc/constants'
 import { convertNumberByUnits } from 'uiSrc/pages/slow-log/utils'
 import { appContextDbConfig } from 'uiSrc/slices/app/context'
@@ -24,7 +25,6 @@ import {
 } from 'uiSrc/telemetry'
 import { formatLongName, getDbIndex, setTitle } from 'uiSrc/utils'
 import { numberWithSpaces } from 'uiSrc/utils/numbers'
-import AnalyticsTabs from 'uiSrc/components/analytics-tabs'
 import {
   analyticsSettingsSelector,
   setAnalyticsViewTab,
@@ -33,50 +33,56 @@ import { AnalyticsViewTab } from 'uiSrc/slices/interfaces/analytics'
 
 import { FormatedDate } from 'uiSrc/components'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Text } from 'uiSrc/components/base/text'
-import {
-  defaultValueRender,
-  RiSelect,
-} from 'uiSrc/components/base/forms/select/RiSelect'
-import { SlowLog } from 'apiSrc/modules/slow-log/models'
+import { Text, Title } from 'uiSrc/components/base/text'
+import { defaultValueRender } from 'uiSrc/components/base/forms/select/RiSelect'
+import { SlowLog } from 'apiClient'
+import { AnalysisPageContainer } from 'uiSrc/pages/database-analysis/components/analysis-page-container'
+import { AnalyticsPageHeader } from 'uiSrc/pages/database-analysis/components/analytics-page-header'
 
 import { Actions, EmptySlowLog, SlowLogTable } from './components'
 
-import styles from './styles.module.scss'
+import { StyledSelect, ContentWrapper } from './SlowLogPage.styles'
+import { Container } from '../database-analysis/components/header/Header.styles'
 
 const HIDE_TIMESTAMP_FROM_WIDTH = 850
 const DEFAULT_COUNT_VALUE = '50'
 const MAX_COUNT_VALUE = '-1'
-const countOptions = [
-  { value: '10', inputDisplay: '10' },
-  { value: '25', inputDisplay: '25' },
-  { value: '50', inputDisplay: '50' },
-  { value: '100', inputDisplay: '100' },
-  { value: MAX_COUNT_VALUE, inputDisplay: 'Max available' },
-]
 
 const SlowLogPage = () => {
+  const { t } = useTranslation()
   const {
     connectionType,
     name: connectedInstanceName,
     db,
-  } = useSelector(connectedInstanceSelector)
-  const { data, loading, config } = useSelector(slowLogSelector)
-  const { slowLogDurationUnit: durationUnit } = useSelector(appContextDbConfig)
-  const { slowlogLogSlowerThan = 0, slowlogMaxLen } = useSelector(
+  } = useAppSelector(connectedInstanceSelector)
+  const { data, loading, config } = useAppSelector(slowLogSelector)
+  const { slowLogDurationUnit: durationUnit } =
+    useAppSelector(appContextDbConfig)
+  const { slowlogLogSlowerThan = 0, slowlogMaxLen } = useAppSelector(
     slowLogConfigSelector,
   )
-  const { viewTab } = useSelector(analyticsSettingsSelector)
+  const { viewTab } = useAppSelector(analyticsSettingsSelector)
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const [count, setCount] = useState<string>(DEFAULT_COUNT_VALUE)
   const [isPageViewSent, setIsPageViewSent] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+
+  const countOptions = [
+    { value: '10', inputDisplay: '10' },
+    { value: '25', inputDisplay: '25' },
+    { value: '50', inputDisplay: '50' },
+    { value: '100', inputDisplay: '100' },
+    {
+      value: MAX_COUNT_VALUE,
+      inputDisplay: t('analytics.slowLog.page.maxAvailable'),
+    },
+  ]
 
   const lastTimestamp = minBy(data, 'time')?.time
   const dbName = `${formatLongName(connectedInstanceName, 33, 0, '...')} ${getDbIndex(db)}`
-  setTitle(`${dbName} - Slow Log`)
+  setTitle(t('analytics.slowLog.page.pageTitle', { dbName }))
 
   useEffect(() => {
     getConfig()
@@ -144,102 +150,116 @@ const SlowLogPage = () => {
   const isEmptySlowLog = !data.length
 
   return (
-    <div className={styles.main} data-testid="slow-log-page">
-      <Row className={styles.header} align="center" justify="between">
-        <FlexItem>
-          <AnalyticsTabs />
-        </FlexItem>
-
-        <FlexItem>
-          {connectionType !== ConnectionType.Cluster && config && (
-            <Text size="xs" color="subdued" data-testid="config-info">
-              Execution time:{' '}
-              {numberWithSpaces(
-                convertNumberByUnits(slowlogLogSlowerThan, durationUnit),
-              )}
-              &nbsp;
-              {durationUnit === DurationUnits.milliSeconds
-                ? DurationUnits.mSeconds
-                : DurationUnits.microSeconds}
-              , Max length: {numberWithSpaces(slowlogMaxLen)}
-            </Text>
-          )}
-        </FlexItem>
-      </Row>
-
+    <AnalysisPageContainer data-testid="slow-log-page">
       <AutoSizer disableHeight>
         {({ width }) => (
           <div style={{ width }}>
-            <Row
-              className={styles.actionsLine}
-              align="center"
-              justify="between"
-            >
-              <FlexItem>
-                <Row align="center" gap="s">
-                  <FlexItem>
-                    <Text color="subdued">
-                      {connectionType === ConnectionType.Cluster
-                        ? 'Display per node:'
-                        : 'Display up to:'}
+            <AnalyticsPageHeader
+              actions={
+                <Container align="center" gap="xl">
+                  {connectionType !== ConnectionType.Cluster && config && (
+                    <Text size="s" color="secondary" data-testid="config-info">
+                      {t('analytics.slowLog.page.executionInfo', {
+                        time: numberWithSpaces(
+                          convertNumberByUnits(
+                            slowlogLogSlowerThan,
+                            durationUnit,
+                          ),
+                        ),
+                        unit:
+                          durationUnit === DurationUnits.milliSeconds
+                            ? t('analytics.units.msec')
+                            : t('analytics.units.microseconds'),
+                        maxLen: numberWithSpaces(slowlogMaxLen),
+                      })}
                     </Text>
-                  </FlexItem>
-                  <FlexItem>
-                    <RiSelect
-                      options={countOptions}
-                      valueRender={defaultValueRender}
-                      value={count}
-                      onChange={(value) => setCount(value)}
-                      className={styles.countSelect}
-                      data-testid="count-select"
-                    />
-                  </FlexItem>
-                  {width > HIDE_TIMESTAMP_FROM_WIDTH && (
-                    <FlexItem style={{ marginLeft: 12 }}>
-                      <Text
-                        size="xs"
-                        color="subdued"
-                        data-testid="entries-from-timestamp"
-                      >
-                        ({data.length} entries
-                        {lastTimestamp && (
-                          <>
-                            <span>&nbsp;from &nbsp;</span>
-                            <FormatedDate date={lastTimestamp * 1000} />
-                          </>
-                        )}
-                        )
-                      </Text>
-                    </FlexItem>
                   )}
-                </Row>
-              </FlexItem>
-              <FlexItem>
-                <Actions
-                  width={width}
-                  isEmptySlowLog={isEmptySlowLog}
-                  durationUnit={durationUnit}
-                  onClear={onClearSlowLogs}
-                  onRefresh={getSlowLogs}
-                />
-              </FlexItem>
-            </Row>
+
+                  <Actions
+                    width={width}
+                    isEmptySlowLog={isEmptySlowLog}
+                    durationUnit={durationUnit}
+                    onClear={onClearSlowLogs}
+                    onRefresh={getSlowLogs}
+                  />
+                </Container>
+              }
+            />
           </div>
         )}
       </AutoSizer>
-      {isEmptySlowLog ? (
-        <EmptySlowLog
-          slowlogLogSlowerThan={slowlogLogSlowerThan}
-          durationUnit={durationUnit}
-        />
-      ) : (
-        <SlowLogTable
-          items={data}
-          loading={loading}
-          durationUnit={durationUnit}
-        />
-      )}
-    </div>
+      <ContentWrapper>
+        <AutoSizer disableHeight>
+          {({ width }) => (
+            <div style={{ width }}>
+              <Row align="center" justify="between">
+                <FlexItem>
+                  <Title size="L" color="primary">
+                    {t('analytics.slowLog.page.title')}
+                  </Title>
+                </FlexItem>
+                <FlexItem>
+                  <Row align="center" gap="xs">
+                    <FlexItem>
+                      <Text size="s" color="primary">
+                        {connectionType === ConnectionType.Cluster
+                          ? t('analytics.slowLog.page.displayPerNode')
+                          : t('analytics.slowLog.page.displayUpTo')}
+                      </Text>
+                    </FlexItem>
+                    <FlexItem>
+                      <StyledSelect
+                        options={countOptions}
+                        valueRender={defaultValueRender}
+                        value={count}
+                        onChange={(value) => setCount(value)}
+                        data-testid="count-select"
+                      />
+                    </FlexItem>
+                    {width > HIDE_TIMESTAMP_FROM_WIDTH && (
+                      <FlexItem style={{ marginLeft: 12 }}>
+                        <Text
+                          size="s"
+                          color="secondary"
+                          data-testid="entries-from-timestamp"
+                        >
+                          (
+                          {t('analytics.slowLog.page.entries', {
+                            count: data.length,
+                          })}
+                          {lastTimestamp && (
+                            <>
+                              <span>
+                                &nbsp;{t('analytics.slowLog.page.entriesFrom')}
+                                &nbsp;
+                              </span>
+                              <FormatedDate date={lastTimestamp * 1000} />
+                            </>
+                          )}
+                          )
+                        </Text>
+                      </FlexItem>
+                    )}
+                  </Row>
+                </FlexItem>
+              </Row>
+            </div>
+          )}
+        </AutoSizer>
+        {isEmptySlowLog ? (
+          <EmptySlowLog
+            slowlogLogSlowerThan={slowlogLogSlowerThan}
+            durationUnit={durationUnit}
+          />
+        ) : (
+          <SlowLogTable
+            items={data}
+            loading={loading}
+            durationUnit={durationUnit}
+          />
+        )}
+      </ContentWrapper>
+    </AnalysisPageContainer>
   )
 }
 

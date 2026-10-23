@@ -1,6 +1,7 @@
 import log from 'electron-log'
 import { parse } from 'url'
 import {
+  azureDeepLinkHandler,
   cloudDeepLinkHandler,
   focusWindow,
   getWindows,
@@ -8,13 +9,7 @@ import {
   WindowType,
 } from 'desktopSrc/lib'
 import { wrapErrorMessageSensitiveData } from 'desktopSrc/utils'
-import { IpcOnEvent } from 'uiSrc/electron/constants'
-
-export interface IParsedDeepLink {
-  initialPage?: string
-  target?: string
-  from?: string
-}
+import { IpcOnEvent, IParsedDeepLink } from 'uiSrc/electron/constants'
 
 export const deepLinkHandler = async (
   from?: string,
@@ -23,6 +18,9 @@ export const deepLinkHandler = async (
     try {
       const url = parse(from, true)
       switch (url?.hostname) {
+        case 'azure':
+          await azureDeepLinkHandler(url)
+          break
         case 'cloud':
           await cloudDeepLinkHandler(url)
           break

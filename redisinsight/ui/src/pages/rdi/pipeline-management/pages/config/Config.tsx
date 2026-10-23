@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import cx from 'classnames'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { get, throttle } from 'lodash'
 
@@ -31,15 +30,21 @@ import {
 import { appContextPipelineManagement } from 'uiSrc/slices/app/context'
 import { createAxiosError, isEqualPipelineFile, yamlToJson } from 'uiSrc/utils'
 
-import { addErrorNotification } from 'uiSrc/slices/app/notifications'
+import {
+  addErrorNotification,
+  type IAddInstanceErrorPayload,
+} from 'uiSrc/slices/app/notifications'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
-import { Text } from 'uiSrc/components/base/text'
+import { Text, Title } from 'uiSrc/components/base/text'
 
-import { Link } from 'uiSrc/components/base/link/Link'
 import { Loader } from 'uiSrc/components/base/display'
-import styles from './styles.module.scss'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Link } from '@redis-ui/components'
+import { Trans, useTranslation } from 'uiSrc/i18n'
+import { StyledRdiDatabaseConfigContainer } from 'uiSrc/pages/rdi/pipeline-management/pages/config/styles'
 
 const Config = () => {
+  const { t } = useTranslation()
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false)
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false)
 
@@ -48,14 +53,14 @@ const Config = () => {
     schema,
     data,
     config,
-  } = useSelector(rdiPipelineSelector)
-  const { loading: testingConnections } = useSelector(
+  } = useAppSelector(rdiPipelineSelector)
+  const { loading: testingConnections } = useAppSelector(
     rdiTestConnectionsSelector,
   )
-  const { isOpenDialog } = useSelector(appContextPipelineManagement)
+  const { isOpenDialog } = useAppSelector(appContextPipelineManagement)
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     sendPageViewTelemetry({
@@ -88,7 +93,7 @@ const Config = () => {
         addErrorNotification(
           createAxiosError({
             message: rdiErrorMessages.invalidStructure('config', msg),
-          }),
+          }) as IAddInstanceErrorPayload,
         ),
       )
     })
@@ -141,70 +146,83 @@ const Config = () => {
   }
 
   return (
-    <>
-      <div
-        className={cx('content', 'rdi__wrapper', {
-          [styles.isPanelOpen]: isPanelOpen,
-        })}
-      >
-        <div className="rdi__content-header">
-          <Text className="rdi__title">Target database configuration</Text>
-          <TemplatePopover
-            isPopoverOpen={isPopoverOpen && !isOpenDialog}
-            setIsPopoverOpen={setIsPopoverOpen}
-            value={config}
-            setFieldValue={(template) => dispatch(setPipelineConfig(template))}
-            loading={pipelineLoading}
-            source={RdiPipelineTabs.Config}
-          />
-        </div>
-        <Text color="primary">
-          {'Provide '}
-          <Link
-            data-testid="rdi-pipeline-config-link"
-            target="_blank"
-            href={getUtmExternalLink(EXTERNAL_LINKS.rdiPipeline, {
-              medium: UTM_MEDIUMS.Rdi,
-              campaign: 'config_file',
-            })}
-          >
-            connection details
-          </Link>
-          {
-            ' for source and target databases and other collector configurations, such as tables and columns to track.'
-          }
-        </Text>
-        {pipelineLoading ? (
-          <div
-            className={cx('rdi__editorWrapper', 'rdi__loading')}
-            data-testid="rdi-config-loading"
-          >
-            <Loader color="secondary" size="l" loaderText='Loading data...' />
-          </div>
-        ) : (
-          <MonacoYaml
-            schema={get(schema, 'config', null)}
-            value={config}
-            onChange={handleChange}
-            disabled={pipelineLoading}
-            wrapperClassName="rdi__editorWrapper"
-            data-testid="rdi-monaco-config"
-          />
-        )}
-        <div className="rdi__actions">
-          <PrimaryButton
-            size="s"
-            onClick={testConnections}
-            loading={testingConnections || pipelineLoading}
-            aria-labelledby="test target connections"
-            data-testid="rdi-test-connection-btn"
-          >
-            Test Connection
-          </PrimaryButton>
-        </div>
-      </div>
-      {isPanelOpen && <TestConnectionsPanel onClose={handleClosePanel} />}
-    </>
+    <Row>
+      <StyledRdiDatabaseConfigContainer grow>
+        <Col gap="m">
+          <Row grow={false} align="center" justify="between">
+            <Title size="S" color="primary">
+              {t('rdi.pipeline.config.title')}
+            </Title>
+            <TemplatePopover
+              isPopoverOpen={isPopoverOpen && !isOpenDialog}
+              setIsPopoverOpen={setIsPopoverOpen}
+              value={config}
+              setFieldValue={(template) =>
+                dispatch(setPipelineConfig(template))
+              }
+              loading={pipelineLoading}
+              source={RdiPipelineTabs.Config}
+            />
+          </Row>
+          <FlexItem>
+            <Text>
+              <Trans
+                i18nKey="rdi.pipeline.config.description"
+                components={{
+                  docsLink: (
+                    <Link
+                      data-testid="rdi-pipeline-config-link"
+                      target="_blank"
+                      href={getUtmExternalLink(EXTERNAL_LINKS.rdiPipeline, {
+                        medium: UTM_MEDIUMS.Rdi,
+                        campaign: 'config_file',
+                      })}
+                      variant="inline"
+                    />
+                  ),
+                }}
+              />
+            </Text>
+          </FlexItem>
+          <FlexItem grow>
+            {pipelineLoading ? (
+              <Col grow data-testid="rdi-config-loading">
+                <Loader
+                  color="secondary"
+                  size="l"
+                  loaderText={t('rdi.pipeline.loading')}
+                />
+              </Col>
+            ) : (
+              <MonacoYaml
+                schema={get(schema, 'config', null)}
+                value={config}
+                onChange={handleChange}
+                disabled={pipelineLoading}
+                data-testid="rdi-monaco-config"
+                fullHeight
+              />
+            )}
+          </FlexItem>
+          <Row grow={false} justify="end">
+            <PrimaryButton
+              onClick={testConnections}
+              loading={testingConnections}
+              disabled={pipelineLoading}
+              aria-labelledby="test target connections"
+              data-testid="rdi-test-connection-btn"
+            >
+              {t('rdi.pipeline.config.testButton')}
+            </PrimaryButton>
+          </Row>
+        </Col>
+      </StyledRdiDatabaseConfigContainer>
+      {isPanelOpen && (
+        <FlexItem>
+          <TestConnectionsPanel onClose={handleClosePanel} />
+        </FlexItem>
+      )}
+    </Row>
   )
 }
 

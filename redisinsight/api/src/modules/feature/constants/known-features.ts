@@ -58,4 +58,48 @@ export const knownFeatures: Record<KnownFeatures, IFeatureFlag> = {
       flag: SERVER_CONFIG.databaseManagement,
     }),
   },
+  [KnownFeatures.CustomTutorials]: {
+    name: KnownFeatures.CustomTutorials,
+    storage: FeatureStorage.Custom,
+    factory: () => ({
+      name: KnownFeatures.CustomTutorials,
+      flag: SERVER_CONFIG.customTutorials,
+    }),
+  },
+  [KnownFeatures.AzureEntraId]: {
+    name: KnownFeatures.AzureEntraId,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.DevAzureEntraId]: {
+    name: KnownFeatures.DevAzureEntraId,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.DevBrowser]: {
+    name: KnownFeatures.DevBrowser,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.Array]: {
+    name: KnownFeatures.Array,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.DevLanguage]: {
+    name: KnownFeatures.DevLanguage,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.DevRdiUi]: {
+    name: KnownFeatures.DevRdiUi,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.VectorSearchEnhancements]: {
+    name: KnownFeatures.VectorSearchEnhancements,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.ValueDecoder]: {
+    name: KnownFeatures.ValueDecoder,
+    storage: FeatureStorage.Database,
+  },
+  [KnownFeatures.AppUpdateStrategySettings]: {
+    name: KnownFeatures.AppUpdateStrategySettings,
+    storage: FeatureStorage.Database,
+  },
 };

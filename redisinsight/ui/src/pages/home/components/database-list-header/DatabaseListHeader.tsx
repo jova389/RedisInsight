@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import { useAppSelector, useAppDispatch } from 'uiSrc/slices/hooks'
 import { isEmpty } from 'lodash'
 import cx from 'classnames'
 
@@ -12,10 +12,9 @@ import { OAuthSocialAction, OAuthSocialSource } from 'uiSrc/slices/interfaces'
 import PromoLink from 'uiSrc/components/promo-link/PromoLink'
 
 import { FeatureFlagComponent, OAuthSsoHandlerDialog } from 'uiSrc/components'
-import { RiPopover } from 'uiSrc/components/base'
 import { getPathToResource } from 'uiSrc/services/resourcesService'
 import { ContentCreateRedis } from 'uiSrc/slices/interfaces/content'
-import { HELP_LINKS } from 'uiSrc/pages/home/constants'
+import { CREATE_CLOUD_DB_ID, HELP_LINKS } from 'uiSrc/pages/home/constants'
 import { contentSelector } from 'uiSrc/slices/content/create-redis-buttons'
 import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import { getContentByFeature } from 'uiSrc/utils/content'
@@ -27,12 +26,11 @@ import {
 } from 'uiSrc/constants'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from 'uiSrc/components/base/forms/buttons'
-import { ColumnsIcon } from 'uiSrc/components/base/icons'
-import { Checkbox } from 'uiSrc/components/base/forms/checkbox/Checkbox'
+import { EmptyButton, PrimaryButton } from 'uiSrc/components/base/forms/buttons'
+import { PlusIcon } from 'uiSrc/components/base/icons'
+import ColumnsConfigPopover from 'uiSrc/components/columns-config/ColumnsConfigPopover'
+import { useTranslation } from 'uiSrc/i18n'
+import handleClickFreeCloudDb from './handleClickFreeCloudDb'
 import SearchDatabasesList from '../search-databases-list'
 
 import styles from './styles.module.scss'
@@ -42,19 +40,19 @@ export interface Props {
 }
 
 const DatabaseListHeader = ({ onAddInstance }: Props) => {
-  const { data: instances, shownColumns } = useSelector(instancesSelector)
-  const featureFlags = useSelector(appFeatureFlagsFeaturesSelector)
-  const { loading, data } = useSelector(contentSelector)
+  const { t } = useTranslation()
+  const { data: instances, shownColumns } = useAppSelector(instancesSelector)
+  const featureFlags = useAppSelector(appFeatureFlagsFeaturesSelector)
+  const { loading, data } = useAppSelector(contentSelector)
 
   const [promoData, setPromoData] = useState<ContentCreateRedis>()
-  const [columnsConfigShown, setColumnsConfigShown] = useState(false)
 
   const { theme } = useContext(ThemeContext)
   const { [FeatureFlags.enhancedCloudUI]: enhancedCloudUIFeature } =
     featureFlags
   const isShowPromoBtn = !enhancedCloudUIFeature?.flag
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (loading || !data || isEmpty(data)) {
@@ -62,7 +60,7 @@ const DatabaseListHeader = ({ onAddInstance }: Props) => {
     }
 
     if (data?.cloud && !isEmpty(data.cloud)) {
-      setPromoData(getContentByFeature(data.cloud, featureFlags))
+      setPromoData(getContentByFeature(data.cloud as any, featureFlags))
     }
   }, [loading, data, featureFlags])
 
@@ -94,42 +92,41 @@ const DatabaseListHeader = ({ onAddInstance }: Props) => {
     handleClickLink(event, eventData)
   }
 
-  const toggleColumnsConfigVisibility = () =>
-    setColumnsConfigShown(!columnsConfigShown)
-
-  const changeShownColumns = (status: boolean, column: DatabaseListColumn) => {
-    const newColumns = status
-      ? [...shownColumns, column]
-      : shownColumns.filter((col) => col !== column)
-
-    dispatch(setShownColumns(newColumns))
-
-    const shown: DatabaseListColumn[] = []
-    const hidden: DatabaseListColumn[] = []
-
-    if (status) {
-      shown.push(column)
-    } else {
-      hidden.push(column)
-    }
-
+  const handleColumnsChange = (
+    next: DatabaseListColumn[],
+    diff: { shown: DatabaseListColumn[]; hidden: DatabaseListColumn[] },
+  ) => {
+    dispatch(setShownColumns(next))
     sendEventTelemetry({
       event: TelemetryEvent.DATABASE_LIST_COLUMNS_CLICKED,
-      eventData: {
-        shown,
-        hidden,
-      },
+      eventData: diff,
     })
   }
 
-  const AddInstanceBtn = () => (
-    <PrimaryButton
-      onClick={handleOnAddDatabase}
-      className={styles.addInstanceBtn}
-      data-testid="add-redis-database-short"
+  const AddCloudInstanceButton = () => (
+    <FeatureFlagComponent
+      name={[FeatureFlags.enhancedCloudUI, FeatureFlags.cloudAds]}
     >
-      <span>+ Add Redis database</span>
-    </PrimaryButton>
+      <PrimaryButton
+        onClick={handleClickFreeCloudDb}
+        data-testid={`${CREATE_CLOUD_DB_ID}-button`}
+      >
+        {t('home.header.button.createCloudDb')}
+      </PrimaryButton>
+    </FeatureFlagComponent>
+  )
+
+  const AddLocalInstanceButton = () => (
+    <FeatureFlagComponent name={FeatureFlags.databaseManagement}>
+      <EmptyButton
+        variant="primary"
+        onClick={handleOnAddDatabase}
+        data-testid="add-redis-database-short"
+        icon={PlusIcon}
+      >
+        {t('home.header.button.connectExistingDb')}
+      </EmptyButton>
+    </FeatureFlagComponent>
   )
 
   const CreateBtn = ({ content }: { content: ContentCreateRedis }) => {
@@ -168,21 +165,6 @@ const DatabaseListHeader = ({ onAddInstance }: Props) => {
     )
   }
 
-  const columnCheckboxes = Array.from(COLUMN_FIELD_NAME_MAP.entries()).map(
-    ([field, name]) => (
-      <Checkbox
-        key={`show-${field}`}
-        id={`show-${field}`}
-        name={`show-${field}`}
-        label={name}
-        checked={shownColumns.includes(field)}
-        disabled={shownColumns.includes(field) && shownColumns.length === 1}
-        onChange={(e) => changeShownColumns(e.target.checked, field)}
-        data-testid={`show-${field}`}
-      />
-    ),
-  )
-
   return (
     <div className={styles.containerDl}>
       <Row
@@ -191,10 +173,9 @@ const DatabaseListHeader = ({ onAddInstance }: Props) => {
         responsive={false}
         gap="s"
       >
-        <FlexItem>
-          <FeatureFlagComponent name={FeatureFlags.databaseManagement}>
-            <AddInstanceBtn />
-          </FeatureFlagComponent>
+        <FlexItem direction="row" $gap="m">
+          <AddCloudInstanceButton />
+          <AddLocalInstanceButton />
         </FlexItem>
         {!loading && !isEmpty(data) && (
           <FlexItem className={cx(styles.promo)}>
@@ -210,43 +191,14 @@ const DatabaseListHeader = ({ onAddInstance }: Props) => {
           </FlexItem>
         )}
         {instances.length > 0 && (
-          <FlexItem grow>
-            <Row justify="end" align="center" gap="s">
-              <FlexItem className={styles.columnsButtonItem}>
-                <RiPopover
-                  ownFocus={false}
-                  anchorPosition="downLeft"
-                  isOpen={columnsConfigShown}
-                  closePopover={() => setColumnsConfigShown(false)}
-                  data-testid="columns-config-popover"
-                  button={
-                    <SecondaryButton
-                      icon={ColumnsIcon}
-                      onClick={toggleColumnsConfigVisibility}
-                      className={styles.columnsButton}
-                      data-testid="btn-columns-config"
-                      aria-label="columns"
-                    >
-                      <span>Columns</span>
-                    </SecondaryButton>
-                  }
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    {columnCheckboxes}
-                  </div>
-                </RiPopover>
-              </FlexItem>
-              <FlexItem>
-                <SearchDatabasesList />
-              </FlexItem>
-            </Row>
-          </FlexItem>
+          <Row justify="end" align="center" gap="l">
+            <ColumnsConfigPopover
+              columnsMap={COLUMN_FIELD_NAME_MAP}
+              shownColumns={shownColumns}
+              onChange={handleColumnsChange}
+            />
+            <SearchDatabasesList />
+          </Row>
         )}
       </Row>
       <Spacer className={styles.spacerDl} />

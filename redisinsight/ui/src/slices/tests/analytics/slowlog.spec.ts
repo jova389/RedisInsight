@@ -11,7 +11,7 @@ import {
 import { addErrorNotification } from 'uiSrc/slices/app/notifications'
 import { MOCK_TIMESTAMP } from 'uiSrc/mocks/data/dateNow'
 
-import { SlowLog, SlowLogConfig } from 'apiSrc/modules/slow-log/models'
+import { SlowLog, SlowLogConfig } from 'apiClient'
 
 import reducer, {
   initialState,
@@ -56,7 +56,7 @@ describe('slowLog slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)

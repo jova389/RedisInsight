@@ -1,6 +1,6 @@
 /* eslint-disable react/no-array-index-key */
 import React, { useCallback, useMemo, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { PlusIcon } from 'uiSrc/components/base/icons'
 import { ConnectionProvider, Instance } from 'uiSrc/slices/interfaces'
 import { FormDialog } from 'uiSrc/components'
@@ -13,14 +13,20 @@ import {
   PrimaryButton,
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useTranslation } from 'uiSrc/i18n'
 import { VALID_TAG_KEY_REGEX, VALID_TAG_VALUE_REGEX } from './constants'
 import { TagInputField } from './TagInputField'
 import { getInvalidTagErrors } from './utils'
-import styles from './styles.module.scss'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import {
+  HeaderWrapper,
+  TagFormRow,
+  TagFormWrapper,
+  WarningBannerWrapper,
+} from './ManageTagsModal.styles'
 
 export type ManageTagsModalProps = {
   instance: Instance
@@ -31,7 +37,8 @@ export const ManageTagsModal = ({
   instance,
   onClose,
 }: ManageTagsModalProps) => {
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
   const editedInstanceTags = useMemo(
     () => (instance?.tags || []).map(({ key, value }) => ({ key, value })),
     [instance?.tags],
@@ -104,99 +111,107 @@ export const ManageTagsModal = ({
     <FormDialog
       isOpen
       onClose={onClose}
-      className={styles.manageTagsModal}
       header={
-        <div className={styles.header}>
-          <Title size="M">Manage tags for {instance.name}</Title>
-          <Spacer size="s" />
-          <Text size="s" color="subdued">
-            Tags are key-value pairs that let you categorize your databases.
+        <Col gap="xl">
+          <Title size="L">
+            {t('home.databaseList.manageTags.title', { name: instance.name })}
+          </Title>
+          <Text size="m" color="secondary">
+            {t('home.databaseList.manageTags.description')}
           </Text>
-        </div>
+        </Col>
       }
       footer={
         <>
           {(isCloudDb || isClusterDb) && (
-            <div className={styles.warning}>
-              <RiIcon
-                type="ToastNotificationIcon"
-                color="attention600"
-                size="m"
-              />
+            <WarningBannerWrapper>
+              <RiIcon type="ToastNotificationIcon" color="notice600" size="m" />
               <Text size="m">
-                Tag changes in Redis Insight apply locally and are not synced
-                with Redis {isCloudDb ? 'Cloud' : 'Software'}.
+                {t('home.databaseList.manageTags.warning', {
+                  product: isCloudDb ? 'Cloud' : 'Software',
+                })}
               </Text>
-            </div>
+            </WarningBannerWrapper>
           )}
-          <div className={styles.footer}>
+          <Row justify="end" gap="m">
             <SecondaryButton onClick={onClose} data-testid="close-button">
-              Close
+              {t('home.databaseList.manageTags.button.cancel')}
             </SecondaryButton>
             <PrimaryButton
               onClick={handleSave}
               disabled={isSaveButtonDisabled}
               data-testid="save-tags-button"
             >
-              Save tags
+              {t('home.databaseList.manageTags.button.save')}
             </PrimaryButton>
-          </div>
+          </Row>
         </>
       }
     >
-      <div className={styles.tagForm}>
-        <div className={styles.tagFormHeader}>
-          <div>Key</div>
-          <div>Value</div>
-        </div>
-        <div className={styles.tagFormBody}>
-          {tags.map((tag, index) => {
-            const { keyError, valueError } = getInvalidTagErrors(tags, index)
+      <Col gap="l">
+        <TagFormWrapper>
+          <HeaderWrapper>
+            <Text color="primary">
+              {t('home.databaseList.manageTags.header.key')}
+            </Text>
+            <Text color="primary">
+              {t('home.databaseList.manageTags.header.value')}
+            </Text>
+          </HeaderWrapper>
+          <Col gap="none">
+            {tags.map((tag, index) => {
+              const { keyError, valueError } = getInvalidTagErrors(tags, index)
 
-            return (
-              <div key={`tag-row-${index}`} className={styles.tagFormRow}>
-                <TagInputField
-                  errorMessage={keyError}
-                  value={tag.key}
-                  currentTagKeys={currentTagKeys}
-                  onChange={(value) => {
-                    handleTagChange(index, 'key', value)
-                  }}
-                  rightContent={<>:</>}
-                />
-                <TagInputField
-                  errorMessage={valueError}
-                  disabled={!tag.key || Boolean(keyError)}
-                  value={tag.value}
-                  currentTagKeys={currentTagKeys}
-                  suggestedTagKey={tag.key}
-                  onChange={(value) => {
-                    handleTagChange(index, 'value', value)
-                  }}
-                  rightContent={
-                    <RiIcon
-                      type="DeleteIcon"
-                      onClick={() => handleRemoveTag(index)}
-                      className={styles.deleteIcon}
-                      data-testid="remove-tag-button"
-                    />
-                  }
-                />
-              </div>
-            )
-          })}
+              return (
+                <TagFormRow key={`tag-row-${index}`}>
+                  <TagInputField
+                    errorMessage={keyError}
+                    value={tag.key}
+                    currentTagKeys={currentTagKeys}
+                    placeholder={t(
+                      'home.databaseList.manageTags.placeholder.key',
+                    )}
+                    onChange={(value) => {
+                      handleTagChange(index, 'key', value)
+                    }}
+                    rightContent={<>:</>}
+                  />
+                  <TagInputField
+                    errorMessage={valueError}
+                    disabled={!tag.key || Boolean(keyError)}
+                    value={tag.value}
+                    currentTagKeys={currentTagKeys}
+                    suggestedTagKey={tag.key}
+                    placeholder={t(
+                      'home.databaseList.manageTags.placeholder.value',
+                    )}
+                    onChange={(value) => {
+                      handleTagChange(index, 'value', value)
+                    }}
+                    rightContent={
+                      <RiIcon
+                        type="DeleteIcon"
+                        onClick={() => handleRemoveTag(index)}
+                        data-testid="remove-tag-button"
+                      />
+                    }
+                  />
+                </TagFormRow>
+              )
+            })}
+          </Col>
+        </TagFormWrapper>
+        <div>
+          <EmptyButton
+            icon={PlusIcon}
+            onClick={handleAddTag}
+            size="small"
+            data-testid="add-tag-button"
+          >
+            {t('home.databaseList.manageTags.button.addTag')}
+          </EmptyButton>
         </div>
-      </div>
-      <Spacer size="s" />
-      <EmptyButton
-        icon={PlusIcon}
-        onClick={handleAddTag}
-        size="small"
-        className={styles.addTagButton}
-        data-testid="add-tag-button"
-      >
-        Add additional tag
-      </EmptyButton>
+      </Col>
     </FormDialog>
   )
 }

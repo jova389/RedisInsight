@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useEffect } from 'react'
+import { useHistory, useLocation } from 'react-router-dom'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+import {
+  EDIT_INSTANCE_QUERY_PARAM,
+  FOCUS_FIELD_QUERY_PARAM,
+} from 'uiSrc/constants'
 import {
   clusterSelector,
   resetDataRedisCluster,
   resetInstancesRedisCluster,
 } from 'uiSrc/slices/instances/cluster'
-import { Nullable, setTitle } from 'uiSrc/utils'
+import { setTitle } from 'uiSrc/utils'
 import { HomePageTemplate } from 'uiSrc/templates'
-import { BrowserStorageItem, FeatureFlags } from 'uiSrc/constants'
 import { resetKeys } from 'uiSrc/slices/browser/keys'
 import {
   resetCliHelperSettings,
@@ -21,6 +25,7 @@ import {
 import { Instance } from 'uiSrc/slices/interfaces'
 import {
   cloudSelector,
+  resetDataRedisCloud,
   resetSubscriptionsRedisCloud,
 } from 'uiSrc/slices/instances/cloud'
 import {
@@ -32,15 +37,11 @@ import {
   setEditedInstance,
 } from 'uiSrc/slices/instances/instances'
 import { fetchTags } from 'uiSrc/slices/instances/tags'
-import { localStorageService } from 'uiSrc/services'
 import {
   resetDataSentinel,
   sentinelSelector,
 } from 'uiSrc/slices/instances/sentinel'
-import {
-  contentSelector,
-  fetchContentAction as fetchCreateRedisButtonsAction,
-} from 'uiSrc/slices/content/create-redis-buttons'
+import { fetchContentAction as fetchCreateRedisButtonsAction } from 'uiSrc/slices/content/create-redis-buttons'
 import {
   sendEventTelemetry,
   sendPageViewTelemetry,
@@ -52,16 +53,19 @@ import {
   setUrlHandlingInitialState,
 } from 'uiSrc/slices/app/url-handling'
 import { UrlHandlingActions } from 'uiSrc/slices/interfaces/urlHandling'
-import { CREATE_CLOUD_DB_ID } from 'uiSrc/pages/home/constants'
-import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
+import { useTranslation } from 'uiSrc/i18n'
 
 import { Page, PageBody } from 'uiSrc/components/base/layout/page'
 import { Card } from 'uiSrc/components/base/layout'
-import DatabasesList from './components/database-list-component'
+import DatabasesList from './components/databases-list/DatabasesList'
 import DatabaseListHeader from './components/database-list-header'
 import EmptyMessage from './components/empty-message/EmptyMessage'
 import DatabasePanelDialog from './components/database-panel-dialog'
 import { ManageTagsModal } from './components/database-manage-tags-modal/ManageTagsModal'
+import {
+  HomePageDataProviderProvider,
+  useHomePageDataProvider,
+} from './contexts/HomePageDataProvider'
 
 import './styles.scss'
 import styles from './styles.module.scss'
@@ -73,19 +77,15 @@ enum OpenDialogName {
 }
 
 const HomePage = () => {
-  const [openDialog, setOpenDialog] = useState<Nullable<OpenDialogName>>(null)
+  const { t } = useTranslation()
+  const { openDialog, setOpenDialog } = useHomePageDataProvider()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
-  const { credentials: clusterCredentials } = useSelector(clusterSelector)
-  const { credentials: cloudCredentials } = useSelector(cloudSelector)
-  const { instance: sentinelInstance } = useSelector(sentinelSelector)
-  const { action, dbConnection } = useSelector(appRedirectionSelector)
-  const { data: createDbContent } = useSelector(contentSelector)
-  const {
-    [FeatureFlags.enhancedCloudUI]: enhancedCloudUIFeature,
-    [FeatureFlags.cloudAds]: cloudAdsFeature,
-  } = useSelector(appFeatureFlagsFeaturesSelector)
+  const { credentials: clusterCredentials } = useAppSelector(clusterSelector)
+  const { credentials: cloudCredentials } = useAppSelector(cloudSelector)
+  const { instance: sentinelInstance } = useAppSelector(sentinelSelector)
+  const { action, dbConnection } = useAppSelector(appRedirectionSelector)
 
   const {
     loading,
@@ -93,29 +93,18 @@ const HomePage = () => {
     data: instances,
     changedSuccessfully: isChangedInstance,
     deletedSuccessfully: isDeletedInstance,
-  } = useSelector(instancesSelector)
+  } = useAppSelector(instancesSelector)
 
-  const { data: editedInstance } = useSelector(editedInstanceSelector)
+  const { data: editedInstance } = useAppSelector(editedInstanceSelector)
 
-  const { contextInstanceId } = useSelector(appContextSelector)
+  const { contextInstanceId } = useAppSelector(appContextSelector)
 
-  const predefinedInstances =
-    enhancedCloudUIFeature?.flag &&
-    cloudAdsFeature?.flag &&
-    createDbContent?.cloud_list_of_databases
-      ? [
-          {
-            id: CREATE_CLOUD_DB_ID,
-            ...createDbContent.cloud_list_of_databases,
-          } as Instance,
-        ]
-      : []
-  const isInstanceExists =
-    instances.length > 0 || predefinedInstances.length > 0
+  const history = useHistory()
+  const { search } = useLocation()
+
+  const hideDbList = instances.length === 0 && !loading && !loadingChanging
 
   useEffect(() => {
-    setTitle('Redis databases')
-
     dispatch(fetchInstancesAction(handleOpenPage))
     dispatch(resetInstancesRedisCluster())
     dispatch(resetSubscriptionsRedisCloud())
@@ -126,6 +115,10 @@ const HomePage = () => {
       dispatch(setEditedInstance(null))
     }
   }, [])
+
+  useEffect(() => {
+    setTitle(t('home.title'))
+  }, [t])
 
   useEffect(() => {
     if (isDeletedInstance) {
@@ -163,6 +156,26 @@ const HomePage = () => {
     }
   }, [instances])
 
+  // Open the edit-database dialog when deep-linked via `?editInstance=<id>`
+  // (e.g. from the production-mode CTA, or the encryption-error flow). Any
+  // `focusField` param is left for the relevant field component to consume.
+  useEffect(() => {
+    const params = new URLSearchParams(search)
+    const editInstanceId = params.get(EDIT_INSTANCE_QUERY_PARAM)
+    if (!editInstanceId || !instances.length) {
+      return
+    }
+
+    const found = instances.find((item: Instance) => item.id === editInstanceId)
+    if (found) {
+      dispatch(fetchEditedInstanceAction(found))
+      setOpenDialog(OpenDialogName.EditDatabase)
+      // Consume the id param so closing the dialog can't reopen it on re-render.
+      params.delete(EDIT_INSTANCE_QUERY_PARAM)
+      history.replace({ search: params.toString() })
+    }
+  }, [search, instances])
+
   const handleOpenPage = (instances: Instance[]) => {
     const instancesWithTagsCount = instances.filter(
       (instance) => instance.tags && instance.tags.length > 0,
@@ -191,6 +204,14 @@ const HomePage = () => {
     dispatch(setEditedInstance(null))
     setOpenDialog(null)
 
+    // Drop a leftover focus param (if the field component never consumed it)
+    // so a later edit can't auto-open that field.
+    const params = new URLSearchParams(search)
+    if (params.has(FOCUS_FIELD_QUERY_PARAM)) {
+      params.delete(FOCUS_FIELD_QUERY_PARAM)
+      history.replace({ search: params.toString() })
+    }
+
     sendEventTelemetry({
       event: TelemetryEvent.CONFIG_DATABASES_DATABASE_EDIT_CANCELLED_CLICKED,
       eventData: {
@@ -203,6 +224,7 @@ const HomePage = () => {
     dispatch(resetDataRedisCluster())
     dispatch(resetDataSentinel())
     dispatch(resetImportInstances())
+    dispatch(resetDataRedisCloud())
 
     setOpenDialog(null)
     dispatch(setEditedInstance(null))
@@ -219,31 +241,6 @@ const HomePage = () => {
   const handleAddInstance = () => {
     setOpenDialog(OpenDialogName.AddDatabase)
     dispatch(setEditedInstance(null))
-  }
-
-  const handleManageInstanceTags = (instance: Instance) => {
-    dispatch(setEditedInstance(instance))
-    setOpenDialog(OpenDialogName.ManageTags)
-  }
-
-  const handleEditInstance = (editedInstance: Instance) => {
-    if (editedInstance) {
-      dispatch(fetchEditedInstanceAction(editedInstance))
-      setOpenDialog(OpenDialogName.EditDatabase)
-    }
-  }
-  const handleDeleteInstances = (instances: Instance[]) => {
-    if (
-      instances.find((instance) => instance.id === editedInstance?.id) &&
-      openDialog === OpenDialogName.EditDatabase
-    ) {
-      dispatch(setEditedInstance(null))
-      setOpenDialog(null)
-    }
-
-    instances.forEach((instance) => {
-      localStorageService.remove(BrowserStorageItem.dbConfig + instance.id)
-    })
   }
 
   return (
@@ -279,21 +276,12 @@ const HomePage = () => {
               />
             )}
             <div key="homePage" className="homePage">
-              {!isInstanceExists && !loading && !loadingChanging ? (
+              {hideDbList && (
                 <Card>
                   <EmptyMessage onAddInstanceClick={handleAddInstance} />
                 </Card>
-              ) : (
-                <DatabasesList
-                  loading={loading}
-                  instances={instances}
-                  predefinedInstances={predefinedInstances}
-                  editedInstance={editedInstance}
-                  onEditInstance={handleEditInstance}
-                  onDeleteInstances={handleDeleteInstances}
-                  onManageInstanceTags={handleManageInstanceTags}
-                />
               )}
+              {!hideDbList && <DatabasesList />}
             </div>
           </PageBody>
         </Page>
@@ -302,4 +290,10 @@ const HomePage = () => {
   )
 }
 
-export default HomePage
+const HomePageWithProvider = () => (
+  <HomePageDataProviderProvider>
+    <HomePage />
+  </HomePageDataProviderProvider>
+)
+
+export default HomePageWithProvider

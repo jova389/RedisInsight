@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { toNumber } from 'lodash'
 
 import { stringToBuffer, validateScoreNumber } from 'uiSrc/utils'
@@ -11,7 +11,7 @@ import {
   updateZsetScoreStateSelector,
 } from 'uiSrc/slices/browser/zset'
 
-import { AddZsetFormConfig as config } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
+import { getAddZsetFormConfig } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
 import {
   INITIAL_ZSET_MEMBER_STATE,
   IZsetMemberState,
@@ -26,7 +26,13 @@ import {
 } from 'uiSrc/components/base/forms/buttons'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import styles from './styles.module.scss'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { EntryContent } from '../../common/AddKeysContainer.styled'
 
 export interface Props {
   closePanel: (isCancelled?: boolean) => void
@@ -34,16 +40,21 @@ export interface Props {
 
 const AddZsetMembers = (props: Props) => {
   const { closePanel } = props
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const config = getAddZsetFormConfig(t)
+  const dispatch = useAppDispatch()
   const [isFormValid, setIsFormValid] = useState<boolean>(false)
   const [members, setMembers] = useState<IZsetMemberState[]>([
     { ...INITIAL_ZSET_MEMBER_STATE },
   ])
-  const { loading } = useSelector(updateZsetScoreStateSelector)
-  const { name: selectedKey = '' } = useSelector(selectedKeyDataSelector) ?? {
+  const { loading } = useAppSelector(updateZsetScoreStateSelector)
+  const { name: selectedKey = '' } = useAppSelector(
+    selectedKeyDataSelector,
+  ) ?? {
     name: undefined,
   }
   const lastAddedMemberName = useRef<HTMLInputElement>(null)
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   useEffect(
     () =>
@@ -171,12 +182,25 @@ const AddZsetMembers = (props: Props) => {
     dispatch(fetchAddZSetMembers(data, closePanel))
   }
 
+  const handleSubmit = () => {
+    requestConfirmation({
+      title: t('browser.zset.add.confirmTitle'),
+      actionDescription: t('browser.zset.add.confirmMessage', {
+        count: members.length,
+      }),
+      confirmButtonText: t('browser.zset.add.confirmButton'),
+      commandId: BrowserConfirmationCommandId.AddZsetMembers,
+      disableConfirmationInput: true,
+      onConfirm: submitData,
+    })
+  }
+
   const isClearDisabled = (item: IZsetMemberState): boolean =>
     members.length === 1 && !(item.name.length || item.score.length)
 
   return (
     <Col gap="m">
-      <div className={styles.container}>
+      <EntryContent>
         <AddMultipleFields
           items={members}
           isClearDisabled={isClearDisabled}
@@ -225,7 +249,7 @@ const AddZsetMembers = (props: Props) => {
             </Row>
           )}
         </AddMultipleFields>
-      </div>
+      </EntryContent>
       <Row justify="end" gap="l">
         <FlexItem>
           <div>
@@ -233,7 +257,7 @@ const AddZsetMembers = (props: Props) => {
               onClick={() => closePanel(true)}
               data-testid="cancel-members-btn"
             >
-              Cancel
+              {t('browser.zset.add.cancel')}
             </SecondaryButton>
           </div>
         </FlexItem>
@@ -242,10 +266,10 @@ const AddZsetMembers = (props: Props) => {
             <PrimaryButton
               disabled={loading || !isFormValid}
               loading={loading}
-              onClick={submitData}
+              onClick={handleSubmit}
               data-testid="save-members-btn"
             >
-              Save
+              {t('browser.zset.add.save')}
             </PrimaryButton>
           </div>
         </FlexItem>

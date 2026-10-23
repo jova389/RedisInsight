@@ -1,0 +1,51 @@
+{
+  "name": "e2e-playwright",
+  "version": "1.0.0",
+  "description": "Standalone Playwright E2E tests for RedisInsight",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium-parallel --project=chromium-serial",
+    "test:chromium:parallel": "playwright test --project=chromium-parallel",
+    "test:chromium:serial": "playwright test --project=chromium-serial --no-deps",
+    "test:chromium:headed": "playwright test --project=chromium-parallel --project=chromium-serial --headed",
+    "test:chromium:debug": "playwright test --project=chromium-parallel --debug",
+    "test:chromium:ui": "playwright test --project=chromium-parallel --ui",
+    "test:electron": "playwright test --project=electron-parallel --project=electron-serial",
+    "test:electron:parallel": "playwright test --project=electron-parallel",
+    "test:electron:serial": "playwright test --project=electron-serial --no-deps",
+    "test:electron:headed": "playwright test --project=electron-parallel --project=electron-serial --headed",
+    "test:electron:debug": "playwright test --project=electron-parallel --debug",
+    "test:report": "playwright show-report",
+    "test:codegen": "playwright codegen http://localhost:8080",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"**/*.ts\"",
+    "format:check": "prettier --check \"**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "prepare": "cd ../.. && husky tests/e2e-playwright/.husky"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --cache --fix",
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.5.0",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "eslint": "^8.57.1",
+    "fishery": "^2.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  }
+}

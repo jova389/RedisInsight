@@ -9,6 +9,15 @@ import { Text } from 'uiSrc/components/base/text'
 import { EditIcon } from 'uiSrc/components/base/icons'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import { TextArea } from 'uiSrc/components/base/inputs'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import {
+  NonUnicodeEditConfirmation,
+  useNonUnicodeEditGuard,
+} from 'uiSrc/pages/browser/modules/key-details/shared/non-unicode-edit-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -24,12 +33,17 @@ export interface Props {
   disabledTooltipText?: { title: string; content: string }
   approveText?: { title: string; text: string }
   editToolTipContent?: React.ReactNode
+  /** Suppresses the built-in hover edit pencil (and the space reserved for
+   *  it) in the non-editing state. Used where the edit trigger lives outside
+   *  the cell (the array table drives editing from its actions column);
+   *  defaults to false, so all other consumers are unchanged. */
+  hideEditButton?: boolean
   approveByValidation?: (value: string) => boolean
   onEdit: (isEditing: boolean) => void
   onUpdateTextAreaHeight?: () => void
   onChange?: (e: ChangeEvent<HTMLTextAreaElement>) => void
   onDecline: (event?: React.MouseEvent<HTMLElement>) => void
-  onApply: (value: string, event: React.MouseEvent) => void
+  onApply: (value: string, event?: React.MouseEvent) => void
   testIdPrefix?: string
 }
 
@@ -47,6 +61,7 @@ const EditableTextArea = (props: Props) => {
     disabledTooltipText,
     approveText,
     editToolTipContent,
+    hideEditButton = false,
     approveByValidation = () => true,
     onEdit,
     onUpdateTextAreaHeight,
@@ -59,6 +74,9 @@ const EditableTextArea = (props: Props) => {
   const [value, setValue] = useState('')
   const [isHovering, setIsHovering] = useState(false)
   const textAreaRef: Ref<HTMLTextAreaElement> = useRef(null)
+  const { t } = useTranslation()
+  const { requestConfirmation } = useProductionWriteConfirmation()
+  const editGuard = useNonUnicodeEditGuard()
 
   useEffect(() => {
     setValue(initialValue)
@@ -88,37 +106,48 @@ const EditableTextArea = (props: Props) => {
   if (!isEditing) {
     return (
       <div
-        className={styles.contentWrapper}
+        className={cx(styles.contentWrapper, {
+          [styles.contentWrapperNoEditButton]: hideEditButton,
+        })}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         data-testid={`${testIdPrefix}_content-value-${field}`}
       >
         <Text
-          color="subdued"
-          size="s"
+          component="div"
+          color="secondary"
           style={{ maxWidth: '100%', whiteSpace: 'break-spaces' }}
         >
           {children}
         </Text>
-        {isHovering && (
-          <RiTooltip
-            content={editToolTipContent}
+        {!hideEditButton && (isHovering || editGuard.isOpen) && (
+          <NonUnicodeEditConfirmation
+            isOpen={editGuard.isOpen}
+            format={editGuard.format}
             anchorClassName={styles.editBtnAnchor}
-            data-testid={`${testIdPrefix}_edit-tooltip-${field}`}
-          >
-            <IconButton
-              icon={EditIcon}
-              aria-label="Edit field"
-              className={cx('editFieldBtn', styles.editBtn)}
-              disabled={isEditDisabled}
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation()
-                onEdit?.(true)
-                setIsHovering(false)
-              }}
-              data-testid={`${testIdPrefix}_edit-btn-${field}`}
-            />
-          </RiTooltip>
+            onCancel={editGuard.cancel}
+            onChangeToUnicode={editGuard.changeToUnicode}
+            onEditAnyway={editGuard.editAnyway}
+            button={
+              <RiTooltip
+                content={editToolTipContent}
+                data-testid={`${testIdPrefix}_edit-tooltip-${field}`}
+              >
+                <IconButton
+                  icon={EditIcon}
+                  aria-label={t('browser.keyDetails.editable.editAria')}
+                  className={cx('editFieldBtn', styles.editBtn)}
+                  disabled={isEditDisabled}
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    editGuard.requestEdit(() => onEdit?.(true))
+                    setIsHovering(false)
+                  }}
+                  data-testid={`${testIdPrefix}_edit-btn-${field}`}
+                />
+              </RiTooltip>
+            }
+          />
         )}
       </div>
     )
@@ -129,7 +158,7 @@ const EditableTextArea = (props: Props) => {
       disableHeight
       onResize={() => setTimeout(updateTextAreaHeight, 0)}
     >
-      {({ width }) => (
+      {({ width }: { width: number }) => (
         <div style={{ width }}>
           <StopPropagation>
             <InlineItemEditor
@@ -151,10 +180,23 @@ const EditableTextArea = (props: Props) => {
                 setValue(initialValue)
                 onEdit(false)
               }}
-              onApply={(_, event) => {
-                onApply(value, event)
-                setValue(initialValue)
-                onEdit(false)
+              onApply={() => {
+                requestConfirmation({
+                  title: t('browser.keyDetails.editable.confirmTitle'),
+                  actionDescription: t(
+                    'browser.keyDetails.editable.confirmMessage',
+                  ),
+                  confirmButtonText: t(
+                    'browser.keyDetails.editable.confirmButton',
+                  ),
+                  commandId: BrowserConfirmationCommandId.EditValue,
+                  disableConfirmationInput: true,
+                  onConfirm: () => {
+                    onApply(value)
+                    setValue(initialValue)
+                    onEdit(false)
+                  },
+                })
               }}
               approveText={approveText}
               approveByValidation={() => approveByValidation?.(value)}
@@ -162,7 +204,7 @@ const EditableTextArea = (props: Props) => {
               <TextArea
                 name="value"
                 id="value"
-                placeholder="Enter Value"
+                placeholder={t('browser.keyDetails.editable.valuePlaceholder')}
                 value={value}
                 onChangeCapture={handleOnChange}
                 disabled={isLoading}

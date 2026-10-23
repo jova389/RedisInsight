@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { validateCountNumber } from 'uiSrc/utils'
 import { SCAN_COUNT_DEFAULT } from 'uiSrc/constants/api'
@@ -9,11 +9,14 @@ import {
   userSettingsConfigSelector,
 } from 'uiSrc/slices/user/user-settings'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
+import { useTranslation } from 'uiSrc/i18n'
 
 const AdvancedSettings = () => {
-  const { scanThreshold = '' } = useSelector(userSettingsConfigSelector) ?? {}
+  const { t } = useTranslation()
+  const { scanThreshold = '' } =
+    useAppSelector(userSettingsConfigSelector) ?? {}
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleApplyKeysToScanChanges = (value: string) => {
     // eslint-disable-next-line no-nested-ternary
@@ -32,11 +35,11 @@ const AdvancedSettings = () => {
         initValue={scanThreshold.toString()}
         onApply={handleApplyKeysToScanChanges}
         validation={validateCountNumber}
-        title="Keys to Scan in List view"
-        summary="Sets the amount of keys to scan per one iteration. Filtering by pattern per a large number of keys may decrease performance."
+        title={t('settings.advanced.keysToScan.title')}
+        summary={t('settings.advanced.keysToScan.summary')}
         testid="keys-to-scan"
         placeholder="10 000"
-        label="Keys to Scan:"
+        label={t('settings.advanced.keysToScan.label')}
       />
       <Spacer size="m" />
     </>

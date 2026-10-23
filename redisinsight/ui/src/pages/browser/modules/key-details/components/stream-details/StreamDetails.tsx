@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import React, { useCallback, useRef, useState } from 'react'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { selectedKeySelector } from 'uiSrc/slices/browser/keys'
 import {
@@ -20,6 +20,7 @@ import AddStreamGroup from './add-stream-group'
 import { StreamItemsAction } from '../key-details-actions'
 import { KeyDetailsSubheader } from '../key-details-subheader/KeyDetailsSubheader'
 import { AddKeysContainer } from '../common/AddKeysContainer.styled'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props extends KeyDetailsHeaderProps {
   onRemoveKey: () => void
@@ -30,9 +31,10 @@ export interface Props extends KeyDetailsHeaderProps {
 const StreamDetails = (props: Props) => {
   const keyType = KeyTypes.Stream
   const { onOpenAddItemPanel, onCloseAddItemPanel } = props
+  const { t } = useTranslation()
 
-  const { loading } = useSelector(selectedKeySelector)
-  const { viewType: streamViewType } = useSelector(streamSelector)
+  const { loading } = useAppSelector(selectedKeySelector)
+  const { viewType: streamViewType } = useAppSelector(streamSelector)
 
   const [isAddItemPanelOpen, setIsAddItemPanelOpen] = useState<boolean>(false)
 
@@ -55,12 +57,21 @@ const StreamDetails = (props: Props) => {
     }
   }
 
-  const Actions = ({ width }: { width: number }) => (
-    <StreamItemsAction
-      width={width}
-      title={STREAM_ADD_ACTION[streamViewType].name}
-      openAddItemPanel={openAddItemPanel}
-    />
+  const latest = { streamViewType, openAddItemPanel, t }
+  const latestRef = useRef(latest)
+  latestRef.current = latest
+
+  const Actions = useCallback(
+    ({ width }: { width: number }) => (
+      <StreamItemsAction
+        width={width}
+        title={latestRef.current.t(
+          STREAM_ADD_ACTION[latestRef.current.streamViewType].name,
+        )}
+        openAddItemPanel={latestRef.current.openAddItemPanel}
+      />
+    ),
+    [],
   )
 
   return (

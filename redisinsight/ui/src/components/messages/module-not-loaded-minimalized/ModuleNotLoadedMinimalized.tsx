@@ -1,5 +1,5 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import TelescopeImg from 'uiSrc/assets/img/telescope-dark.svg'
@@ -11,7 +11,6 @@ import {
 import { freeInstancesSelector } from 'uiSrc/slices/instances/instances'
 
 import {
-  ExternalLink,
   FeatureFlagComponent,
   OAuthConnectFreeDb,
   OAuthSsoHandlerDialog,
@@ -29,6 +28,7 @@ import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
+import { Link } from 'uiSrc/components/base/link/Link'
 import {
   MODULE_CAPABILITY_TEXT_NOT_AVAILABLE,
   MODULE_CAPABILITY_TEXT_NOT_AVAILABLE_ENTERPRISE,
@@ -43,11 +43,11 @@ export interface Props {
 
 const ModuleNotLoadedMinimalized = (props: Props) => {
   const history = useHistory()
-  const { [FeatureFlags.cloudAds]: cloudAdsFeature } = useSelector(
+  const { [FeatureFlags.cloudAds]: cloudAdsFeature } = useAppSelector(
     appFeatureFlagsFeaturesSelector,
   )
   const { moduleName, source, onClose } = props
-  const freeInstances = useSelector(freeInstancesSelector) || []
+  const freeInstances = useAppSelector(freeInstancesSelector) || []
 
   const sourceTutorial = getSourceTutorialByCapability(moduleName)
   const moduleText = cloudAdsFeature?.flag
@@ -86,14 +86,13 @@ const ModuleNotLoadedMinimalized = (props: Props) => {
         >
           {!freeDbWithModule ? (
             <>
-              <Text color="subdued" size="s">
-                {moduleText?.text}
-              </Text>
+              <Text size="s">{moduleText?.text}</Text>
               <Spacer size="s" />
               <OAuthSsoHandlerDialog>
                 {(ssoCloudHandlerClick) => (
-                  <ExternalLink
-                    iconSize="S"
+                  <Link
+                    external
+                    target="_blank"
                     href={getUtmExternalLink(EXTERNAL_LINKS.tryFree, {
                       campaign: UTM_CAMPAINGS[source] ?? source,
                     })}
@@ -111,15 +110,15 @@ const ModuleNotLoadedMinimalized = (props: Props) => {
                     data-testid="tutorials-get-started-link"
                   >
                     Start with Cloud for free
-                  </ExternalLink>
+                  </Link>
                 )}
               </OAuthSsoHandlerDialog>
             </>
           ) : (
             <>
-              <Text color="subdued" size="s">
-                Use your free trial all-in-one Redis Cloud database to start
-                exploring these capabilities.
+              <Text size="s">
+                Use your free all-in-one Redis Cloud database to start exploring
+                these capabilities.
               </Text>
               <Spacer size="s" />
               <OAuthConnectFreeDb

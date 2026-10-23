@@ -51,6 +51,7 @@ export const defaultMonacoOptions: monacoEditor.editor.IStandaloneEditorConstruc
     automaticLayout: true,
     formatOnPaste: false,
     glyphMargin: true,
+    fixedOverflowWidgets: true,
     bracketPairColorization: {
       enabled: true,
       independentColorPoolPerBracketType: true,
@@ -63,6 +64,9 @@ export const defaultMonacoOptions: monacoEditor.editor.IStandaloneEditorConstruc
       preview: true,
       showStatusBar: true,
       showIcons: false,
+    },
+    minimap: {
+      enabled: false,
     },
     lineNumbersMinChars: 4,
   }

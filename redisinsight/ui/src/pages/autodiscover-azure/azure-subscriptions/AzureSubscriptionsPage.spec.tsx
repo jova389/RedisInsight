@@ -1,0 +1,196 @@
+import React from 'react'
+import reactRouterDom from 'react-router-dom'
+import { cloneDeep } from 'lodash'
+import { faker } from '@faker-js/faker'
+import {
+  cleanup,
+  mockedStore,
+  render,
+  fireEvent,
+  screen,
+} from 'uiSrc/utils/test-utils'
+import { Pages } from 'uiSrc/constants'
+import {
+  azureSelector,
+  fetchSubscriptionsAzure,
+  clearSubscriptionsAzure,
+} from 'uiSrc/slices/instances/azure'
+import { useAzureAuth } from 'uiSrc/components/hooks/useAzureAuth'
+import {
+  azureAuthAccountSelector,
+  azureAuthTenantSelector,
+} from 'uiSrc/slices/oauth/azure'
+import { AzureLoginSource } from 'uiSrc/slices/interfaces'
+import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
+import { AzureAccountFactory } from 'uiSrc/mocks/factories/cloud/AzureAccount.factory'
+
+import AzureSubscriptionsPage from './AzureSubscriptionsPage'
+
+jest.mock('uiSrc/slices/instances/azure', () => ({
+  ...jest.requireActual('uiSrc/slices/instances/azure'),
+  azureSelector: jest.fn(),
+  fetchSubscriptionsAzure: jest
+    .fn()
+    .mockReturnValue({ type: 'fetchSubscriptionsAzure' }),
+  clearSubscriptionsAzure: jest
+    .fn()
+    .mockReturnValue({ type: 'clearSubscriptionsAzure' }),
+}))
+
+jest.mock('uiSrc/components/hooks/useAzureAuth', () => ({
+  useAzureAuth: jest.fn(),
+}))
+
+jest.mock('uiSrc/slices/oauth/azure', () => ({
+  ...jest.requireActual('uiSrc/slices/oauth/azure'),
+  azureAuthAccountSelector: jest.fn(),
+  azureAuthTenantSelector: jest.fn(),
+}))
+
+jest.mock('uiSrc/telemetry', () => ({
+  ...jest.requireActual('uiSrc/telemetry'),
+  sendEventTelemetry: jest.fn(),
+}))
+
+const mockSubscription = {
+  subscriptionId: faker.string.uuid(),
+  displayName: 'Test Subscription',
+  state: 'Enabled',
+  tenantId: faker.string.uuid(),
+}
+
+const mockAccount = AzureAccountFactory.build()
+
+const defaultAzureState = {
+  loading: false,
+  error: '',
+  subscriptions: [mockSubscription],
+  selectedSubscription: null,
+  databases: [],
+  databasesAdded: [],
+  loaded: {
+    subscriptions: true,
+    databases: false,
+    databasesAdded: false,
+  },
+}
+
+let store: typeof mockedStore
+
+const mockedAzureSelector = azureSelector as jest.Mock
+const mockedAzureAuthAccountSelector = azureAuthAccountSelector as jest.Mock
+const mockedAzureAuthTenantSelector = azureAuthTenantSelector as jest.Mock
+const mockedFetchSubscriptionsAzure = fetchSubscriptionsAzure as jest.Mock
+const mockedUseAzureAuth = useAzureAuth as jest.Mock
+const mockedSendEventTelemetry = sendEventTelemetry as jest.Mock
+
+describe('AzureSubscriptionsPage', () => {
+  const mockInitiateLogin = jest.fn()
+
+  beforeEach(() => {
+    cleanup()
+    store = cloneDeep(mockedStore)
+    store.clearActions()
+    mockedAzureSelector.mockReturnValue(defaultAzureState)
+    mockedAzureAuthAccountSelector.mockReturnValue(mockAccount)
+    mockedAzureAuthTenantSelector.mockReturnValue(undefined)
+    mockedFetchSubscriptionsAzure.mockClear()
+    mockedUseAzureAuth.mockReturnValue({
+      initiateLogin: mockInitiateLogin,
+      account: mockAccount,
+      loading: false,
+      error: '',
+    })
+    mockedSendEventTelemetry.mockClear()
+    mockInitiateLogin.mockClear()
+  })
+
+  it('should redirect to home when not authenticated', () => {
+    const pushMock = jest.fn()
+    reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: pushMock })
+    mockedUseAzureAuth.mockReturnValue({
+      initiateLogin: mockInitiateLogin,
+      account: null,
+    })
+
+    render(<AzureSubscriptionsPage />, { store })
+
+    expect(pushMock).toHaveBeenCalledWith(Pages.home)
+  })
+
+  it('should fetch subscriptions on mount when not already loaded', () => {
+    mockedAzureSelector.mockReturnValue({
+      ...defaultAzureState,
+      loaded: { ...defaultAzureState.loaded, subscriptions: false },
+    })
+
+    render(<AzureSubscriptionsPage />, { store })
+
+    expect(fetchSubscriptionsAzure).toHaveBeenCalledWith(
+      mockAccount.id,
+      undefined,
+    )
+  })
+
+  it('should fetch subscriptions for the active tenant', () => {
+    const tenant = '11111111-1111-1111-1111-111111111111'
+    mockedAzureSelector.mockReturnValue({
+      ...defaultAzureState,
+      loaded: { ...defaultAzureState.loaded, subscriptions: false },
+    })
+    mockedAzureAuthTenantSelector.mockReturnValue(tenant)
+
+    render(<AzureSubscriptionsPage />, { store })
+
+    expect(fetchSubscriptionsAzure).toHaveBeenCalledWith(mockAccount.id, tenant)
+  })
+
+  describe('switch account', () => {
+    it('should open the sign-in dialog when switch account is clicked', () => {
+      render(<AzureSubscriptionsPage />, { store })
+
+      fireEvent.click(screen.getByTestId('btn-switch-account'))
+
+      expect(
+        screen.getByTestId('azure-sign-in-dialog-sign-in'),
+      ).toBeInTheDocument()
+      expect(mockInitiateLogin).not.toHaveBeenCalled()
+    })
+
+    it('should call initiateLogin when signing in from the dialog', () => {
+      render(<AzureSubscriptionsPage />, { store })
+
+      fireEvent.click(screen.getByTestId('btn-switch-account'))
+      fireEvent.click(screen.getByTestId('azure-sign-in-dialog-sign-in'))
+
+      expect(mockInitiateLogin).toHaveBeenCalledWith(
+        AzureLoginSource.Autodiscovery,
+        undefined,
+      )
+    })
+
+    it('should send telemetry when switch account is clicked', () => {
+      render(<AzureSubscriptionsPage />, { store })
+
+      fireEvent.click(screen.getByTestId('btn-switch-account'))
+
+      expect(mockedSendEventTelemetry).toHaveBeenCalledWith({
+        event: TelemetryEvent.AZURE_SWITCH_ACCOUNT_CLICKED,
+      })
+    })
+  })
+
+  describe('refresh', () => {
+    it('should clear and refetch subscriptions when refresh is clicked', () => {
+      render(<AzureSubscriptionsPage />, { store })
+
+      fireEvent.click(screen.getByTestId('btn-refresh-subscriptions'))
+
+      expect(clearSubscriptionsAzure).toHaveBeenCalled()
+      expect(fetchSubscriptionsAzure).toHaveBeenCalledWith(
+        mockAccount.id,
+        undefined,
+      )
+    })
+  })
+})

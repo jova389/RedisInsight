@@ -6,20 +6,21 @@ import { Text } from 'uiSrc/components/base/text'
 
 export const ASSISTANCE_CHAT_AGREEMENTS = (
   <>
-    <Text size="xs">
+    <Text size="m" color="primary">
       Redis Copilot is powered by OpenAI API and is designed for general
       information only.
     </Text>
     <Spacer size="xs" />
-    <Text size="xs">
+    <Text size="m" color="primary">
       Please do not input any personal data or confidential information.
     </Text>
     <Spacer size="xs" />
-    <Text size="xs">
+    <Text size="m" color="primary">
       By accessing and/or using Redis Copilot, you acknowledge that you agree to
       the{' '}
       <Link
-        variant="small-inline"
+        variant="inline"
+        size="S"
         color="subdued"
         target="_blank"
         href="https://redis.io/legal/redis-copilot-terms-of-use/"
@@ -28,7 +29,8 @@ export const ASSISTANCE_CHAT_AGREEMENTS = (
       </Link>{' '}
       and{' '}
       <Link
-        variant="small-inline"
+        variant="inline"
+        size="S"
         color="subdued"
         target="_blank"
         href="https://redis.com/legal/privacy-policy/"
@@ -42,22 +44,25 @@ export const ASSISTANCE_CHAT_AGREEMENTS = (
 
 export const EXPERT_CHAT_AGREEMENTS = (
   <>
-    <Text size="xs">Redis Copilot is powered by OpenAI API.</Text>
+    <Text size="m" color="primary">
+      Redis Copilot is powered by OpenAI API.
+    </Text>
     <Spacer size="xs" />
-    <Text size="xs">
+    <Text size="m" color="primary">
       Please do not include any personal data (except as expressly required for
       the use of Redis Copilot) or confidential information.
     </Text>
-    <Text size="xs">
+    <Text size="m" color="primary">
       Redis Copilot needs access to the information in your database to provide
       you context-aware assistance.
     </Text>
     <Spacer size="xs" />
-    <Text size="xs">
+    <Text size="m" color="primary">
       By accepting these terms, you consent to the processing of any information
       included in your database, and you agree to the{' '}
       <Link
-        variant="small-inline"
+        variant="inline"
+        size="S"
         color="subdued"
         target="_blank"
         href="https://redis.io/legal/redis-copilot-terms-of-use/"
@@ -66,7 +71,8 @@ export const EXPERT_CHAT_AGREEMENTS = (
       </Link>{' '}
       and{' '}
       <Link
-        variant="small-inline"
+        variant="inline"
+        size="S"
         color="subdued"
         target="_blank"
         href="https://redis.com/legal/privacy-policy/"

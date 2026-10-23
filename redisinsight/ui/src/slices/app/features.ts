@@ -53,11 +53,38 @@ export const initialState: StateAppFeatures = {
       [FeatureFlags.databaseManagement]: {
         flag: true,
       },
+      [FeatureFlags.customTutorials]: {
+        flag: false,
+      },
       [FeatureFlags.envDependent]: {
         flag: riConfig.features.envDependent.defaultFlag,
       },
       [FeatureFlags.cloudAds]: {
         flag: riConfig.features.cloudAds.defaultFlag,
+      },
+      [FeatureFlags.array]: {
+        flag: false,
+      },
+      [FeatureFlags.azureEntraId]: {
+        flag: false,
+      },
+      [FeatureFlags.devBrowser]: {
+        flag: false,
+      },
+      [FeatureFlags.devLanguage]: {
+        flag: false,
+      },
+      [FeatureFlags.devRdiUi]: {
+        flag: false,
+      },
+      [FeatureFlags.vectorSearchEnhancements]: {
+        flag: false,
+      },
+      [FeatureFlags.valueDecoder]: {
+        flag: false,
+      },
+      [FeatureFlags.appUpdateStrategySettings]: {
+        flag: false,
       },
     },
   },
@@ -192,6 +219,62 @@ export const appFeatureFlagsSelector = (state: RootState) =>
   state.app.features.featureFlags
 export const appFeatureFlagsFeaturesSelector = (state: RootState) =>
   state.app.features.featureFlags.features
+
+export const isValueDecoderEnabledSelector = (state: RootState): boolean =>
+  state.app.features.featureFlags.features[FeatureFlags.valueDecoder]?.flag ??
+  false
+
+export const isDevelopment = riConfig.app.env === 'development'
+
+export const isAzureEntraIdEnabledSelector = (state: RootState): boolean => {
+  if (isDevelopment) {
+    return true
+  }
+
+  const features = state.app.features.featureFlags.features
+  const azureEntraIdEnabled = features[FeatureFlags.azureEntraId]?.flag ?? false
+  const envDependentEnabled = features[FeatureFlags.envDependent]?.flag ?? false
+
+  return azureEntraIdEnabled && envDependentEnabled
+}
+
+export const isArrayEnabledSelector = (state: RootState): boolean => {
+  if (isDevelopment) {
+    return true
+  }
+
+  const features = state.app.features.featureFlags.features
+  return features[FeatureFlags.array]?.flag ?? false
+}
+
+export const isDevLanguageEnabledSelector = (state: RootState): boolean => {
+  if (isDevelopment) {
+    return true
+  }
+
+  const features = state.app.features.featureFlags.features
+  return features[FeatureFlags.devLanguage]?.flag ?? false
+}
+
+export const isDevRdiUiEnabledSelector = (state: RootState): boolean => {
+  if (isDevelopment) {
+    return true
+  }
+
+  const features = state.app.features.featureFlags.features
+  return features[FeatureFlags.devRdiUi]?.flag ?? false
+}
+
+export const isVectorSearchEnhancementsEnabledSelector = (
+  state: RootState,
+): boolean => {
+  if (isDevelopment) {
+    return true
+  }
+
+  const features = state.app.features.featureFlags.features
+  return features[FeatureFlags.vectorSearchEnhancements]?.flag ?? false
+}
 
 export default appFeaturesSlice.reducer
 

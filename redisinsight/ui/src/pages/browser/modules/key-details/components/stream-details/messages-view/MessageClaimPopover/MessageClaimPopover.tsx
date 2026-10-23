@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ChangeEvent } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { useFormik } from 'formik'
 import { orderBy, filter } from 'lodash'
@@ -27,15 +27,17 @@ import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { NumericInput, SwitchInput } from 'uiSrc/components/base/inputs'
 import { RiPopover, RiTooltip } from 'uiSrc/components/base'
 import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
+import { useTranslation } from 'uiSrc/i18n'
+import { TFunction } from 'i18next'
 import {
   ClaimPendingEntryDto,
   ClaimPendingEntriesResponse,
   ConsumerDto,
-} from 'apiSrc/modules/browser/stream/dto'
+} from 'apiClient'
 
 import styles from './styles.module.scss'
 
-const getConsumersOptions = (consumers: ConsumerDto[]) =>
+const getConsumersOptions = (consumers: ConsumerDto[], t: TFunction) =>
   consumers.map((consumer) => ({
     value: consumer.name?.viewValue,
     inputDisplay: (
@@ -51,15 +53,21 @@ const getConsumersOptions = (consumers: ConsumerDto[]) =>
           className={styles.pendingCount}
           data-testid="pending-count"
         >
-          {`pending: ${consumer.pending}`}
+          {t('browser.stream.claim.pendingCount', { count: consumer.pending })}
         </Text>
       </Text>
     ),
   }))
 
-const timeOptions = [
-  { value: ClaimTimeOptions.RELATIVE, label: 'Relative Time' },
-  { value: ClaimTimeOptions.ABSOLUTE, label: 'Timestamp' },
+const getTimeOptions = (t: TFunction) => [
+  {
+    value: ClaimTimeOptions.RELATIVE,
+    label: t('browser.stream.claim.relativeTime'),
+  },
+  {
+    value: ClaimTimeOptions.ABSOLUTE,
+    label: t('browser.stream.claim.timestamp'),
+  },
 ]
 
 export interface Props {
@@ -84,8 +92,11 @@ const MessageClaimPopover = (props: Props) => {
     handleCancelClaim,
   } = props
 
-  const { data: consumers = [] } = useSelector(selectedGroupSelector) ?? {}
-  const { name: currentConsumerName, pending = 0 } = useSelector(
+  const { t } = useTranslation()
+  const timeOptions = getTimeOptions(t)
+
+  const { data: consumers = [] } = useAppSelector(selectedGroupSelector) ?? {}
+  const { name: currentConsumerName, pending = 0 } = useAppSelector(
     selectedConsumerSelector,
   ) ?? { name: '' }
 
@@ -155,7 +166,7 @@ const MessageClaimPopover = (props: Props) => {
       (consumer) => !isEqualBuffers(consumer.name, currentConsumerName),
     )
     const sortedConsumers = orderBy(
-      getConsumersOptions(consumersWithoutCurrent),
+      getConsumersOptions(consumersWithoutCurrent, t),
       ['name.viewValue'],
       ['asc'],
     )
@@ -167,12 +178,12 @@ const MessageClaimPopover = (props: Props) => {
           ?.viewValue,
       })
     }
-  }, [consumers, currentConsumerName])
+  }, [consumers, currentConsumerName, t])
 
   const button = (
     <SecondaryButton
       size="s"
-      aria-label="Claim pending message"
+      aria-label={t('browser.stream.claim.aria')}
       onClick={showPopover}
       data-testid="claim-pending-message"
       className={styles.claimBtn}
@@ -184,7 +195,7 @@ const MessageClaimPopover = (props: Props) => {
 
   const buttonTooltip = (
     <RiTooltip
-      content="There is no consumer to claim the message."
+      content={t('browser.stream.claim.noConsumerTooltip')}
       position="top"
       anchorClassName="flex-row"
       data-testid="claim-pending-message-tooltip"
@@ -209,7 +220,7 @@ const MessageClaimPopover = (props: Props) => {
       <form>
         <Row responsive gap="m">
           <FlexItem>
-            <FormField label="Consumer">
+            <FormField label={t('browser.stream.claim.consumerLabel')}>
               <RiSelect
                 value={formik.values.consumerName}
                 options={consumerOptions}
@@ -223,8 +234,8 @@ const MessageClaimPopover = (props: Props) => {
               />
             </FormField>
           </FlexItem>
-          <FlexItem grow className={styles.relative}>
-            <FormField label="Min Idle Time">
+          <FlexItem grow>
+            <FormField label={t('browser.stream.claim.minIdleTimeLabel')}>
               <div className={styles.timeWrapper}>
                 <NumericInput
                   autoValidate
@@ -246,15 +257,10 @@ const MessageClaimPopover = (props: Props) => {
         </Row>
         {isOptionalShow && (
           <>
-            <Spacer size="m" />
-            <Row
-              className={styles.container}
-              align="center"
-              justify="between"
-              gap="m"
-            >
-              <FlexItem grow className={styles.idle}>
-                <FormField label="Idle Time">
+            <Spacer size="xl" />
+            <Row align="center" justify="between" gap="m">
+              <FlexItem grow>
+                <FormField label={t('browser.stream.claim.idleTimeLabel')}>
                   <div className={styles.timeWrapper}>
                     <NumericInput
                       autoValidate
@@ -274,7 +280,7 @@ const MessageClaimPopover = (props: Props) => {
                 </FormField>
               </FlexItem>
               <FlexItem className={styles.timeSelect}>
-                <FormField label="Time">
+                <FormField label={t('browser.stream.claim.timeLabel')}>
                   <RiSelect
                     value={formik.values.timeOption}
                     options={timeOptions}
@@ -286,7 +292,7 @@ const MessageClaimPopover = (props: Props) => {
                 </FormField>
               </FlexItem>
               <FlexItem>
-                <FormField label="Retry Count">
+                <FormField label={t('browser.stream.claim.retryCountLabel')}>
                   <NumericInput
                     autoValidate
                     min={0}
@@ -303,11 +309,14 @@ const MessageClaimPopover = (props: Props) => {
                 </FormField>
               </FlexItem>
               <FlexItem grow={2}>
-                <FormField className={styles.hiddenLabel} label="Force">
+                <FormField
+                  className={styles.hiddenLabel}
+                  label={t('browser.stream.claim.forceLabel')}
+                >
                   <Checkbox
                     id="force_claim"
                     name="force"
-                    label="Force Claim"
+                    label={t('browser.stream.claim.forceClaimLabel')}
                     checked={formik.values.force}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
                       formik.setFieldValue(e.target.name, !formik.values.force)
@@ -319,36 +328,27 @@ const MessageClaimPopover = (props: Props) => {
             </Row>
           </>
         )}
-        <Row
-          responsive
-          className={styles.footer}
-          justify="between"
-          align="center"
-        >
+        <Spacer size="xl" />
+        <Row responsive justify="between" align="center">
           <FlexItem>
             <SwitchInput
-              title="Optional Parameters"
+              title={t('browser.stream.claim.optionalParams')}
               checked={isOptionalShow}
               onCheckedChange={setIsOptionalShow}
               data-testid="optional-parameters-switcher"
             />
           </FlexItem>
-          <div>
-            <SecondaryButton
-              className={styles.footerBtn}
-              onClick={handleCancel}
-            >
-              Cancel
+          <Row grow={false} gap="m">
+            <SecondaryButton onClick={handleCancel}>
+              {t('browser.stream.claim.cancel')}
             </SecondaryButton>
             <PrimaryButton
-              className={styles.footerBtn}
-              type="submit"
               onClick={() => formik.handleSubmit()}
               data-testid="btn-submit"
             >
-              Claim
+              {t('browser.stream.claim.confirm')}
             </PrimaryButton>
-          </div>
+          </Row>
         </Row>
       </form>
     </RiPopover>

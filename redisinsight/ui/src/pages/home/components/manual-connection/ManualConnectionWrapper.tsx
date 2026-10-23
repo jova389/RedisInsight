@@ -1,6 +1,6 @@
 import { pick, toNumber, omit } from 'lodash'
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router'
 
 import {
@@ -17,6 +17,8 @@ import {
   getFormUpdates,
   transformQueryParamsObject,
   getDiffKeysOfObjectValues,
+  isAzureDatabase,
+  isManagedDatabase,
 } from 'uiSrc/utils'
 import { BuildType } from 'uiSrc/constants/env'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
@@ -75,16 +77,17 @@ const ManualConnectionWrapper = (props: Props) => {
 
   const [isCloneMode, setIsCloneMode] = useState<boolean>(false)
 
-  const { loadingChanging: loadingStandalone } = useSelector(instancesSelector)
-  const { server } = useSelector(appInfoSelector)
-  const { properties: urlHandlingProperties } = useSelector(
+  const { loadingChanging: loadingStandalone } =
+    useAppSelector(instancesSelector)
+  const { server } = useAppSelector(appInfoSelector)
+  const { properties: urlHandlingProperties } = useAppSelector(
     appRedirectionSelector,
   )
 
   const connectionType = editedInstance?.connectionType ?? DbType.STANDALONE
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     dispatch(fetchCaCerts())
@@ -210,6 +213,8 @@ const ManualConnectionWrapper = (props: Props) => {
       tls,
       forceStandalone,
       keyNameFormat,
+      environment,
+      connectionFamily,
     } = values
 
     const database: any = {
@@ -226,6 +231,8 @@ const ManualConnectionWrapper = (props: Props) => {
       tls,
       forceStandalone,
       keyNameFormat,
+      environment,
+      connectionFamily,
     }
 
     // add tls & ssh for database (modifies database object)
@@ -256,6 +263,7 @@ const ManualConnectionWrapper = (props: Props) => {
       if (
         values.selectedCaCertName === ADD_NEW_CA_CERT &&
         values.newCaCertName !== '' &&
+        editedInstance &&
         values.newCaCertName === editedInstance.caCert?.name
       ) {
         updatedValues.caCert = database.caCert
@@ -307,6 +315,9 @@ const ManualConnectionWrapper = (props: Props) => {
       InstanceType.Standalone,
     )
 
+  const isFromAzure = isAzureDatabase(editedInstance)
+  const isManaged = isManagedDatabase(editedInstance)
+
   return (
     <ManualConnectionForm
       formFields={formFields}
@@ -323,6 +334,8 @@ const ManualConnectionWrapper = (props: Props) => {
       setIsCloneMode={setIsCloneMode}
       onAliasEdited={onAliasEdited}
       onClickBack={onClickBack}
+      isFromAzure={isFromAzure}
+      isManaged={isManaged}
     />
   )
 }

@@ -4,6 +4,7 @@ import { cloneDeep } from 'lodash'
 import {
   cleanup,
   mockedStore,
+  mockStore,
   render,
   screen,
   fireEvent,
@@ -13,11 +14,20 @@ import {
 import { stringDataSelector, stringSelector } from 'uiSrc/slices/browser/string'
 import { setSelectedKeyRefreshDisabled } from 'uiSrc/slices/browser/keys'
 import { MOCK_TRUNCATED_BUFFER_VALUE } from 'uiSrc/mocks/data/bigString'
-import { TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA } from 'uiSrc/constants'
+import { KeyValueFormat } from 'uiSrc/constants'
+import { handleCopy } from 'uiSrc/utils'
 import { Props, StringDetails } from './StringDetails'
+
+jest.mock('uiSrc/utils', () => ({
+  ...jest.requireActual('uiSrc/utils'),
+  handleCopy: jest.fn(),
+}))
+
+const mockedHandleCopy = jest.mocked(handleCopy)
 
 const mockedProps = mock<Props>()
 const EDIT_VALUE_BTN_TEST_ID = 'edit-key-value-btn'
+const COPY_VALUE_BTN_TEST_ID = 'copy-string-value-btn'
 
 jest.mock('uiSrc/slices/browser/string', () => ({
   ...jest.requireActual('uiSrc/slices/browser/string'),
@@ -42,6 +52,14 @@ jest.mock('uiSrc/slices/browser/keys', () => ({
     nameString: 'test',
     length: 4,
   }),
+}))
+
+jest.mock('uiSrc/pages/vector-search/hooks/useIsKeyIndexed', () => ({
+  useIsKeyIndexed: jest.fn().mockReturnValue({
+    indexes: [],
+    status: 'idle',
+  }),
+  UseIsKeyIndexedStatus: { Idle: 'idle', Loading: 'loading', Ready: 'ready' },
 }))
 
 let store: typeof mockedStore
@@ -99,6 +117,20 @@ describe('StringDetails', () => {
     expect(queryByTestId('edit-key-value-btn')).toBeInTheDocument()
   })
 
+  it('warns before editing when a non-Unicode format is selected', () => {
+    const state = cloneDeep(mockedStore.getState())
+    state.browser.keys.selectedKey.viewFormat = KeyValueFormat.JSON
+    const jsonStore = mockStore(state)
+
+    render(<StringDetails {...mockedProps} />, { store: jsonStore })
+
+    fireEvent.click(screen.getByTestId(EDIT_VALUE_BTN_TEST_ID))
+
+    expect(
+      screen.getByTestId('non-unicode-edit-to-unicode'),
+    ).toBeInTheDocument()
+  })
+
   it('should disable refresh when editing', async () => {
     render(<StringDetails {...mockedProps} />)
     const afterRenderActions = [...store.getActions()]
@@ -111,6 +143,64 @@ describe('StringDetails', () => {
       ...afterRenderActions,
       setSelectedKeyRefreshDisabled(true),
     ])
+  })
+
+  describe('copy value action', () => {
+    it('should render the copy value button when the string is fully loaded', () => {
+      render(<StringDetails {...mockedProps} />)
+
+      expect(screen.getByTestId(COPY_VALUE_BTN_TEST_ID)).toBeInTheDocument()
+    })
+
+    it('should copy the decompressed value when the copy button is clicked', () => {
+      render(<StringDetails {...mockedProps} />)
+
+      fireEvent.click(screen.getByTestId(COPY_VALUE_BTN_TEST_ID))
+
+      // buffer [49, 50, 51, 52] decodes to "1234"
+      expect(mockedHandleCopy).toHaveBeenCalledWith('1234')
+    })
+
+    it('should hide the copy button while editing the value', async () => {
+      render(<StringDetails {...mockedProps} />)
+
+      expect(screen.getByTestId(COPY_VALUE_BTN_TEST_ID)).toBeInTheDocument()
+
+      await act(() => {
+        fireEvent.click(screen.getByTestId(EDIT_VALUE_BTN_TEST_ID))
+      })
+
+      expect(
+        screen.queryByTestId(COPY_VALUE_BTN_TEST_ID),
+      ).not.toBeInTheDocument()
+    })
+
+    it('should keep the copy button available for compressed values', () => {
+      const mockStringSelector = stringSelector as jest.Mock
+      mockStringSelector.mockReturnValueOnce({ isCompressed: true })
+
+      render(<StringDetails {...mockedProps} />)
+
+      const copyBtn = screen.getByTestId(COPY_VALUE_BTN_TEST_ID)
+      expect(copyBtn).toBeInTheDocument()
+      expect(copyBtn).not.toBeDisabled()
+    })
+
+    it('should not render the copy value button when the string is not fully loaded', () => {
+      const mockStringDataSelector = stringDataSelector as jest.Mock
+      mockStringDataSelector.mockReturnValueOnce({
+        value: {
+          type: 'Buffer',
+          data: [49, 50, 51],
+        },
+      })
+
+      render(<StringDetails {...mockedProps} />)
+
+      expect(
+        screen.queryByTestId(COPY_VALUE_BTN_TEST_ID),
+      ).not.toBeInTheDocument()
+    })
   })
 
   describe('truncated data', () => {
@@ -133,7 +223,7 @@ describe('StringDetails', () => {
       await waitForRiTooltipVisible()
 
       expect(screen.getByTestId('edit-key-value-tooltip')).toHaveTextContent(
-        TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA,
+        'This action is disabled because the key or value is too large to process within Redis Insight.',
       )
     })
   })

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
 import { isArray } from 'lodash'
 import { useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { Group as ListGroup } from 'uiSrc/components/base/layout/list'
 import {
   EnablementAreaComponent,
@@ -37,8 +37,8 @@ import { FormValues } from '../UploadTutorialForm/UploadTutorialForm'
 import Group from '../Group'
 import InternalLink from '../InternalLink'
 import PlainText from '../PlainText'
+import { Col } from 'uiSrc/components/base/layout/flex'
 import UploadTutorialForm from '../UploadTutorialForm'
-import WelcomeMyTutorials from '../WelcomeMyTutorials'
 
 import styles from './styles.module.scss'
 
@@ -69,14 +69,15 @@ const PATHS = {
 
 const Navigation = (props: Props) => {
   const { tutorials, customTutorials, isInternalPageVisible } = props
-  const { currentStep, isActive } = useSelector(appFeatureOnboardingSelector)
-  const { [FeatureFlags.envDependent]: envDependentFeature } = useSelector(
-    appFeatureFlagsFeaturesSelector,
-  )
+  const { currentStep, isActive } = useAppSelector(appFeatureOnboardingSelector)
+  const {
+    [FeatureFlags.envDependent]: envDependentFeature,
+    [FeatureFlags.customTutorials]: customTutorialsFeature,
+  } = useAppSelector(appFeatureFlagsFeaturesSelector)
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId = '' } = useParams<{ instanceId: string }>()
 
   const isCustomTutorialsOnboarding =
@@ -88,6 +89,17 @@ const Navigation = (props: Props) => {
     },
     [],
   )
+
+  // Open form when onboarding is triggered and form is not visible
+  useEffect(() => {
+    if (
+      isCustomTutorialsOnboarding &&
+      customTutorials?.length > 0 &&
+      !isCreateOpen
+    ) {
+      setIsCreateOpen(true)
+    }
+  }, [isCustomTutorialsOnboarding, customTutorials?.length, isCreateOpen])
 
   const submitCreate = ({ file, link }: FormValues) => {
     const formData = new FormData()
@@ -148,7 +160,7 @@ const Navigation = (props: Props) => {
     } = item
 
     const paddingsStyle = {
-      paddingLeft: `${padding + level * 14}px`,
+      paddingLeft: `${padding + level * 0}px`, // Note: Using the accordion component, we don't need to manually increase padding for nested items anymore
       paddingRight: `${padding}px`,
     }
     const currentSourcePath =
@@ -156,6 +168,7 @@ const Navigation = (props: Props) => {
     const currentManifestPath = `${manifestPath}/${key}`
 
     const isCustomTutorials = id === CUSTOM_TUTORIALS_ID && level === 0
+    const hasChildren = (children?.length ?? 0) > 0
 
     switch (type) {
       case EnablementAreaComponent.Group:
@@ -170,7 +183,7 @@ const Navigation = (props: Props) => {
             )}
             onCreate={() => setIsCreateOpen((v) => !v)}
             onDelete={onDeleteCustomTutorial}
-            isPageOpened={isInternalPageVisible}
+            hasChildren={hasChildren}
             forceState={
               isCustomTutorials && isCustomTutorialsOnboarding
                 ? 'open'
@@ -178,26 +191,25 @@ const Navigation = (props: Props) => {
             }
             {...args}
           >
-            {isCustomTutorials && actions?.includes(EAItemActions.Create) && (
-              <div className={styles.customTuturoialsForm}>
-                {!isCreateOpen && children?.length === 0 && (
-                  <div>
-                    <WelcomeMyTutorials
-                      handleOpenUpload={() => setIsCreateOpen(true)}
-                    />
-                    <div className={styles.uploadWarningContainer}>
-                      <UploadWarning />
-                    </div>
-                  </div>
-                )}
-                {isCreateOpen && (
+            {isCustomTutorials &&
+              actions?.includes(EAItemActions.Create) &&
+              (children?.length === 0 ? (
+                <Col gap="l">
+                  <UploadTutorialForm
+                    onSubmit={submitCreate}
+                    isPageOpened={isInternalPageVisible}
+                  />
+                  <UploadWarning />
+                </Col>
+              ) : (
+                isCreateOpen && (
                   <UploadTutorialForm
                     onSubmit={submitCreate}
                     onCancel={() => setIsCreateOpen(false)}
+                    isPageOpened={isInternalPageVisible}
                   />
-                )}
-              </div>
-            )}
+                )
+              ))}
             {renderTreeView(
               children ? getManifestItems(children) : [],
               {
@@ -251,6 +263,7 @@ const Navigation = (props: Props) => {
         renderTreeView(getManifestItems(tutorials), PATHS.tutorials)}
       {customTutorials &&
         envDependentFeature?.flag &&
+        customTutorialsFeature?.flag &&
         renderTreeView(
           getManifestItems(customTutorials),
           PATHS.customTutorials,

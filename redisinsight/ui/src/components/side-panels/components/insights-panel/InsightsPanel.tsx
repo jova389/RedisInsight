@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { Header } from 'uiSrc/components/side-panels/components'
-import styles from 'uiSrc/components/side-panels/styles.module.scss'
 import { InsightsPanelTabs } from 'uiSrc/slices/interfaces/insights'
 import EnablementAreaWrapper from 'uiSrc/components/side-panels/panels/enablement-area'
 import LiveTimeRecommendations from 'uiSrc/components/side-panels/panels/live-time-recommendations'
@@ -19,6 +18,9 @@ import {
   TELEMETRY_EMPTY_VALUE,
   TelemetryEvent,
 } from 'uiSrc/telemetry'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import { Text } from 'uiSrc/components/base/text'
+import styles from 'uiSrc/components/side-panels/styles.module.scss'
 
 export interface Props {
   isFullScreen: boolean
@@ -28,12 +30,12 @@ export interface Props {
 
 const InsightsPanel = (props: Props) => {
   const { isFullScreen, onToggleFullScreen, onClose } = props
-  const { tabSelected } = useSelector(insightsPanelSelector)
+  const { tabSelected } = useAppSelector(insightsPanelSelector)
   const {
     data: { totalUnread },
-  } = useSelector(recommendationsSelector)
+  } = useAppSelector(recommendationsSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const handleChangeTab = (name: InsightsPanelTabs) => {
@@ -89,11 +91,13 @@ const InsightsPanel = (props: Props) => {
         onClose={onClose}
         panelName="insights"
       >
-        <div className={styles.titleWrapper}>
-          <span className={styles.title}>Insights</span>
-        </div>
+        <Row>
+          <Text size="L" color="primary">
+            Insights
+          </Text>
+        </Row>
       </Header>
-      <div className={styles.body}>
+      <Col className={styles.body}>
         <Tabs
           tabs={tabs}
           value={tabSelected}
@@ -105,7 +109,7 @@ const InsightsPanel = (props: Props) => {
         {tabSelected === InsightsPanelTabs.Recommendations && (
           <LiveTimeRecommendations />
         )}
-      </div>
+      </Col>
     </>
   )
 }

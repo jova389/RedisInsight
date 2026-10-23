@@ -1,10 +1,5 @@
-import React, {
-  FormEvent,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { FormEvent, useEffect, useRef, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { Maybe, stringToBuffer } from 'uiSrc/utils'
 import { addKeyStateSelector, addSetKey } from 'uiSrc/slices/browser/keys'
 
@@ -13,10 +8,11 @@ import { ActionFooter } from 'uiSrc/pages/browser/components/action-footer'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import { CreateSetWithExpireDto } from 'apiSrc/modules/browser/set/dto'
+import { CreateSetWithExpireDto } from 'apiClient'
 
 import { INITIAL_SET_MEMBER_STATE, ISetMemberState } from './interfaces'
-import { AddSetFormConfig as config } from '../constants/fields-config'
+import { useTranslation } from 'uiSrc/i18n'
+import { getAddSetFormConfig } from '../constants/fields-config'
 
 export interface Props {
   keyName: string
@@ -26,7 +22,9 @@ export interface Props {
 
 const AddKeySet = (props: Props) => {
   const { keyName = '', keyTTL, onCancel } = props
-  const { loading } = useSelector(addKeyStateSelector)
+  const { t } = useTranslation()
+  const config = getAddSetFormConfig(t)
+  const { loading } = useAppSelector(addKeyStateSelector)
   const [members, setMembers] = useState<ISetMemberState[]>([
     { ...INITIAL_SET_MEMBER_STATE },
   ])
@@ -34,7 +32,7 @@ const AddKeySet = (props: Props) => {
   const lastAddedMemberName = useRef<HTMLInputElement>(null)
   const prevCountMembers = useRef<number>(0)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     setIsFormValid(keyName.length > 0)
@@ -156,7 +154,7 @@ const AddKeySet = (props: Props) => {
       <ActionFooter
         onCancel={() => onCancel(true)}
         onAction={submitData}
-        actionText="Add Key"
+        actionText={t('browser.addKey.button.submit')}
         loading={loading}
         disabled={!isFormValid}
         actionTestId="add-key-set-btn"

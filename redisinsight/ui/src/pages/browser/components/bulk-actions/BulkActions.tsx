@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import {
@@ -24,6 +24,7 @@ import { Title } from 'uiSrc/components/base/text/Title'
 import BulkUpload from './BulkUpload'
 import BulkDelete from './BulkDelete'
 import BulkActionsTabs from './BulkActionsTabs'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 import {
   BulkActionsContainer,
@@ -48,12 +49,13 @@ const BulkActions = (props: Props) => {
     onBulkActionsPanel,
     onToggleFullScreen,
   } = props
+  const { t } = useTranslation()
   const { instanceId = '' } = useParams<{ instanceId: string }>()
 
-  const { filter, search } = useSelector(keysSelector)
-  const { type } = useSelector(selectedBulkActionsSelector)
+  const { filter, search } = useAppSelector(keysSelector)
+  const { type } = useAppSelector(selectedBulkActionsSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     sendEventTelemetry({
@@ -107,7 +109,7 @@ const BulkActions = (props: Props) => {
     <BulkActionsPage>
       <BulkActionsContainer justify="center" gap="l">
         <BulkActionsHeader align="center" justify="between">
-          <Title size="M">Bulk Actions</Title>
+          <Title size="M">{t('browser.bulkActions.title')}</Title>
           <Row align="center" gap="s" grow={false}>
             {!arePanelsCollapsed && (
               <FullScreen
@@ -118,13 +120,13 @@ const BulkActions = (props: Props) => {
             )}
             {(!arePanelsCollapsed || isFullScreen) && (
               <RiTooltip
-                content="Close"
+                content={t('browser.bulkActions.close.tooltip')}
                 position="left"
                 anchorClassName={styles.anchorTooltip}
               >
                 <IconButton
                   icon={CancelSlimIcon}
-                  aria-label="Close panel"
+                  aria-label={t('browser.bulkActions.close.aria')}
                   data-testid="bulk-close-panel"
                   onClick={closePanel}
                 />

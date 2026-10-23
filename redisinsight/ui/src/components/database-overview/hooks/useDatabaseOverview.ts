@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import {
   connectedInstanceOverviewSelector,
@@ -29,14 +29,14 @@ function getUsedMemoryPercent(
 
 export const useDatabaseOverview = () => {
   const { theme } = useContext(ThemeContext)
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const [lastRefreshTime, setLastRefreshTime] = useState<number | null>(null)
-  const { id: connectedInstanceId = '', db } = useSelector(
+  const { id: connectedInstanceId = '', db } = useAppSelector(
     connectedInstanceSelector,
   )
-  const connectivityError = useSelector(appConnectivityError)
+  const connectivityError = useAppSelector(appConnectivityError)
 
-  const overview = useSelector(connectedInstanceOverviewSelector)
+  const overview = useAppSelector(connectedInstanceOverviewSelector)
   const {
     usedMemory,
     cloudDetails: {
@@ -48,9 +48,16 @@ export const useDatabaseOverview = () => {
     } = {},
   } = overview
 
-  const loadData = (forceDataReload = false) => {
-    if (connectedInstanceId && (!connectivityError || forceDataReload)) {
-      dispatch(getDatabaseConfigInfoAction(connectedInstanceId))
+  const loadData = () => {
+    if (connectedInstanceId) {
+      dispatch(
+        getDatabaseConfigInfoAction(connectedInstanceId, () => {
+          // Clear connectivity error on successful API call.
+          // Always dispatch to avoid stale closure issues - dispatching null
+          // when there's no error is a safe no-op.
+          dispatch(setConnectivityError(null))
+        }),
+      )
       setLastRefreshTime(Date.now())
     }
   }
@@ -75,12 +82,8 @@ export const useDatabaseOverview = () => {
       },
     })
 
-  const handleRefresh = (forceRefresh?: boolean) => {
-    loadData(forceRefresh)
-  }
-  const handleRefreshClick = () => {
-    // clear error, if connectivity is broken, the interceptor will set it again
-    dispatch(setConnectivityError(null))
+  const handleRefresh = () => {
+    loadData()
   }
   const usedMemoryPercent = getUsedMemoryPercent(
     planMemoryLimit,
@@ -109,6 +112,5 @@ export const useDatabaseOverview = () => {
     usedMemoryPercent,
     handleEnableAutoRefresh,
     handleRefresh,
-    handleRefreshClick,
   }
 }

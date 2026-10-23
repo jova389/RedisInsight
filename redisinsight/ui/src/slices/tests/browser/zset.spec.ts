@@ -1,4 +1,5 @@
 import { cloneDeep } from 'lodash'
+import { RootState } from 'uiSrc/slices/store'
 import { AxiosError } from 'axios'
 import { SortOrder } from 'uiSrc/constants'
 import { apiService } from 'uiSrc/services'
@@ -16,10 +17,7 @@ import successMessages from 'uiSrc/components/notifications/success-messages'
 import { stringToBuffer } from 'uiSrc/utils'
 import { deleteRedisearchKeyFromList } from 'uiSrc/slices/browser/redisearch'
 import { MOCK_TIMESTAMP } from 'uiSrc/mocks/data/dateNow'
-import {
-  AddMembersToZSetDto,
-  ZSetMemberDto,
-} from 'apiSrc/modules/browser/z-set/dto'
+import { AddMembersToZSetDto, ZSetMemberDto } from 'apiClient'
 import {
   defaultSelectedKeyAction,
   deleteSelectedKeySuccess,
@@ -90,7 +88,7 @@ describe('zset slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)
@@ -100,9 +98,9 @@ describe('zset slice', () => {
   describe('setZsetInitialState', () => {
     it('should properly set initial state', () => {
       const nextState = reducer(initialState, setZsetInitialState())
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(initialState)
     })
@@ -123,9 +121,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -158,9 +156,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, loadZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -186,9 +184,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, loadZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -215,9 +213,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -238,9 +236,9 @@ describe('zset slice', () => {
 
       // Act
       const nextState = reducer(initialState, searchZSetMembers('*'))
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -271,9 +269,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, searchZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -302,9 +300,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, searchZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -325,9 +323,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -350,9 +348,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, searchMoreZSetMembers(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -381,9 +379,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -403,9 +401,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(initialState)
     })
@@ -426,9 +424,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -446,9 +444,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, loadMoreZSetMembers())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -484,9 +482,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, loadMoreZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -505,9 +503,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, loadMoreZSetMembersSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(initialState)
     })
@@ -529,9 +527,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -571,9 +569,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialStateRemove, removeZsetMembersSuccess())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(initialStateRemove)
     })
@@ -594,9 +592,9 @@ describe('zset slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -635,9 +633,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialStateRemove, removeMembersFromList(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -659,9 +657,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, updateScore())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -682,9 +680,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, updateScoreSuccess())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -706,9 +704,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, updateScoreFailure(errorMessage))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -730,9 +728,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialState, resetUpdateScore())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })
@@ -786,9 +784,9 @@ describe('zset slice', () => {
       const nextState = reducer(initialStateToUpdate, updateMembersInList(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: { zset: nextState },
+        browser: { ...initialStateDefault.browser, zset: nextState },
       }
       expect(zsetSelector(rootState)).toEqual(state)
     })

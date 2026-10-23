@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import { Text } from 'uiSrc/components/base/text'
@@ -16,36 +16,56 @@ import {
   sendPageViewTelemetry,
 } from 'uiSrc/telemetry'
 import { formatLongName, Nullable, setTitle } from 'uiSrc/utils'
+import { useTranslation } from 'uiSrc/i18n'
 import { setLastPageContext } from 'uiSrc/slices/app/context'
 import { PageNames } from 'uiSrc/constants'
 import { Loader } from 'uiSrc/components/base/display'
-import { IRdiStatistics, RdiPipelineStatus } from 'uiSrc/slices/interfaces'
+import {
+  type IRdiStatistics,
+  type IStatisticsSection,
+  RdiPipelineStatus,
+  RdiStatisticsViewType,
+} from 'uiSrc/slices/interfaces'
 
-import Clients from './clients'
-import DataStreams from './data-streams'
+import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { AutoRefresh } from 'uiSrc/components'
 import Empty from './empty'
-import ProcessingPerformance from './processing-performance'
-import Status from './status'
-import TargetConnections from './target-connections'
-
-import styles from './styles.module.scss'
+import StatisticsTable from './components/statistics-table'
+import StatisticsBlocks from './components/statistics-blocks'
+import StatisticsInfo from './components/statistics-info'
+import * as S from './StatisticsPage.styles'
 
 const shouldShowStatistics = (data: Nullable<IRdiStatistics>) =>
   data?.status === RdiPipelineStatus.Success && !!data?.data
 
+const renderStatisticsSection = (section: IStatisticsSection) => {
+  switch (section.view) {
+    case RdiStatisticsViewType.Info:
+      return <StatisticsInfo key={section.name} data={section} />
+    case RdiStatisticsViewType.Table:
+      return <StatisticsTable key={section.name} data={section} />
+    case RdiStatisticsViewType.Blocks:
+      return <StatisticsBlocks key={section.name} data={section} />
+    default:
+      return null
+  }
+}
+
 const StatisticsPage = () => {
+  const { t } = useTranslation()
   const [pageLoading, setPageLoading] = useState(true)
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
+  const [lastRefreshTime, setLastRefreshTime] = React.useState(Date.now())
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const { loading: isStatisticsLoading, results: statisticsResults } =
-    useSelector(rdiStatisticsSelector)
-  const { name: connectedRdiInstanceName } = useSelector(
+    useAppSelector(rdiStatisticsSelector)
+  const { name: connectedRdiInstanceName } = useAppSelector(
     connectedInstanceSelector,
   )
   const rdiInstanceName = formatLongName(connectedRdiInstanceName, 33, 0, '...')
-  setTitle(`${rdiInstanceName} - Pipeline Status`)
+  setTitle(t('rdi.statistics.pageTitle', { name: rdiInstanceName }))
 
   const onRefresh = (section: string) => {
     dispatch(fetchRdiStatistics(rdiInstanceId, section))
@@ -112,83 +132,60 @@ const StatisticsPage = () => {
   // todo add interface
   if (statisticsResults.status === 'failed') {
     return (
-      <Text style={{ margin: '20px auto' }}>
-        Unexpected error in your RDI endpoint, please refresh the page
-      </Text>
+      <Text style={{ margin: '20px auto' }}>{t('rdi.statistics.error')}</Text>
     )
   }
 
-  const { data: statisticsData } = statisticsResults
-
+  const sections = statisticsResults.data?.sections || []
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.bodyContainer}>
+    <S.Container>
+      <S.ContentWrapper gap="xxl" grow={false}>
         {pageLoading && (
-          <div className={styles.cover}>
+          <S.LoadingState centered>
             <Loader size="xl" />
-          </div>
+          </S.LoadingState>
         )}
         {!shouldShowStatistics(statisticsResults) ? (
           // TODO add loader
           <Empty rdiInstanceId={rdiInstanceId} />
         ) : (
-          <>
-            <Status data={statisticsData.rdiPipelineStatus} />
-            <ProcessingPerformance
-              data={statisticsData.processingPerformance}
-              loading={isStatisticsLoading}
-              onRefresh={() => onRefresh('processing_performance')}
-              onRefreshClicked={() =>
-                onRefreshClicked('processing_performance')
-              }
-              onChangeAutoRefresh={(
-                enableAutoRefresh: boolean,
-                refreshRate: string,
-              ) =>
-                onChangeAutoRefresh(
-                  'processing_performance',
-                  enableAutoRefresh,
-                  refreshRate,
-                )
-              }
-            />
-            <TargetConnections data={statisticsData.connections} />
-            <DataStreams
-              data={statisticsData.dataStreams}
-              loading={isStatisticsLoading}
-              onRefresh={() => {
-                dispatch(fetchRdiStatistics(rdiInstanceId, 'data_streams'))
-              }}
-              onRefreshClicked={() => onRefreshClicked('data_streams')}
-              onChangeAutoRefresh={(
-                enableAutoRefresh: boolean,
-                refreshRate: string,
-              ) =>
-                onChangeAutoRefresh(
-                  'data_streams',
-                  enableAutoRefresh,
-                  refreshRate,
-                )
-              }
-            />
-            <Clients
-              data={statisticsData.clients}
-              loading={isStatisticsLoading}
-              onRefresh={() => {
-                dispatch(fetchRdiStatistics(rdiInstanceId, 'clients'))
-              }}
-              onRefreshClicked={() => onRefreshClicked('clients')}
-              onChangeAutoRefresh={(
-                enableAutoRefresh: boolean,
-                refreshRate: string,
-              ) =>
-                onChangeAutoRefresh('clients', enableAutoRefresh, refreshRate)
-              }
-            />
-          </>
+          !pageLoading && (
+            <>
+              <Row justify="end">
+                <FlexItem>
+                  <AutoRefresh
+                    postfix="processing-performance-info"
+                    displayText
+                    loading={isStatisticsLoading}
+                    lastRefreshTime={lastRefreshTime}
+                    enableAutoRefreshDefault
+                    testid="processing-performance-info"
+                    onRefresh={() => {
+                      setLastRefreshTime(Date.now())
+                      onRefresh('processing_performance')
+                    }}
+                    onRefreshClicked={() =>
+                      onRefreshClicked('processing_performance')
+                    }
+                    onEnableAutoRefresh={(
+                      enableAutoRefresh: boolean,
+                      refreshRate: string,
+                    ) =>
+                      onChangeAutoRefresh(
+                        'processing_performance',
+                        enableAutoRefresh,
+                        refreshRate,
+                      )
+                    }
+                  />
+                </FlexItem>
+              </Row>
+              {sections.map((section) => renderStatisticsSection(section))}
+            </>
+          )
         )}
-      </div>
-    </div>
+      </S.ContentWrapper>
+    </S.Container>
   )
 }
 

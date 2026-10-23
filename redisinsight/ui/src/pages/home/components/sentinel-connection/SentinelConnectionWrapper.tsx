@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router'
 
 import {
@@ -25,6 +25,7 @@ import { ADD_NEW, NO_CA_CERT } from 'uiSrc/pages/home/constants'
 import { InstanceType } from 'uiSrc/slices/interfaces'
 import { useModalHeader } from 'uiSrc/contexts/ModalTitleProvider'
 import { Title } from 'uiSrc/components/base/text/Title'
+import { useTranslation } from 'uiSrc/i18n'
 import SentinelConnectionForm from './sentinel-connection-form'
 
 export interface Props {
@@ -46,27 +47,33 @@ const INITIAL_VALUES = {
 }
 
 const SentinelConnectionWrapper = (props: Props) => {
+  const { t } = useTranslation()
   const { onClose } = props
   const [initialValues, setInitialValues] = useState(INITIAL_VALUES)
 
-  const { loading } = useSelector(sentinelSelector)
-  const { data: caCertificates } = useSelector(caCertsSelector)
-  const { data: certificates } = useSelector(clientCertsSelector)
+  const { loading } = useAppSelector(sentinelSelector)
+  const { data: caCertificates } = useAppSelector(caCertsSelector)
+  const { data: certificates } = useAppSelector(clientCertsSelector)
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { setModalHeader } = useModalHeader()
 
   useEffect(() => {
     dispatch(fetchCaCerts())
     dispatch(fetchClientCerts())
 
-    setModalHeader(<Title size="M">Redis Sentinel</Title>, true)
-
     return () => {
       setModalHeader(null)
     }
   }, [])
+
+  useEffect(() => {
+    setModalHeader(
+      <Title size="M">{t('home.form.sentinel.modalTitle')}</Title>,
+      true,
+    )
+  }, [t])
 
   const onMastersSentinelFetched = () => {
     history.push(Pages.sentinelDatabases)

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { useHistory, useLocation, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { IRoute, PageNames, Pages } from 'uiSrc/constants'
 import { connectedInstanceSelector } from 'uiSrc/slices/rdi/instances'
@@ -15,36 +15,46 @@ import {
   setLastPipelineManagementPage,
 } from 'uiSrc/slices/app/context'
 import { formatLongName, setTitle } from 'uiSrc/utils'
+import { useTranslation } from 'uiSrc/i18n'
 import SourcePipelineDialog from 'uiSrc/pages/rdi/pipeline-management/components/source-pipeline-dialog'
 import Navigation from 'uiSrc/pages/rdi/pipeline-management/components/navigation'
 
 import { removeInfiniteNotification } from 'uiSrc/slices/app/notifications'
 import { InfiniteMessagesIds } from 'uiSrc/components/notifications/components'
 import PipelinePageRouter from './PipelineManagementPageRouter'
-import styles from './styles.module.scss'
+import { Row } from 'uiSrc/components/base/layout/flex'
+import {
+  ContentContainer,
+  NavigationContainer,
+} from './PipelineManagementPage.styles'
 
 export interface Props {
   routes: IRoute[]
 }
 
 const PipelineManagementPage = ({ routes = [] }: Props) => {
+  const { t } = useTranslation()
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
-  const { lastViewedPage } = useSelector(appContextPipelineManagement)
-  const { name: connectedRdiInstanceName } = useSelector(
+  const { lastViewedPage } = useAppSelector(appContextPipelineManagement)
+  const { name: connectedRdiInstanceName } = useAppSelector(
     connectedInstanceSelector,
   )
 
   const pathnameRef = useRef<string>('')
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { pathname } = useLocation()
 
   const rdiInstanceName = formatLongName(connectedRdiInstanceName, 33, 0, '...')
-  setTitle(`${rdiInstanceName} - Pipeline Management`)
+  setTitle(t('rdi.pipeline.pageTitle', { name: rdiInstanceName }))
 
   useEffect(() => {
-    dispatch(fetchRdiPipeline(rdiInstanceId))
+    if (
+      !lastViewedPage?.startsWith(Pages.rdiPipelineManagement(rdiInstanceId))
+    ) {
+      dispatch(fetchRdiPipeline(rdiInstanceId))
+    }
     dispatch(fetchRdiPipelineSchema(rdiInstanceId))
     dispatch(fetchRdiPipelineJobFunctions(rdiInstanceId))
   }, [])
@@ -81,11 +91,15 @@ const PipelineManagementPage = ({ routes = [] }: Props) => {
   }, [pathname, lastViewedPage])
 
   return (
-    <div className={styles.wrapper}>
-      <Navigation />
+    <Row>
+      <NavigationContainer>
+        <Navigation />
+      </NavigationContainer>
       <SourcePipelineDialog />
-      <PipelinePageRouter routes={routes} />
-    </div>
+      <ContentContainer>
+        <PipelinePageRouter routes={routes} />
+      </ContentContainer>
+    </Row>
   )
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useFormik } from 'formik'
 import { has } from 'lodash'
 
@@ -11,19 +11,21 @@ import {
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 import ConsentOption from '../ConsentOption'
 import { ConsentCategories, IConsent } from '../ConsentsSettings'
 
 import styles from '../styles.module.scss'
 
 const ConsentsPrivacy = () => {
+  const { t } = useTranslation()
   const [consents, setConsents] = useState<IConsent[]>([])
   const [privacyConsents, setPrivacyConsents] = useState<IConsent[]>([])
   const [initialValues, setInitialValues] = useState<any>({})
 
-  const { config, spec } = useSelector(userSettingsSelector)
+  const { config, spec } = useAppSelector(userSettingsSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const formik = useFormik({
     initialValues,
@@ -80,11 +82,12 @@ const ConsentsPrivacy = () => {
   return (
     <form onSubmit={formik.handleSubmit} data-testid="consents-settings-form">
       <div className={styles.consentsWrapper}>
-        <Text size="s" className={styles.smallText} color="primary">
-          To optimize your experience, Redis Insight uses third-party tools.
+        <Text size="M" color="primary">
+          {t('settings.privacy.description')}
         </Text>
-        <Spacer />
-        <Title size="XS">Usage Data</Title>
+        <Spacer size="m" />
+        <Title size="M">{t('settings.privacy.usageData.title')}</Title>
+        <Spacer size="m" />
         {privacyConsents.map((consent: IConsent) => (
           <ConsentOption
             consent={consent}

@@ -1,12 +1,13 @@
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import React, { useEffect, useState } from 'react'
-import cx from 'classnames'
 import AutoSizer from 'react-virtualized-auto-sizer'
+
+import { useTranslation } from 'uiSrc/i18n'
 
 import {
   DEFAULT_EXTRAPOLATION,
   SectionName,
-} from 'uiSrc/pages/database-analysis'
+} from 'uiSrc/pages/database-analysis/constants'
 import {
   extrapolate,
   formatBytes,
@@ -25,11 +26,21 @@ import {
   dbAnalysisReportsSelector,
   setShowNoExpiryGroup,
 } from 'uiSrc/slices/analytics/dbAnalysis'
-import { SwitchInput } from 'uiSrc/components/base/inputs'
 import { Title } from 'uiSrc/components/base/text/Title'
-import { DatabaseAnalysis } from 'apiSrc/modules/database-analysis/models'
+import { DatabaseAnalysis } from 'apiClient'
 
-import styles from './styles.module.scss'
+import {
+  SectionTitleWrapper,
+  SwitchExtrapolateResults,
+} from 'uiSrc/pages/database-analysis/components/styles'
+import {
+  Chart,
+  Container,
+  Content,
+  LoadingWrapper,
+  Switch,
+  TitleWrapper,
+} from './ExpirationGroupsView.styles'
 
 export interface Props {
   data: Nullable<DatabaseAnalysis>
@@ -40,13 +51,14 @@ export interface Props {
 
 const ExpirationGroupsView = (props: Props) => {
   const { data, loading, extrapolation, onSwitchExtrapolation } = props
+  const { t } = useTranslation()
   const { totalMemory, totalKeys } = data || {}
 
-  const { showNoExpiryGroup } = useSelector(dbAnalysisReportsSelector)
+  const { showNoExpiryGroup } = useAppSelector(dbAnalysisReportsSelector)
   const [expirationGroups, setExpirationGroups] = useState<BarChartData[]>([])
   const [isExtrapolated, setIsExtrapolated] = useState<boolean>(true)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     setIsExtrapolated(extrapolation !== DEFAULT_EXTRAPOLATION)
@@ -83,12 +95,7 @@ const ExpirationGroupsView = (props: Props) => {
   }, [data?.expirationGroups, showNoExpiryGroup, isExtrapolated, extrapolation])
 
   if (loading) {
-    return (
-      <div
-        className={cx(styles.content, styles.loadingWrapper)}
-        data-testid="summary-per-ttl-loading"
-      />
-    )
+    return <LoadingWrapper data-testid="summary-per-ttl-loading" />
   }
 
   const onSwitchChange = (value: boolean) => {
@@ -107,17 +114,15 @@ const ExpirationGroupsView = (props: Props) => {
   const yCountTicks = DEFAULT_Y_TICKS
 
   return (
-    <div className={cx('section', styles.container)} data-testid="analysis-ttl">
-      <div className="section-title-wrapper">
-        <div className={styles.titleWrapper}>
+    <Container data-testid="analysis-ttl">
+      <SectionTitleWrapper>
+        <TitleWrapper>
           <Title size="M" className="section-title">
-            MEMORY LIKELY TO BE FREED OVER TIME
+            {t('analytics.databaseAnalysis.expiration.title')}
           </Title>
           {extrapolation !== DEFAULT_EXTRAPOLATION && (
-            <SwitchInput
-              color="subdued"
-              className="switch-extrapolate-results"
-              title="Extrapolate results"
+            <SwitchExtrapolateResults
+              title={t('analytics.databaseAnalysis.extrapolateResults')}
               checked={isExtrapolated}
               onCheckedChange={(checked) => {
                 setIsExtrapolated(checked)
@@ -129,20 +134,18 @@ const ExpirationGroupsView = (props: Props) => {
               data-testid="extrapolate-results"
             />
           )}
-        </div>
-        <SwitchInput
-          color="subdued"
-          className={styles.switch}
-          title={'Show "No Expiry"'}
+        </TitleWrapper>
+        <Switch
+          title={t('analytics.databaseAnalysis.expiration.showNoExpiry')}
           checked={showNoExpiryGroup}
           onCheckedChange={onSwitchChange}
           data-testid="show-no-expiry-switch"
         />
-      </div>
-      <div className={cx('section-content', styles.content)}>
-        <div className={styles.chart}>
+      </SectionTitleWrapper>
+      <Content>
+        <Chart>
           <AutoSizer>
-            {({ width, height }) => (
+            {({ width = 0, height = 0 }) => (
               <BarChart
                 name="expiration-groups"
                 width={width}
@@ -167,9 +170,9 @@ const ExpirationGroupsView = (props: Props) => {
               />
             )}
           </AutoSizer>
-        </div>
-      </div>
-    </div>
+        </Chart>
+      </Content>
+    </Container>
   )
 }
 

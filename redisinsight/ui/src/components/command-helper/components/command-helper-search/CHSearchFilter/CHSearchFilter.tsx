@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { GROUP_TYPES_DISPLAY } from 'uiSrc/constants'
 import { appRedisCommandsSelector } from 'uiSrc/slices/app/redis-commands'
 import { cliSettingsSelector } from 'uiSrc/slices/cli/cli-settings'
 import { Text } from 'uiSrc/components/base/text'
-
+import { Row } from 'uiSrc/components/base/layout/flex'
 import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import styles from './styles.module.scss'
@@ -17,9 +17,9 @@ export interface Props {
 }
 
 const CHSearchFilter = ({ submitFilter, isLoading }: Props) => {
-  const { commandGroups = [] } = useSelector(appRedisCommandsSelector)
+  const { commandGroups = [] } = useAppSelector(appRedisCommandsSelector)
   const { isEnteringCommand, matchedCommand, searchingCommandFilter } =
-    useSelector(cliSettingsSelector)
+    useAppSelector(cliSettingsSelector)
 
   const [typeSelected, setTypeSelected] = useState<string>(
     searchingCommandFilter,
@@ -79,13 +79,13 @@ const CHSearchFilter = ({ submitFilter, isLoading }: Props) => {
         options={options}
         allowReset
         placeholder={
-          <div role="presentation">
+          <Row role="presentation">
             <RiIcon
               type="FilterIcon"
               data-testid="filter-option--group-type-default"
               className={styles.controlsIcon}
             />
-          </div>
+          </Row>
         }
         value={typeSelected}
         data-testid="select-filter-group-type"

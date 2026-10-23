@@ -602,13 +602,18 @@ describe('ONBOARDING_FEATURES', () => {
       )
     })
 
-    it('should call proper actions on next', () => {
+    it('should navigate to vector search on next', () => {
+      const pushMock = jest.fn()
+      reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: pushMock })
+
       render(
         <OnboardingTour options={ONBOARDING_FEATURES.BROWSER_PROFILER}>
           <span />
         </OnboardingTour>,
       )
       fireEvent.click(screen.getByTestId('next-btn'))
+
+      expect(pushMock).toHaveBeenCalledWith(Pages.vectorSearch(''))
 
       const expectedActions = [
         resetCliSettings(),
@@ -620,17 +625,78 @@ describe('ONBOARDING_FEATURES', () => {
         clearStoreActions(expectedActions),
       )
     })
+  })
 
-    it('should properly push history on next', () => {
+  describe('VECTOR_SEARCH_PAGE', () => {
+    beforeEach(() => {
+      ;(appFeatureOnboardingSelector as jest.Mock).mockReturnValue({
+        currentStep: OnboardingSteps.VectorSearchPage,
+        isActive: true,
+        totalSteps: Object.keys(ONBOARDING_FEATURES).length,
+      })
+    })
+
+    it('should render', () => {
+      render(
+        <OnboardingTour options={ONBOARDING_FEATURES.VECTOR_SEARCH_PAGE}>
+          <span />
+        </OnboardingTour>,
+      )
+      expect(screen.getByTestId('step-content')).toHaveTextContent(
+        'This is Search, where you can index your data and query it using Redis Search.',
+      )
+      expect(screen.getByTestId('step-content')).toHaveTextContent(
+        'Load sample data to create your first index and run sample queries to see results instantly.',
+      )
+    })
+
+    it('should call proper telemetry events', () => {
+      const sendEventTelemetryMock = jest.fn()
+      ;(sendEventTelemetry as jest.Mock).mockImplementation(
+        () => sendEventTelemetryMock,
+      )
+
+      render(
+        <OnboardingTour options={ONBOARDING_FEATURES.VECTOR_SEARCH_PAGE}>
+          <span />
+        </OnboardingTour>,
+      )
+      checkAllTelemetryButtons(
+        OnboardingStepName.VectorSearchIntro,
+        sendEventTelemetry as jest.Mock,
+      )
+    })
+
+    it('should navigate to browser and show monitor on back', () => {
       const pushMock = jest.fn()
       reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: pushMock })
 
       render(
-        <OnboardingTour options={ONBOARDING_FEATURES.BROWSER_PROFILER}>
+        <OnboardingTour options={ONBOARDING_FEATURES.VECTOR_SEARCH_PAGE}>
+          <span />
+        </OnboardingTour>,
+      )
+      fireEvent.click(screen.getByTestId('back-btn'))
+
+      expect(pushMock).toHaveBeenCalledWith(Pages.browser(''))
+
+      const expectedActions = [showMonitor(), setOnboardPrevStep()]
+      expect(clearStoreActions(store.getActions().slice(-2))).toEqual(
+        clearStoreActions(expectedActions),
+      )
+    })
+
+    it('should navigate to workbench on next', () => {
+      const pushMock = jest.fn()
+      reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: pushMock })
+
+      render(
+        <OnboardingTour options={ONBOARDING_FEATURES.VECTOR_SEARCH_PAGE}>
           <span />
         </OnboardingTour>,
       )
       fireEvent.click(screen.getByTestId('next-btn'))
+
       expect(pushMock).toHaveBeenCalledWith(Pages.workbench(''))
     })
   })
@@ -809,21 +875,7 @@ describe('ONBOARDING_FEATURES', () => {
       )
     })
 
-    it('should call proper actions on back', () => {
-      render(
-        <OnboardingTour options={ONBOARDING_FEATURES.WORKBENCH_PAGE}>
-          <span />
-        </OnboardingTour>,
-      )
-      fireEvent.click(screen.getByTestId('back-btn'))
-
-      const expectedActions = [showMonitor(), setOnboardPrevStep()]
-      expect(clearStoreActions(store.getActions().slice(-2))).toEqual(
-        clearStoreActions(expectedActions),
-      )
-    })
-
-    it('should properly push history on back', () => {
+    it('should navigate to vector search on back', () => {
       const pushMock = jest.fn()
       reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: pushMock })
 
@@ -833,7 +885,8 @@ describe('ONBOARDING_FEATURES', () => {
         </OnboardingTour>,
       )
       fireEvent.click(screen.getByTestId('back-btn'))
-      expect(pushMock).toHaveBeenCalledWith(Pages.browser(''))
+
+      expect(pushMock).toHaveBeenCalledWith(Pages.vectorSearch(''))
     })
 
     it('should call proper actions on next', () => {

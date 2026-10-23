@@ -30,21 +30,26 @@ export const FIELD_TYPE_OPTIONS = [
   {
     text: 'TEXT',
     value: FieldTypes.TEXT,
+    descriptionKey: 'vectorSearch.fieldType.desc.text',
   },
   {
     text: 'TAG',
     value: FieldTypes.TAG,
+    descriptionKey: 'vectorSearch.fieldType.desc.tag',
   },
   {
     text: 'NUMERIC',
     value: FieldTypes.NUMERIC,
+    descriptionKey: 'vectorSearch.fieldType.desc.numeric',
   },
   {
     text: 'GEO',
     value: FieldTypes.GEO,
+    descriptionKey: 'vectorSearch.fieldType.desc.geo',
   },
   {
     text: 'VECTOR',
     value: FieldTypes.VECTOR,
+    descriptionKey: 'vectorSearch.fieldType.desc.vector',
   },
 ]

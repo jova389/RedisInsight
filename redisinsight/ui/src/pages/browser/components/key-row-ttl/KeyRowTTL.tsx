@@ -11,6 +11,7 @@ import {
   truncateNumberToFirstUnit,
   truncateTTLToSeconds,
 } from 'uiSrc/utils'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -22,6 +23,7 @@ export interface Props {
 
 const KeyRowTTL = (props: Props) => {
   const { ttl, nameString, deletePopoverId, rowId } = props
+  const { t } = useTranslation()
 
   if (isUndefined(ttl)) {
     return (
@@ -38,19 +40,20 @@ const KeyRowTTL = (props: Props) => {
         className={cx(styles.keyTTL, 'moveOnHoverKey', {
           hide: deletePopoverId === rowId,
         })}
-        color="subdued"
+        color="secondary"
         data-testid={`ttl-${nameString}`}
       >
-        No limit
+        {t('browser.keyList.ttl.noLimit')}
       </ColorText>
     )
   }
   return (
     <Text
+      component="div"
       className={cx(styles.keyTTL, 'moveOnHoverKey', {
         hide: deletePopoverId === rowId,
       })}
-      color="subdued"
+      color="secondary"
       size="s"
     >
       <div
@@ -59,7 +62,7 @@ const KeyRowTTL = (props: Props) => {
         data-testid={`ttl-${nameString}`}
       >
         <RiTooltip
-          title="Time to Live"
+          title={t('browser.keyList.ttl.tooltipTitle')}
           className={styles.tooltip}
           anchorClassName="truncateText"
           position="right"

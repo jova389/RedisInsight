@@ -4,9 +4,12 @@ import { Row } from 'uiSrc/components/base/layout/flex'
 import {
   StyledAppNavigation,
   StyledAppNavigationContainer,
-  StyledAppNavTab,
 } from './AppNavigation.styles'
-import { useNavigation } from '../hooks/useNavigation'
+import FeatureFlagComponent from 'uiSrc/components/feature-flag-component/FeatureFlagComponent'
+import { FeatureFlags } from 'uiSrc/constants'
+import { OnboardingTourOptions } from 'uiSrc/components/onboarding-tour'
+import NavigationTabTrigger from './AppNavigationTabTrigger'
+import { INavigations } from 'uiSrc/components/navigation-menu/navigation.types'
 
 type AppNavigationContainerProps = {
   children?: ReactNode
@@ -38,27 +41,39 @@ const AppNavigationContainer = ({
 )
 
 export type AppNavigationProps = {
+  routes: INavigations[]
   actions?: ReactNode
   onChange?: (tabValue: string) => void
 }
 
-const AppNavigation = ({ actions, onChange }: AppNavigationProps) => {
-  const { privateRoutes } = useNavigation()
-  const activeTab = privateRoutes.find((route) => route.isActivePage)
-  const navTabs: TabInfo[] = privateRoutes.map((route) => ({
+const AppNavigation = ({ actions, onChange, routes }: AppNavigationProps) => {
+  const activeTab = routes.find((route) => route.isActivePage)
+  const navTabs: (TabInfo & {
+    isActivePage: boolean
+    featureFlag?: FeatureFlags
+    onboard?: OnboardingTourOptions
+  })[] = routes.map((route) => ({
     label: route.tooltipText,
     content: '',
     value: route.pageName,
+    isActivePage: route.isActivePage,
+    featureFlag: route.featureFlag,
+    onboard: route.onboard,
   }))
 
   return (
     <StyledAppNavigation>
       <AppNavigationContainer />
-      <AppNavigationContainer borderLess grow={false} justify="center" style={{ paddingTop: '20px' }}>
+      <AppNavigationContainer
+        borderLess
+        grow={false}
+        justify="center"
+        align="end"
+      >
         <Tabs.Compose
           value={activeTab?.pageName}
           onChange={(tabValue) => {
-            const tabNavItem = privateRoutes.find(
+            const tabNavItem = routes.find(
               (route) => route.pageName === tabValue,
             )
             if (tabNavItem) {
@@ -68,19 +83,43 @@ const AppNavigation = ({ actions, onChange }: AppNavigationProps) => {
           }}
         >
           <Tabs.TabBar.Compose variant="default">
-            {navTabs.map(({ value, label, disabled }, index) => {
-              const key = `${value}-${index}`
-              return (
-                <Tabs.TabBar.Trigger.Compose
-                  value={value}
-                  disabled={disabled}
-                  key={key}
-                >
-                  <StyledAppNavTab>{label ?? value}</StyledAppNavTab>
-                  <Tabs.TabBar.Trigger.Marker />
-                </Tabs.TabBar.Trigger.Compose>
-              )
-            })}
+            {navTabs.map(
+              (
+                { value, label, disabled, featureFlag, onboard, isActivePage },
+                index,
+              ) => {
+                const key = `${value}-${index}`
+                if (featureFlag) {
+                  return (
+                    <FeatureFlagComponent
+                      name={featureFlag as FeatureFlags}
+                      key={key}
+                    >
+                      <NavigationTabTrigger
+                        value={value}
+                        label={label}
+                        disabled={disabled}
+                        onboard={onboard}
+                        isActivePage={isActivePage}
+                        tabKey={key}
+                      />
+                    </FeatureFlagComponent>
+                  )
+                }
+
+                return (
+                  <NavigationTabTrigger
+                    key={key}
+                    value={value}
+                    label={label}
+                    disabled={disabled}
+                    onboard={onboard}
+                    isActivePage={isActivePage}
+                    tabKey={key}
+                  />
+                )
+              },
+            )}
           </Tabs.TabBar.Compose>
         </Tabs.Compose>
       </AppNavigationContainer>

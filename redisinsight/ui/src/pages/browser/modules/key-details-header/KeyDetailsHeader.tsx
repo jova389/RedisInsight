@@ -1,7 +1,8 @@
 import React, { ReactElement } from 'react'
 import { isUndefined } from 'lodash'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import AutoSizer from 'react-virtualized-auto-sizer'
+import { useTranslation } from 'uiSrc/i18n'
 
 import {
   GroupBadge,
@@ -9,8 +10,14 @@ import {
   FullScreen,
   LoadingContent,
   RiTooltip,
+  FeatureFlagComponent,
 } from 'uiSrc/components'
-import { HIDE_LAST_REFRESH } from 'uiSrc/constants'
+import {
+  HIDE_LAST_REFRESH,
+  FeatureFlags,
+  KeyTypes,
+  SEARCHABLE_KEY_TYPES,
+} from 'uiSrc/constants'
 import {
   deleteSelectedKeyAction,
   editKey,
@@ -32,11 +39,19 @@ import {
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { CancelSlimIcon } from 'uiSrc/components/base/icons'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
+import {
+  useIsKeyIndexed,
+  UseIsKeyIndexedStatus,
+} from 'uiSrc/pages/vector-search/hooks/useIsKeyIndexed'
+import { ViewIndexDataButton } from 'uiSrc/pages/browser/components/view-index-data-button'
+import { MakeSearchableButton } from 'uiSrc/pages/browser/components/make-searchable-button'
+import { ConfigValueDecoderButton } from 'uiSrc/pages/browser/components/value-decoder'
 import { KeyDetailsHeaderName } from './components/key-details-header-name'
 import { KeyDetailsHeaderTTL } from './components/key-details-header-ttl'
 import { KeyDetailsHeaderDelete } from './components/key-details-header-delete'
 import { KeyDetailsHeaderSizeLength } from './components/key-details-header-size-length'
 
+import * as S from './KeyDetailsHeader.styles'
 import styles from './styles.module.scss'
 
 export interface KeyDetailsHeaderProps {
@@ -63,19 +78,29 @@ const KeyDetailsHeader = ({
   Actions,
 }: KeyDetailsHeaderProps) => {
   const { refreshing, loading, lastRefreshTime, isRefreshDisabled } =
-    useSelector(selectedKeySelector)
+    useAppSelector(selectedKeySelector)
   const {
     type,
     length,
     name: keyBuffer,
-  } = useSelector(selectedKeyDataSelector) ?? initialKeyInfo
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { viewType } = useSelector(keysSelector)
+    nameString: keyName,
+  } = useAppSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { viewType } = useAppSelector(keysSelector)
+  const { t } = useTranslation()
 
-  const dispatch = useDispatch()
+  const isSearchableType = SEARCHABLE_KEY_TYPES.includes(type as KeyTypes)
+  const {
+    indexes,
+    status: keyIndexedStatus,
+    refresh: refreshKeyIndexes,
+  } = useIsKeyIndexed(isSearchableType ? keyName || '' : '')
+
+  const dispatch = useAppDispatch()
 
   const handleRefreshKey = () => {
     dispatch(refreshKey(keyBuffer!, type, undefined, length))
+    refreshKeyIndexes()
   }
 
   const handleEditTTL = (key: RedisResponseBuffer, ttl: number) => {
@@ -144,8 +169,34 @@ const KeyDetailsHeader = ({
                 </FlexItem>
                 <KeyDetailsHeaderName onEditKey={handleEditKey} />
                 <FlexItem grow />
+                {isSearchableType &&
+                  keyIndexedStatus === UseIsKeyIndexedStatus.Ready && (
+                    <FlexItem>
+                      {indexes.length > 0 ? (
+                        <ViewIndexDataButton
+                          indexes={indexes}
+                          instanceId={instanceId}
+                        />
+                      ) : (
+                        <S.MakeSearchableWrapper>
+                          <MakeSearchableButton
+                            keyName={keyBuffer!}
+                            keyNameString={keyName ?? ''}
+                            keyType={type as KeyTypes}
+                          />
+                        </S.MakeSearchableWrapper>
+                      )}
+                    </FlexItem>
+                  )}
+                {type === KeyTypes.Hash && (
+                  <FeatureFlagComponent name={FeatureFlags.valueDecoder}>
+                    <FlexItem>
+                      <ConfigValueDecoderButton />
+                    </FlexItem>
+                  </FeatureFlagComponent>
+                )}
                 {!arePanelsCollapsed && (
-                  <FlexItem style={{ marginRight: '8px' }}>
+                  <FlexItem>
                     <FullScreen
                       isFullScreen={isFullScreen}
                       onToggleFullScreen={onToggleFullScreen}
@@ -154,10 +205,13 @@ const KeyDetailsHeader = ({
                 )}
                 <FlexItem>
                   {(!arePanelsCollapsed || isFullScreen) && (
-                    <RiTooltip content="Close" position="left">
+                    <RiTooltip
+                      content={t('browser.keyDetails.close.tooltip')}
+                      position="left"
+                    >
                       <IconButton
                         icon={CancelSlimIcon}
-                        aria-label="Close key"
+                        aria-label={t('browser.keyDetails.close.aria')}
                         className={styles.closeBtn}
                         onClick={() => onCloseKey()}
                         data-testid="close-key-btn"
@@ -166,10 +220,17 @@ const KeyDetailsHeader = ({
                   )}
                 </FlexItem>
               </Row>
-              <Row centered className={styles.groupSecondLine} gap="m">
-                <KeyDetailsHeaderSizeLength width={width} />
-                <KeyDetailsHeaderTTL onEditTTL={handleEditTTL} />
-                <FlexItem grow>
+              <Row
+                className={styles.groupSecondLine}
+                gap="m"
+                align="start"
+                justify="between"
+              >
+                <Row gap="l">
+                  <KeyDetailsHeaderSizeLength width={width} />
+                  <KeyDetailsHeaderTTL onEditTTL={handleEditTTL} />
+                </Row>
+                <FlexItem>
                   <div className={styles.subtitleActionBtns}>
                     <AutoRefresh
                       postfix={type}

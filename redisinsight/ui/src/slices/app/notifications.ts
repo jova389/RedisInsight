@@ -4,13 +4,14 @@ import { findIndex, isUndefined } from 'lodash'
 import { ApiEndpoints } from 'uiSrc/constants'
 import { apiService } from 'uiSrc/services'
 import {
-  getApiErrorMessage,
   getApiErrorName,
+  getTranslatedApiError,
+  getTranslatedApiTitle,
   isStatusSuccessful,
   Maybe,
   Nullable,
 } from 'uiSrc/utils'
-import { NotificationsDto } from 'apiSrc/modules/notification/dto'
+import { NotificationsDto } from 'apiClient'
 import {
   IError,
   IGlobalNotification,
@@ -39,6 +40,7 @@ export interface IAddInstanceErrorPayload extends AxiosError {
   instanceId?: string
   response?: AxiosError['response'] & {
     data: {
+      message?: string | JSX.Element
       title?: string
       additionalInfo?: Record<string, any>
     }
@@ -51,13 +53,14 @@ const notificationsSlice = createSlice({
   reducers: {
     addErrorNotification: (
       state,
-      { payload }: { payload: IAddInstanceErrorPayload },
+      { payload }: { payload: AxiosError & { instanceId?: string } },
     ) => {
-      const { instanceId } = payload
-      const title = payload?.response?.data?.title
+      const errorPayload = payload as IAddInstanceErrorPayload
+      const { instanceId } = errorPayload
+      const title = getTranslatedApiTitle(payload)
       const errorName = getApiErrorName(payload)
-      const message = getApiErrorMessage(payload)
-      const additionalInfo = payload?.response?.data?.additionalInfo
+      const message = getTranslatedApiError(payload)
+      const additionalInfo = errorPayload?.response?.data?.additionalInfo
       const errorExistedId = state.errors.findIndex(
         (err) => err.message === message,
       )
@@ -168,6 +171,14 @@ const notificationsSlice = createSlice({
       if (index === -1) {
         state.infiniteMessages.push(payload)
       } else {
+        const currentNotification = state.infiniteMessages[index]
+        // check if existing notification is exactly the same as the new one, if yes, do not update
+        if (
+          currentNotification.variation &&
+          payload.variation === currentNotification.variation
+        ) {
+          return
+        }
         state.infiniteMessages[index] = payload
       }
     },

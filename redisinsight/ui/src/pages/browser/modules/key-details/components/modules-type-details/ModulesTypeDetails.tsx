@@ -1,11 +1,12 @@
 import React from 'react'
 import { useHistory } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { Text } from 'uiSrc/components/base/text'
 import { Pages } from 'uiSrc/constants'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { Title } from 'uiSrc/components/base/text/Title'
+import { Trans, useTranslation } from 'uiSrc/i18n'
 
 import TextDetailsWrapper from '../text-details-wrapper/TextDetailsWrapper'
 import styles from './styles.module.scss'
@@ -18,8 +19,9 @@ const ModulesTypeDetails = ({
   moduleName = 'unsupported',
   onClose,
 }: ModulesTypeDetailsProps) => {
+  const { t } = useTranslation()
   const history = useHistory()
-  const { id: connectedInstanceId = '' } = useSelector(
+  const { id: connectedInstanceId = '' } = useAppSelector(
     connectedInstanceSelector,
   )
 
@@ -30,21 +32,28 @@ const ModulesTypeDetails = ({
 
   return (
     <TextDetailsWrapper onClose={onClose} testid="modules-type">
-      <Title size="M">{`This is a ${moduleName} key.`}</Title>
+      <Title size="M">
+        {t('browser.keyDetails.modulesType.title', { moduleName })}
+      </Title>
       <Text size="S">
-        {'Use Redis commands in the '}
-        <a
-          tabIndex={0}
-          onClick={handleGoWorkbenchPage}
-          className={styles.link}
-          data-testid="internal-workbench-link"
-          onKeyDown={() => ({})}
-          role="link"
-          rel="noreferrer"
-        >
-          Workbench
-        </a>
-        {' tool to view the value.'}
+        <Trans
+          i18nKey="browser.keyDetails.modulesType.message"
+          components={{
+            workbenchLink: (
+              <a
+                tabIndex={0}
+                onClick={handleGoWorkbenchPage}
+                className={styles.link}
+                data-testid="internal-workbench-link"
+                onKeyDown={() => ({})}
+                role="link"
+                rel="noreferrer"
+              >
+                {''}
+              </a>
+            ),
+          }}
+        />
       </Text>
     </TextDetailsWrapper>
   )

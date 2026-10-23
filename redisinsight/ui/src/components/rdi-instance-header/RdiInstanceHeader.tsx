@@ -1,5 +1,5 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import { CopilotTrigger, InsightsTrigger } from 'uiSrc/components/triggers'
@@ -13,17 +13,20 @@ import { OAuthSocialSource } from 'uiSrc/slices/interfaces'
 import { connectedInstanceSelector } from 'uiSrc/slices/rdi/instances'
 import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import { isAnyFeatureEnabled } from 'uiSrc/utils/features'
+import { useTranslation } from 'uiSrc/i18n'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Text } from 'uiSrc/components/base/text'
+import { Link } from 'uiSrc/components/base/link/Link'
 import InstancesNavigationPopover from '../instance-header/components/instances-navigation-popover'
 import styles from './styles.module.scss'
 
 const RdiInstanceHeader = () => {
-  const { name = '' } = useSelector(connectedInstanceSelector)
+  const { t } = useTranslation()
+  const { name = '' } = useAppSelector(connectedInstanceSelector)
   const {
     [FeatureFlags.databaseChat]: databaseChatFeature,
     [FeatureFlags.documentationChat]: documentationChatFeature,
-  } = useSelector(appFeatureFlagsFeaturesSelector)
+  } = useAppSelector(appFeatureFlagsFeaturesSelector)
   const isAnyChatAvailable = isAnyFeatureEnabled([
     databaseChatFeature,
     documentationChatFeature,
@@ -42,23 +45,27 @@ const RdiInstanceHeader = () => {
           data-testid="breadcrumbs-container"
         >
           <div>
-            <RiTooltip position="bottom" content="My RDI instances">
-              <Text
-                className={styles.breadCrumbLink}
-                aria-label="My RDI instances"
+            <RiTooltip
+              position="bottom"
+              content={t('rdiInstanceHeader.myRdiInstances')}
+            >
+              <Link
+                color="subdued"
+                underline
+                variant="inline"
+                aria-label={t('rdiInstanceHeader.myRdiInstances')}
                 data-testid="my-rdi-instances-btn"
                 onClick={goHome}
-                onKeyDown={goHome}
               >
-                RDI instances
-              </Text>
+                {t('rdiInstanceHeader.dataIntegration')}
+              </Link>
             </RiTooltip>
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <div style={{ maxWidth: '100%' }}>
               <Row align="center">
                 <FlexItem>
-                  <Text className={styles.divider}>&#62;</Text>
+                  <Text className={styles.divider}>/</Text>
                 </FlexItem>
                 <FlexItem grow style={{ overflow: 'hidden' }}>
                   <InstancesNavigationPopover name={name} />

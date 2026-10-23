@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import { format } from 'date-fns'
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { isNull } from 'lodash'
 
 import { formatLongName, Nullable } from 'uiSrc/utils'
@@ -15,19 +15,23 @@ import {
 import { removeCapiKeyAction } from 'uiSrc/slices/oauth/cloud'
 import { Text } from 'uiSrc/components/base/text'
 
-import {
-  EmptyButton,
-  IconButton,
-  PrimaryButton,
-} from 'uiSrc/components/base/forms/buttons'
-import { CopyIcon } from 'uiSrc/components/base/icons'
+import { EmptyButton, PrimaryButton } from 'uiSrc/components/base/forms/buttons'
+import { CopyButton } from 'uiSrc/components/copy-button'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { Title } from 'uiSrc/components/base/text/Title'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
+import { Table, ColumnDef } from 'uiSrc/components/base/layout/table'
 import { Link } from 'uiSrc/components/base/link/Link'
 import { Row } from 'uiSrc/components/base/layout/flex'
+import { EXTERNAL_LINKS, UTM_MEDIUMS } from 'uiSrc/constants/links'
+import { getUtmExternalLink } from 'uiSrc/utils/links'
+import { escapeTrans, Trans, useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
+
+const clearKeysCloudLink = getUtmExternalLink(
+  EXTERNAL_LINKS.redisEnterpriseCloud,
+  { medium: UTM_MEDIUMS.Settings, campaign: 'clear_keys' },
+)
 
 export interface Props {
   items: Nullable<CloudCapiKey[]>
@@ -35,11 +39,11 @@ export interface Props {
 }
 
 const UserApiKeysTable = ({ items, loading }: Props) => {
+  const { t } = useTranslation()
   const [deleting, setDeleting] = useState('')
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
-  const handleCopy = (value: string) => {
-    navigator?.clipboard?.writeText(value)
+  const handleCopy = () => {
     sendEventTelemetry({
       event: TelemetryEvent.SETTINGS_CLOUD_API_KEY_NAME_COPIED,
     })
@@ -72,9 +76,9 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
     )
   }
 
-  const columns: ColumnDefinition<CloudCapiKey>[] = [
+  const columns: ColumnDef<CloudCapiKey>[] = [
     {
-      header: 'API Key Name',
+      header: t('settings.cloud.table.name'),
       id: 'name',
       accessorKey: 'name',
       enableSorting: true,
@@ -88,7 +92,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
           <div className={styles.nameField}>
             {!valid && (
               <RiTooltip
-                content="This API key is invalid. Remove it from Redis Cloud and create a new one instead."
+                content={t('settings.cloud.table.invalidTooltip')}
                 anchorClassName={styles.invalidIconAnchor}
               >
                 <RiIcon
@@ -98,7 +102,10 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
                 />
               </RiTooltip>
             )}
-            <RiTooltip title="API Key Name" content={tooltipContent}>
+            <RiTooltip
+              title={t('settings.cloud.table.name')}
+              content={tooltipContent}
+            >
               <>{name}</>
             </RiTooltip>
           </div>
@@ -106,7 +113,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
       },
     },
     {
-      header: 'Created',
+      header: t('settings.cloud.table.created'),
       id: 'createdAt',
       accessorKey: 'createdAt',
       enableSorting: true,
@@ -121,7 +128,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
       ),
     },
     {
-      header: 'Last used',
+      header: t('settings.cloud.table.lastUsed'),
       id: 'lastUsed',
       accessorKey: 'lastUsed',
       enableSorting: true,
@@ -138,7 +145,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
               <>{format(new Date(lastUsed), 'd MMM yyyy')}</>
             </RiTooltip>
           ) : (
-            'Never'
+            t('settings.cloud.table.never')
           )}
         </>
       ),
@@ -147,44 +154,50 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
       header: '',
       id: 'actions',
       accessorKey: 'id',
+      size: 48,
+      sizeUnit: 'px',
+      maxSize: 48,
+      enableResizing: false,
+      enableSorting: false,
       cell: ({
         row: {
           original: { id, name },
         },
       }) => (
-        <div>
-          <RiTooltip
-            content="Copy API Key Name"
-            anchorClassName={styles.copyBtnAnchor}
-          >
-            <IconButton
-              icon={CopyIcon}
-              aria-label="Copy API key"
-              onClick={() => handleCopy(name || '')}
-              style={{ marginRight: 4 }}
-              data-testid={`copy-api-key-${name}`}
-            />
-          </RiTooltip>
+        <Row align="center" justify="start" grow={false} gap="s">
+          <CopyButton
+            copy={name || ''}
+            onCopy={handleCopy}
+            aria-label={t('settings.cloud.table.copy.label')}
+            successLabel=""
+            tooltipConfig={{
+              content: t('settings.cloud.table.copy.tooltip'),
+            }}
+            data-testid={`copy-api-key-${name}`}
+          />
           <PopoverDelete
             header={
-              <>
-                {formatLongName(name)} <br /> will be removed from Redis
-                Insight.
-              </>
+              <Trans
+                i18nKey="settings.cloud.delete.header"
+                values={{ name: escapeTrans(formatLongName(name)) }}
+                components={{ lineBreak: <br /> }}
+              />
             }
             text={
-              <>
-                {'To delete this API key from Redis Cloud, '}
-                <Link
-                  target="_blank"
-                  color="text"
-                  tabIndex={-1}
-                  href="https://redis.io/redis-enterprise-cloud/overview/?utm_source=redisinsight&utm_medium=settings&utm_campaign=clear_keys"
-                >
-                  sign in to Redis Cloud
-                </Link>
-                {' and delete it manually.'}
-              </>
+              <Trans
+                i18nKey="settings.cloud.delete.text"
+                components={{
+                  cloudLink: (
+                    <Link
+                      target="_blank"
+                      variant="inline"
+                      color="text"
+                      tabIndex={-1}
+                      href={clearKeysCloudLink}
+                    />
+                  ),
+                }}
+              />
             }
             item={id}
             suffix=""
@@ -196,7 +209,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
             handleDeleteItem={() => handleDeleteApiKey(id, name)}
             handleButtonClick={handleClickDeleteApiKey}
           />
-        </div>
+        </Row>
       ),
     },
   ]
@@ -213,22 +226,19 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
               type="StarsIcon"
               color="attention300"
             />
-            <Title size="XS">The ultimate Redis starting point</Title>
+            <Title size="XS">{t('settings.cloud.empty.title')}</Title>
           </Row>
           <Spacer size="s" />
           <Text size="s" className={styles.smallText} color="primary">
-            Cloud API keys will be created and stored when you connect to Redis
-            Cloud to create a free trial Cloud database or autodiscover your
-            Cloud database.
+            {t('settings.cloud.empty.description')}
           </Text>
           <Spacer />
-          <div className={styles.actions}>
+          <Row align="center" justify="end" grow={false} gap="s">
             <OAuthSsoHandlerDialog>
               {(socialCloudHandlerClick) => (
                 <EmptyButton
                   size="small"
                   color="ghost"
-                  className={styles.autodiscoverBtn}
                   onClick={(e: React.MouseEvent) =>
                     socialCloudHandlerClick(e, {
                       source: OAuthSocialSource.SettingsPage,
@@ -237,7 +247,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
                   }
                   data-testid="autodiscover-btn"
                 >
-                  Autodiscover
+                  {t('settings.cloud.empty.autodiscover')}
                 </EmptyButton>
               )}
             </OAuthSsoHandlerDialog>
@@ -253,11 +263,11 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
                   }
                   data-testid="create-cloud-db-btn"
                 >
-                  Create Redis Cloud database
+                  {t('settings.cloud.empty.create')}
                 </PrimaryButton>
               )}
             </OAuthSsoHandlerDialog>
-          </div>
+          </Row>
         </div>
         <Spacer />
       </>
@@ -268,6 +278,7 @@ const UserApiKeysTable = ({ items, loading }: Props) => {
     <Table
       columns={columns}
       data={items}
+      enableColumnResizing
       defaultSorting={[
         {
           id: 'createdAt',

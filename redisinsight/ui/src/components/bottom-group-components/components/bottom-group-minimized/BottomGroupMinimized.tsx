@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react'
-import cx from 'classnames'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
-import { EXTERNAL_LINKS } from 'uiSrc/constants/links'
 
+import { EXTERNAL_LINKS } from 'uiSrc/constants/links'
 import {
   clearSearchingCommand,
   cliSettingsSelector,
@@ -21,9 +20,9 @@ import {
 import FeatureFlagComponent from 'uiSrc/components/feature-flag-component'
 import { FeatureFlags } from 'uiSrc/constants'
 
+import { Text } from 'uiSrc/components/base/text'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { HideFor, ShowFor } from 'uiSrc/components/base/utils/ShowHide'
-import { RiBadge } from 'uiSrc/components/base/display/badge/RiBadge'
 import {
   CliIcon,
   DocumentationIcon,
@@ -31,13 +30,17 @@ import {
 } from 'uiSrc/components/base/icons'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import styles from '../../styles.module.scss'
+import {
+  ComponentBadge,
+  ContainerMinimized,
+} from './ButtonGroupMinimized.styles'
 
 const BottomGroupMinimized = () => {
   const { instanceId = '' } = useParams<{ instanceId: string }>()
   const { isShowCli, cliClientUuid, isShowHelper, isMinimizedHelper } =
-    useSelector(cliSettingsSelector)
-  const { isShowMonitor, isMinimizedMonitor } = useSelector(monitorSelector)
-  const dispatch = useDispatch()
+    useAppSelector(cliSettingsSelector)
+  const { isShowMonitor, isMinimizedMonitor } = useAppSelector(monitorSelector)
+  const dispatch = useAppDispatch()
 
   useEffect(
     () => () => {
@@ -90,51 +93,47 @@ const BottomGroupMinimized = () => {
   }
 
   return (
-    <div className={styles.containerMinimized}>
-      <Row align="center" responsive={false} style={{ height: '100%' }}>
-        <FlexItem
-          className={styles.componentBadgeItem}
-          onClick={handleExpandCli}
-          data-testid="expand-cli"
-        >
-          <RiBadge
-            icon={CliIcon}
+    <ContainerMinimized>
+      <Row align="center" responsive={false} style={{ height: '100%' }} gap="s">
+        <FlexItem onClick={handleExpandCli} data-testid="expand-cli">
+          <ComponentBadge
             withIcon
-            label="CLI"
-            variant="light"
-            className={cx(styles.componentBadge, {
-              [styles.active]: isShowCli || cliClientUuid,
-            })}
+            icon={CliIcon}
+            label={
+              <Text size="S" variant="semiBold" component="span">
+                CLI
+              </Text>
+            }
+            isActive={isShowCli || !!cliClientUuid}
           />
         </FlexItem>
 
         <FlexItem
-          className={styles.componentBadgeItem}
           onClick={handleExpandHelper}
           data-testid="expand-command-helper"
         >
-          <RiBadge
+          <ComponentBadge
             withIcon
             icon={DocumentationIcon}
-            className={cx(styles.componentBadge, {
-              [styles.active]: isShowHelper || isMinimizedHelper,
-            })}
-            label="Command Helper"
+            label={
+              <Text size="S" variant="semiBold" component="span">
+                Command Helper
+              </Text>
+            }
+            isActive={isShowHelper || isMinimizedHelper}
           />
         </FlexItem>
         <FeatureFlagComponent name={FeatureFlags.envDependent}>
-          <FlexItem
-            className={styles.componentBadgeItem}
-            onClick={handleExpandMonitor}
-            data-testid="expand-monitor"
-          >
-            <RiBadge
+          <FlexItem onClick={handleExpandMonitor} data-testid="expand-monitor">
+            <ComponentBadge
               withIcon
               icon={ProfilerIcon}
-              className={cx(styles.componentBadge, {
-                [styles.active]: isShowMonitor || isMinimizedMonitor,
-              })}
-              label="Profiler"
+              label={
+                <Text size="S" variant="semiBold" component="span">
+                  Profiler
+                </Text>
+              }
+              isActive={isShowMonitor || isMinimizedMonitor}
             />
           </FlexItem>
         </FeatureFlagComponent>
@@ -157,7 +156,7 @@ const BottomGroupMinimized = () => {
           </ShowFor>
         </a>
       </FeatureFlagComponent>
-    </div>
+    </ContainerMinimized>
   )
 }
 

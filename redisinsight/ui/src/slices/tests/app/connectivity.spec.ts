@@ -1,5 +1,5 @@
 import { cloneDeep } from 'lodash'
-import { rest } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { waitFor } from '@testing-library/react'
 import {
   cleanup,
@@ -88,9 +88,11 @@ describe('app connectivity slice', () => {
         id: '123', // Match the test database ID
       }
 
-      const getDbOverviewMock = jest.fn((_req, res, ctx) => res(ctx.json({})))
+      const getDbOverviewMock = jest.fn(() => {
+        return HttpResponse.json({})
+      })
       mswServer.use(
-        rest.get(
+        http.get(
           getMswURL(`${ApiEndpoints.DATABASES}/123/overview`),
           getDbOverviewMock,
         ),
@@ -125,17 +127,17 @@ describe('app connectivity slice', () => {
         id: '123', // Match the test database ID
       }
 
-      jest.spyOn(store, 'dispatch').mockImplementation((action: any) => {
-        testStore.dispatch(action)
+      jest
+        .spyOn(store, 'dispatch')
+        .mockImplementation((action: any) => testStore.dispatch(action))
+      const getDbOverviewMock = jest.fn(() => {
+        return HttpResponse.json(
+          { code: 'serviceUnavailable', message: 'Test error' },
+          { status: 503 },
+        )
       })
-      const getDbOverviewMock = jest.fn((_req, res, ctx) =>
-        res(
-          ctx.status(503),
-          ctx.json({ code: 'serviceUnavailable', message: 'Test error' }),
-        ),
-      )
       mswServer.use(
-        rest.get(
+        http.get(
           getMswURL(`${ApiEndpoints.DATABASES}/123/overview`),
           getDbOverviewMock,
         ),
@@ -170,17 +172,18 @@ describe('app connectivity slice', () => {
         id: 'different-instance-id', // Different from request URL
       }
 
-      jest.spyOn(store, 'dispatch').mockImplementation((action: any) => {
-        testStore.dispatch(action)
+      jest
+        .spyOn(store, 'dispatch')
+        .mockImplementation((action: any) => testStore.dispatch(action))
+
+      const getDbOverviewMock = jest.fn(async () => {
+        return HttpResponse.json(
+          { code: 'serviceUnavailable', message: 'Test error' },
+          { status: 503 },
+        )
       })
-      const getDbOverviewMock = jest.fn((_req, res, ctx) =>
-        res(
-          ctx.status(503),
-          ctx.json({ code: 'serviceUnavailable', message: 'Test error' }),
-        ),
-      )
       mswServer.use(
-        rest.get(
+        http.get(
           getMswURL(`${ApiEndpoints.DATABASES}/123/overview`), // ID 123 in URL
           getDbOverviewMock,
         ),

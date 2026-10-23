@@ -11,17 +11,12 @@
 
   .editBtnAnchor {
     position: absolute;
-    top: 10px;
     right: 4px;
   }
 }
 
-.textAreaControls {
-  right: 4px !important;
-  bottom: 4px !important;
-  background-color: var(--euiPageBackgroundColor) !important;
-  :nth-child(2) {
-    margin-top: -6px
-  }
+// When the edit trigger lives outside the cell there's no hover icon to make
+// room for, so reclaim the reserved gutter for the value text.
+.contentWrapperNoEditButton {
+  padding-right: 0;
 }
-

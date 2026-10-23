@@ -6,6 +6,7 @@ import {
   mockDatabaseRecommendationRepository,
   mockDatabaseService,
   mockRecommendationScanner,
+  mockSessionMetadata,
 } from 'src/__mocks__';
 import { ClientContext, ClientMetadata } from 'src/common/models';
 import { DatabaseService } from '../database/database.service';
@@ -18,7 +19,7 @@ import { RecommendationScanner } from './scanner/recommendations.scanner';
 
 describe('DatabaseRecommendationService', () => {
   const clientMetadata: ClientMetadata = {
-    sessionMetadata: { userId: '1', sessionId: '1' },
+    sessionMetadata: mockSessionMetadata,
     databaseId: '1',
     context: ClientContext.Browser,
     db: 1,
@@ -26,7 +27,6 @@ describe('DatabaseRecommendationService', () => {
 
   let service: DatabaseRecommendationService;
   let databaseRecommendationRepository: MockType<DatabaseRecommendationRepository>;
-  let scanner: MockType<RecommendationScanner>;
   let databaseService: MockType<DatabaseService>;
   let analytics: MockType<DatabaseRecommendationAnalytics>;
 
@@ -56,7 +56,6 @@ describe('DatabaseRecommendationService', () => {
     databaseRecommendationRepository = await module.get(
       DatabaseRecommendationRepository,
     );
-    scanner = await module.get(RecommendationScanner);
     databaseService = await module.get(DatabaseService);
     analytics = await module.get(DatabaseRecommendationAnalytics);
     service = module.get(DatabaseRecommendationService);

@@ -50,6 +50,10 @@ const dataSchema = Joi.object({
     privateKey: Joi.string().allow(null),
     passphrase: Joi.string().allow(null),
   }).allow(null),
+  environment: Joi.string()
+    .valid('unspecified', 'production', 'development')
+    .allow(null),
+  connectionFamily: Joi.string().valid('auto', 'ipv4', 'ipv6').allow(null),
 })
   .messages({
     'any.required': '{#label} should not be empty',
@@ -227,6 +231,138 @@ describe('POST /databases', () => {
           },
         });
       });
+      it('Create standalone with environment=production', async () => {
+        const dbName = constants.getRandomString();
+
+        await validateApiCall({
+          endpoint,
+          statusCode: 201,
+          data: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+            environment: 'production',
+          },
+          responseSchema,
+          responseBody: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+            environment: 'production',
+          },
+        });
+      });
+      it('Create standalone with environment=fast', async () => {
+        const dbName = constants.getRandomString();
+
+        await validateApiCall({
+          endpoint,
+          statusCode: 201,
+          data: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+            environment: 'development',
+          },
+          responseSchema,
+          responseBody: {
+            name: dbName,
+            environment: 'development',
+          },
+        });
+      });
+      it('Create standalone defaults environment to unmarked when omitted', async () => {
+        const dbName = constants.getRandomString();
+
+        await validateApiCall({
+          endpoint,
+          statusCode: 201,
+          data: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+          },
+          responseSchema,
+          responseBody: {
+            name: dbName,
+            environment: 'unspecified',
+          },
+        });
+      });
+      it('Create standalone forcing IPv4 (connects over IPv4)', async () => {
+        const dbName = constants.getRandomString();
+
+        await validateApiCall({
+          endpoint,
+          statusCode: 201,
+          data: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+            connectionFamily: 'ipv4',
+          },
+          responseSchema,
+          responseBody: {
+            name: dbName,
+            connectionFamily: 'ipv4',
+          },
+        });
+      });
+      it('Create standalone defaults connectionFamily to auto when omitted', async () => {
+        const dbName = constants.getRandomString();
+
+        await validateApiCall({
+          endpoint,
+          statusCode: 201,
+          data: {
+            name: dbName,
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+          },
+          responseSchema,
+          responseBody: {
+            name: dbName,
+            connectionFamily: 'auto',
+          },
+        });
+      });
+      it('Should throw an error with an invalid connectionFamily', async () => {
+        await validateApiCall({
+          endpoint,
+          statusCode: 400,
+          data: {
+            name: constants.getRandomString(),
+            host: constants.TEST_REDIS_HOST,
+            port: constants.TEST_REDIS_PORT,
+            connectionFamily: 'ipv5',
+          },
+        });
+      });
+      // Runs only when an IPv6-reachable Redis endpoint is provided via
+      // TEST_REDIS_IPV6_HOST; skipped otherwise so it never flakes on
+      // IPv4-only environments.
+      describe('IPv6', function () {
+        requirements(() => !!constants.TEST_REDIS_IPV6_HOST);
+        it('Create standalone forcing IPv6 (connects over IPv6)', async () => {
+          const dbName = constants.getRandomString();
+
+          await validateApiCall({
+            endpoint,
+            statusCode: 201,
+            data: {
+              name: dbName,
+              host: constants.TEST_REDIS_IPV6_HOST,
+              port: constants.TEST_REDIS_PORT,
+              connectionFamily: 'ipv6',
+            },
+            responseSchema,
+            responseBody: {
+              name: dbName,
+              connectionFamily: 'ipv6',
+            },
+          });
+        });
+      });
       describe('Enterprise', () => {
         requirements('rte.re');
         it('Should throw an error if db index specified', async () => {
@@ -234,7 +370,7 @@ describe('POST /databases', () => {
 
           await validateApiCall({
             endpoint,
-            statusCode: 400,
+            statusCode: 424,
             data: {
               name: dbName,
               host: constants.TEST_REDIS_HOST,
@@ -547,7 +683,7 @@ describe('POST /databases', () => {
 
         await validateApiCall({
           endpoint,
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -556,10 +692,10 @@ describe('POST /databases', () => {
             verifyServerCert: true,
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
 
@@ -572,7 +708,7 @@ describe('POST /databases', () => {
 
         await validateApiCall({
           endpoint,
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -585,10 +721,10 @@ describe('POST /databases', () => {
             },
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
 
@@ -866,18 +1002,14 @@ describe('POST /databases', () => {
     describe('TLS AUTH', function () {
       requirements('rte.tls', 'rte.tlsAuth');
 
-      let existingCACertId,
-        existingClientCertId,
-        existingCACertName,
-        existingClientCertName;
+      let existingCACertId, existingClientCertId;
 
       after(localDb.initAgreements);
 
       it('Create standalone instance and verify users certs + ssh (basic)', async () => {
         const dbName = constants.getRandomString();
-        const newCaName = (existingCACertName = constants.getRandomString());
-        const newClientCertName = (existingClientCertName =
-          constants.getRandomString());
+        const newCaName = constants.getRandomString();
+        const newClientCertName = constants.getRandomString();
         // preconditions
         expect(await localDb.getInstanceByName(dbName)).to.eql(null);
 
@@ -1277,7 +1409,7 @@ describe('POST /databases', () => {
       it('Should create instance tls and create new CA cert', async () => {
         const dbName = constants.getRandomString();
 
-        const { body } = await validateApiCall({
+        await validateApiCall({
           endpoint,
           statusCode: 201,
           data: {
@@ -1318,10 +1450,10 @@ describe('POST /databases', () => {
             port: constants.TEST_REDIS_PORT,
             password: constants.TEST_REDIS_PASSWORD,
           },
-          statusCode: 400,
+          statusCode: 424,
           responseBody: {
-            statusCode: 400,
-            error: 'SENTINEL_PARAMS_REQUIRED',
+            statusCode: 424,
+            error: 'RedisConnectionSentinelMasterRequiredException',
             message: 'Sentinel master name must be specified.',
           },
         });

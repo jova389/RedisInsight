@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { AxiosError } from 'axios'
 import { remove } from 'lodash'
 
 import { apiService } from 'uiSrc/services'
@@ -14,10 +15,7 @@ import {
 import successMessages from 'uiSrc/components/notifications/success-messages'
 import { SCAN_COUNT_DEFAULT } from 'uiSrc/constants/api'
 
-import {
-  AddMembersToSetDto,
-  GetSetMembersResponse,
-} from 'apiSrc/modules/browser/set/dto'
+import { AddMembersToSetDto, GetSetMembersResponse } from 'apiClient'
 import {
   deleteKeyFromList,
   deleteSelectedKeySuccess,
@@ -212,8 +210,8 @@ export function fetchSetMembers(
         onSuccess?.(data)
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
-      dispatch(addErrorNotification(error))
+      const errorMessage = getApiErrorMessage(error as AxiosError)
+      dispatch(addErrorNotification(error as AxiosError))
       dispatch(loadSetMembersFailure(errorMessage))
     }
   }
@@ -250,8 +248,8 @@ export function fetchMoreSetMembers(
         dispatch(loadMoreSetMembersSuccess(data))
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
-      dispatch(addErrorNotification(error))
+      const errorMessage = getApiErrorMessage(error as AxiosError)
+      dispatch(addErrorNotification(error as AxiosError))
       dispatch(loadMoreSetMembersFailure(errorMessage))
     }
   }
@@ -288,8 +286,8 @@ export function refreshSetMembersAction(
         dispatch(loadSetMembersSuccess(data))
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
-      dispatch(addErrorNotification(error))
+      const errorMessage = getApiErrorMessage(error as AxiosError)
+      dispatch(addErrorNotification(error as AxiosError))
       dispatch(loadSetMembersFailure(errorMessage))
     }
   }
@@ -322,8 +320,8 @@ export function addSetMembersAction(
         onSuccessAction?.()
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
-      dispatch(addErrorNotification(error))
+      const errorMessage = getApiErrorMessage(error as AxiosError)
+      dispatch(addErrorNotification(error as AxiosError))
       dispatch(addSetMembersFailure(errorMessage))
       onFailAction?.()
     }
@@ -380,8 +378,8 @@ export function deleteSetMembers(
         }
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
-      dispatch(addErrorNotification(error))
+      const errorMessage = getApiErrorMessage(error as AxiosError)
+      dispatch(addErrorNotification(error as AxiosError))
       dispatch(removeSetMembersFailure(errorMessage))
     }
   }

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
+import styled from 'styled-components'
 import {
   getPipelineStatusAction,
   rdiPipelineActionSelector,
@@ -16,25 +17,30 @@ import {
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { validatePipeline } from 'uiSrc/components/yaml-validator'
 import {
-  CollectorStatus,
   IActionPipelineResultProps,
   PipelineAction,
   PipelineStatus,
 } from 'uiSrc/slices/interfaces'
 
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Theme } from 'uiSrc/components/base/theme/types'
 import DeployPipelineButton from '../buttons/deploy-pipeline-button'
 import ResetPipelineButton from '../buttons/reset-pipeline-button'
 import RdiConfigFileActionMenu from '../rdi-config-file-action-menu'
 import StopPipelineButton from '../buttons/stop-pipeline-button'
 import StartPipelineButton from '../buttons/start-pipeline-button/StartPipelineButton'
+import { getActionButtonState } from './utils'
+
+const VerticalDelimiter = styled(FlexItem)`
+  border: ${({ theme }: { theme: Theme }) => theme.components.appBar.separator};
+  align-self: stretch;
+`
 
 export interface Props {
-  collectorStatus?: CollectorStatus
   pipelineStatus?: PipelineStatus
 }
 
-const PipelineActions = ({ collectorStatus, pipelineStatus }: Props) => {
+const PipelineActions = ({ pipelineStatus }: Props) => {
   const {
     loading: deployLoading,
     schema,
@@ -42,14 +48,14 @@ const PipelineActions = ({ collectorStatus, pipelineStatus }: Props) => {
     jobNameSchema,
     config,
     jobs,
-  } = useSelector(rdiPipelineSelector)
-  const { loading: actionLoading, action } = useSelector(
+  } = useAppSelector(rdiPipelineSelector)
+  const { loading: actionLoading, action } = useAppSelector(
     rdiPipelineActionSelector,
   )
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (!jobs && !config) {
@@ -148,8 +154,14 @@ const PipelineActions = ({ collectorStatus, pipelineStatus }: Props) => {
     action === actionBtn && actionLoading
   const disabled = deployLoading || actionLoading
 
+  const actionButtonState = getActionButtonState(
+    action,
+    pipelineStatus,
+    disabled,
+  )
+
   return (
-    <Row gap="m" justify="end" align="center">
+    <Row gap="l" justify="end" align="center">
       <FlexItem>
         <ResetPipelineButton
           onClick={onReset}
@@ -157,29 +169,26 @@ const PipelineActions = ({ collectorStatus, pipelineStatus }: Props) => {
           loading={isLoadingBtn(PipelineAction.Reset)}
         />
       </FlexItem>
+      <VerticalDelimiter />
       <FlexItem>
-        {collectorStatus === CollectorStatus.Ready ? (
+        {actionButtonState.button === 'stop' ? (
           <StopPipelineButton
             onClick={onStopPipeline}
-            disabled={disabled}
+            disabled={actionButtonState.disabled}
             loading={isLoadingBtn(PipelineAction.Stop)}
           />
-        ) : (
+        ) : actionButtonState.button === 'start' ? (
           <StartPipelineButton
             onClick={onStartPipeline}
-            disabled={disabled}
+            disabled={actionButtonState.disabled}
             loading={isLoadingBtn(PipelineAction.Start)}
           />
-        )}
+        ) : null}
       </FlexItem>
       <FlexItem>
-        <DeployPipelineButton
-          loading={deployLoading}
-          disabled={disabled}
-          onReset={resetPipeline}
-        />
+        <DeployPipelineButton disabled={disabled} onReset={resetPipeline} />
       </FlexItem>
-      <FlexItem style={{ margin: 0 }}>
+      <FlexItem>
         <RdiConfigFileActionMenu />
       </FlexItem>
     </Row>

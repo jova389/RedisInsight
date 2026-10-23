@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
@@ -11,51 +11,35 @@ import {
 } from 'uiSrc/telemetry'
 import { formatLongName, getDbIndex, setTitle } from 'uiSrc/utils'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { OnboardingTour } from 'uiSrc/components'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import { incrementOnboardStepAction } from 'uiSrc/slices/app/features'
 import { OnboardingSteps } from 'uiSrc/constants/onboarding'
-import {
-  MessagesListWrapper,
-  PublishMessage,
-  SubscriptionPanel,
-} from './components'
+import { MessagesListTable, PublishMessage } from './components'
 
-import styles from './styles.module.scss'
+import { Col, FlexItem } from 'uiSrc/components/base/layout/flex'
+import { Theme } from 'uiSrc/components/base/theme/types'
+import { MessagesListWrapper, OnboardingWrapper } from './PubSubPage.styles'
 
-// Styled components
-const MainContainer = styled.div<React.HTMLAttributes<HTMLDivElement>>`
-  border: 1px solid ${({ theme }) => theme.semantic.color.border.neutral500};
-  border-radius: 8px;
-`
-
-const ContentPanel = styled.div`
-  flex-grow: 1;
-`
-
-const HeaderPanel = styled.div`
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--separatorColor);
-  border-color: ${({ theme }) => theme.semantic.color.border.neutral500};
-`
-
-const FooterPanel = styled.div`
-  margin-top: 16px;
-  padding: 10px 18px 28px;
+const FooterPanel = styled(FlexItem)`
+  border-top: 1px solid ${({ theme }) => theme.semantic.color.border.neutral500};
+  padding: ${({ theme }: { theme: Theme }) => theme.core.space.space300};
 `
 
 const PubSubPage = () => {
-  const { name: connectedInstanceName, db } = useSelector(
+  const { t } = useTranslation()
+  const { name: connectedInstanceName, db } = useAppSelector(
     connectedInstanceSelector,
   )
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const [isPageViewSent, setIsPageViewSent] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const dbName = `${formatLongName(connectedInstanceName, 33, 0, '...')} ${getDbIndex(db)}`
-  setTitle(`${dbName} - Pub/Sub`)
+  setTitle(t('pubsub.pageTitle', { dbName }))
 
   useEffect(
     () => () => {
@@ -92,28 +76,24 @@ const PubSubPage = () => {
   }
 
   return (
-    <MainContainer className={styles.main} data-testid="pub-sub-page">
-      <ContentPanel>
-        <HeaderPanel>
-          <SubscriptionPanel />
-        </HeaderPanel>
-        <div className={styles.tableWrapper}>
-          <MessagesListWrapper />
-        </div>
-      </ContentPanel>
-      <FooterPanel>
+    <Col data-testid="pub-sub-page" justify="between">
+      <MessagesListWrapper grow={true}>
+        <MessagesListTable />
+      </MessagesListWrapper>
+
+      <FooterPanel grow={false}>
         <PublishMessage />
       </FooterPanel>
-      <div className={styles.onboardAnchor}>
+
+      <OnboardingWrapper grow={false}>
         <OnboardingTour
           options={ONBOARDING_FEATURES.FINISH}
-          anchorPosition="downCenter"
-          panelClassName={styles.onboardPanel}
+          anchorPosition="downRight"
         >
           <span />
         </OnboardingTour>
-      </div>
-    </MainContainer>
+      </OnboardingWrapper>
+    </Col>
   )
 }
 

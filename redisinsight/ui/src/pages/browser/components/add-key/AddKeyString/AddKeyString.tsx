@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { Maybe, stringToBuffer } from 'uiSrc/utils'
 
@@ -8,8 +8,9 @@ import { addKeyStateSelector, addStringKey } from 'uiSrc/slices/browser/keys'
 import { ActionFooter } from 'uiSrc/pages/browser/components/action-footer'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { TextArea } from 'uiSrc/components/base/inputs'
-import { SetStringWithExpireDto } from 'apiSrc/modules/browser/string/dto'
-import { AddStringFormConfig as config } from '../constants/fields-config'
+import { SetStringWithExpireDto } from 'apiClient'
+import { useTranslation } from 'uiSrc/i18n'
+import { getAddStringFormConfig } from '../constants/fields-config'
 
 export interface Props {
   keyName: string
@@ -19,11 +20,13 @@ export interface Props {
 
 const AddKeyString = (props: Props) => {
   const { keyName = '', keyTTL, onCancel } = props
-  const { loading } = useSelector(addKeyStateSelector)
+  const { t } = useTranslation()
+  const config = getAddStringFormConfig(t)
+  const { loading } = useAppSelector(addKeyStateSelector)
   const [value, setValue] = useState<string>('')
   const [isFormValid, setIsFormValid] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     setIsFormValid(keyName.length > 0)
@@ -63,7 +66,7 @@ const AddKeyString = (props: Props) => {
       <ActionFooter
         onCancel={() => onCancel(true)}
         onAction={submitData}
-        actionText="Add Key"
+        actionText={t('browser.addKey.button.submit')}
         loading={loading}
         disabled={!isFormValid}
         actionTestId="add-key-string-btn"

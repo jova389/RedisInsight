@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import ReactDOM from 'react-dom'
+
 import {
   fetchInstancesAction,
   importInstancesSelector,
@@ -9,22 +10,21 @@ import {
 } from 'uiSrc/slices/instances/instances'
 import { Nullable } from 'uiSrc/utils'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import { RiTooltip, UploadWarning, RiFilePicker } from 'uiSrc/components'
+import { RiFilePicker, RiTooltip, UploadWarning } from 'uiSrc/components'
 import { useModalHeader } from 'uiSrc/contexts/ModalTitleProvider'
 import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import {
   PrimaryButton,
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
-import { InfoIcon } from 'uiSrc/components/base/icons'
+import { InfoIcon, RiIcon } from 'uiSrc/components/base/icons'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { ColorText, Text } from 'uiSrc/components/base/text'
 import { Loader } from 'uiSrc/components/base/display'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useTranslation } from 'uiSrc/i18n'
 import ResultsLog from './components/ResultsLog'
 
-import styles from './styles.module.scss'
+import { ScrollableWrapper } from '../ManualConnection.styles'
 
 export interface Props {
   onClose: () => void
@@ -34,25 +34,31 @@ const MAX_MB_FILE = 10
 const MAX_FILE_SIZE = MAX_MB_FILE * 1024 * 1024
 
 const ImportDatabase = (props: Props) => {
+  const { t } = useTranslation()
   const { onClose } = props
-  const { loading, data, error } = useSelector(importInstancesSelector)
+  const { loading, data, error } = useAppSelector(importInstancesSelector)
   const [files, setFiles] = useState<Nullable<FileList>>(null)
   const [isInvalid, setIsInvalid] = useState<boolean>(false)
   const [isSubmitDisabled, setIsSubmitDisabled] = useState<boolean>(true)
   const [domReady, setDomReady] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { setModalHeader } = useModalHeader()
 
   useEffect(() => {
     setDomReady(true)
 
-    setModalHeader(<Title size="M">Import from file</Title>, true)
-
     return () => {
       setModalHeader(null)
     }
   }, [])
+
+  useEffect(() => {
+    setModalHeader(
+      <Title size="M">{t('home.importDatabase.title')}</Title>,
+      true,
+    )
+  }, [t])
 
   const onFileChange = (files: FileList | null) => {
     setFiles(files)
@@ -101,53 +107,48 @@ const ImportDatabase = (props: Props) => {
 
     if (error) {
       return ReactDOM.createPortal(
-        <div className="footerAddDatabase">
+        <Row justify="end" gap="m" data-testid="footer-import-database">
           <PrimaryButton
-            size="s"
             color="secondary"
             onClick={onClickRetry}
             data-testid="btn-retry"
           >
-            Retry
+            {t('home.importDatabase.button.retry')}
           </PrimaryButton>
-        </div>,
+        </Row>,
         footerEl,
       )
     }
 
     if (data) {
       return ReactDOM.createPortal(
-        <div className="footerAddDatabase">
+        <Row justify="end" gap="m" data-testid="footer-import-database">
           <PrimaryButton
-            size="s"
             type="submit"
             onClick={handleOnClose}
             data-testid="btn-close"
           >
-            Ok
+            {t('home.importDatabase.button.ok')}
           </PrimaryButton>
-        </div>,
+        </Row>,
         footerEl,
       )
     }
 
     return ReactDOM.createPortal(
-      <div className="footerAddDatabase">
-        <SecondaryButton
-          size="s"
-          className="btn-cancel"
-          onClick={handleOnClose}
-          style={{ marginRight: 12 }}
-        >
-          Cancel
+      <Row justify="end" gap="m" data-testid="footer-import-database">
+        <SecondaryButton className="btn-cancel" onClick={handleOnClose}>
+          {t('home.importDatabase.button.cancel')}
         </SecondaryButton>
         <RiTooltip
           position="top"
-          anchorClassName="euiToolTip__btn-disabled"
-          content={isSubmitDisabled ? 'Upload a file' : undefined}
+          content={
+            isSubmitDisabled
+              ? t('home.importDatabase.tooltip.uploadFile')
+              : undefined
+          }
         >
           <PrimaryButton
-            size="s"
             type="submit"
             onClick={onSubmit}
             loading={loading}
@@ -155,10 +156,10 @@ const ImportDatabase = (props: Props) => {
             icon={isSubmitDisabled ? InfoIcon : undefined}
             data-testid="btn-submit"
           >
-            Submit
+            {t('home.importDatabase.button.submit')}
           </PrimaryButton>
         </RiTooltip>
-      </div>,
+      </Row>,
       footerEl,
     )
   }
@@ -167,74 +168,72 @@ const ImportDatabase = (props: Props) => {
 
   return (
     <>
-      <div className={styles.formWrapper} data-testid="add-db_import">
-        <Col>
-          <FlexItem grow>
+      <ScrollableWrapper data-testid="add-db_import">
+        <Col gap="xl">
+          <Col grow gap="xl">
             {isShowForm && (
-              <>
-                <Text color="subdued" size="s">
-                  Use a JSON file to import your database connections. Ensure
-                  that you only use files from trusted sources to prevent the
-                  risk of automatically executing malicious code.
-                </Text>
-                <Spacer />
+              <Col gap="xl">
+                <Text>{t('home.importDatabase.description')}</Text>
 
                 <RiFilePicker
                   id="import-file-modal-filepicker"
-                  initialPromptText="Select or drag and drop a file"
-                  className={styles.fileDrop}
+                  initialPromptText={t('home.importDatabase.filePicker.prompt')}
                   isInvalid={isInvalid}
                   onChange={onFileChange}
                   display="large"
                   data-testid="import-file-modal-filepicker"
-                  aria-label="Select or drag and drop file"
+                  aria-label={t('home.importDatabase.filePicker.ariaLabel')}
                 />
+
                 {isInvalid && (
-                  <ColorText
-                    color="danger"
-                    className={styles.errorFileMsg}
-                    data-testid="input-file-error-msg"
-                  >
-                    {`File should not exceed ${MAX_MB_FILE} MB`}
+                  <ColorText color="danger" data-testid="input-file-error-msg">
+                    {t('home.importDatabase.error.maxFileSize', {
+                      max: MAX_MB_FILE,
+                    })}
                   </ColorText>
                 )}
-              </>
+              </Col>
             )}
             {loading && (
-              <div
-                className={styles.loading}
+              <Col
+                justify="center"
+                gap="l"
+                align="center"
                 data-testid="file-loading-indicator"
               >
                 <Loader size="xl" />
-                <Text color="subdued" style={{ marginTop: 12 }}>
-                  Uploading...
-                </Text>
-              </div>
+                <Text>{t('home.importDatabase.uploading')}</Text>
+              </Col>
             )}
             {error && (
-              <div className={styles.result} data-testid="result-failed">
-                <RiIcon type="ToastCancelIcon" color="danger600" size="xxl" />
-                <Text color="subdued" style={{ marginTop: 16 }}>
-                  Failed to add database connections
-                </Text>
-                <Text color="subdued">{error}</Text>
-              </div>
+              <Col
+                align="center"
+                gap="l"
+                justify="center"
+                data-testid="result-failed"
+              >
+                <RiIcon
+                  type="IndicatorXIcon"
+                  color="danger600"
+                  customSize="5rem"
+                />
+                <Text>{t('home.importDatabase.error.failed')}</Text>
+                <Text>{error}</Text>
+              </Col>
             )}
-          </FlexItem>
+          </Col>
           {isShowForm && (
-            <FlexItem grow className={styles.uploadWarningContainer}>
+            <FlexItem>
               <UploadWarning />
             </FlexItem>
           )}
         </Col>
         {data && (
           <Row justify="center">
-            <FlexItem grow style={{ maxWidth: '100%' }}>
-              <ResultsLog data={data} />
-            </FlexItem>
+            <ResultsLog data={data} />
           </Row>
         )}
-      </div>
+      </ScrollableWrapper>
       <Footer />
     </>
   )

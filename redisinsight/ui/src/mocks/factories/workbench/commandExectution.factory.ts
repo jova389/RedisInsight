@@ -13,7 +13,7 @@ import {
 export const commandExecutionFactory = Factory.define<CommandExecution>(
   ({ sequence }) => ({
     id: sequence.toString() ?? faker.string.uuid(),
-    databaseId: faker.string.ulid(),
+    databaseId: faker.string.uuid(),
     db: faker.number.int({ min: 0, max: 15 }),
     type: faker.helpers.enumValue(CommandExecutionType),
     mode: faker.helpers.enumValue(RunQueryMode),
@@ -21,7 +21,7 @@ export const commandExecutionFactory = Factory.define<CommandExecution>(
     command: faker.lorem.paragraph(),
     result: commandExecutionResultFactory.buildList(1),
     executionTime: faker.number.int({ min: 1000, max: 5000 }),
-    createdAt: faker.date.past(),
+    createdAt: faker.date.past().toISOString(),
   }),
 )
 

@@ -102,6 +102,7 @@ describe('LocalServerService', () => {
         sessionId: expect.any(Number),
         packageType: undefined, // should be undefined for non-electron applications
       });
+      expect(result.osArch).toEqual(process.arch);
     });
     it('should throw ServerInfoNotFoundException', async () => {
       serverRepository.getOrCreate.mockResolvedValue(null);
@@ -133,25 +134,33 @@ describe('LocalServerService', () => {
     it('should return predefined appType via env variable', () => {
       mockServerConfig.appType = 'ELECTRON_ENTERPRISE';
 
-      expect(ServerService.getAppType(BuildType.Electron)).toEqual(AppType.ElectronEnterprise);
+      expect(ServerService.getAppType(BuildType.Electron)).toEqual(
+        AppType.ElectronEnterprise,
+      );
     });
 
     it('should return predefined appType via env variable (case insensitive)', () => {
       mockServerConfig.appType = 'elecTron_enterPrise';
 
-      expect(ServerService.getAppType(BuildType.Electron)).toEqual(AppType.ElectronEnterprise);
+      expect(ServerService.getAppType(BuildType.Electron)).toEqual(
+        AppType.ElectronEnterprise,
+      );
     });
 
     it('should determine app type based on input when type in app type env', () => {
       mockServerConfig.appType = 'electron_enterprise1';
 
-      expect(ServerService.getAppType(BuildType.Electron)).toEqual(AppType.Electron);
+      expect(ServerService.getAppType(BuildType.Electron)).toEqual(
+        AppType.Electron,
+      );
     });
 
     it('should determine app type based on input when no app type env defined', () => {
       mockServerConfig.appType = undefined;
 
-      expect(ServerService.getAppType(BuildType.Electron)).toEqual(AppType.Electron);
+      expect(ServerService.getAppType(BuildType.Electron)).toEqual(
+        AppType.Electron,
+      );
     });
   });
 });

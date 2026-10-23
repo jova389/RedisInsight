@@ -13,18 +13,19 @@ export const RIResizeObserver: React.FC<RIResizeObserverProps> = ({
 
   useEffect(() => {
     const element = containerRef.current
-    if (element) {
+    if (!element) {
+      return undefined
+    }
 
-      const observer = new window.ResizeObserver(([entry]) => {
-        const { width, height } = entry.contentRect
-        onResize({ width, height })
-      })
+    const observer = new window.ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      onResize({ width, height })
+    })
 
-      observer.observe(element)
+    observer.observe(element)
 
-      return () => {
-        observer.disconnect()
-      }
+    return () => {
+      observer.disconnect()
     }
   }, [onResize, containerRef.current])
 

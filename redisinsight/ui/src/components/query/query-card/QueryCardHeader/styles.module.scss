@@ -6,8 +6,6 @@ $breakpoint-xl: 1650px;
 $marginIcon: 12px;
 
 .container {
-  display: flex;
-  align-items: center;
   height: 45px;
   padding: 0 20px;
   cursor: pointer;
@@ -19,29 +17,11 @@ $marginIcon: 12px;
     }
   }
 
-  :global(.euiFlexGroup--gutterLarge > .euiFlexItem) {
-    margin: $marginIcon calc($marginIcon/2) !important;
-
-    @media (min-width: $breakpoint-m) {
-      margin: $marginIcon !important;
-    }
-  }
-
   &.notExpanded {
     cursor: default;
   }
 }
 
-.isOpen {
-  &.container {
-    color: var(--euiColorPrimary);
-    background-color: var(--tableRowSelectedColor) !important;
-  }
-
-  .title {
-    color: var(--euiColorFullShade) !important;
-  }
-}
 
 .title {
   display: inline-block;
@@ -64,9 +44,6 @@ $marginIcon: 12px;
   max-width: 134px;
 }
 
-.mode + .mode {
-  margin-left: 18px;
-}
 
 .timeText,
 .summaryText {
@@ -94,11 +71,6 @@ $marginIcon: 12px;
   flex: 1;
 }
 
-.dropdownWrapper {
-  position: relative;
-  height: 40px;
-}
-
 .dropdownProfileIcon {
   padding: inherit !important;
   :global {
@@ -120,28 +92,9 @@ $marginIcon: 12px;
   }
 }
 
-.dropdown {
-  width: 168px;
-  position: absolute;
-  z-index: 1;
-
-  // move a little bit left to align with dropdown options icons
-  left: -21px;
-
-  :global {
-    .euiFormControlLayout__childrenWrapper {
-      width: 46px;
-      position: relative;
-      // move right to align self
-      left: 21px;
-    }
-  }
-}
-
 .executionTime {
   min-width: 13px;
   width: 13px;
-  display: flex;
 
   @media (min-width: $breakpoint-m) {
     min-width: 92px;
@@ -196,30 +149,14 @@ $marginIcon: 12px;
   flex-shrink: 0;
 }
 
-.iconDropdownOption {
-  width: 20px !important;
-  height: 20px !important;
+.dropdownOptionSeparator {
+  content-visibility: auto;
 }
 
-.iconExecutingTime {
-  width: 13px !important;
-  height: 13px !important;
-  margin-right: 6px;
-
-  path {
-    fill: var(--iconsDefaultColor);
+:global {
+  [role="option"]:has([class*="dropdownOptionSeparator"]) {
+    border-top: 1px solid var(--separatorDropdownColor);
   }
-}
-
-.dropdownOptionSeparator:after {
-  content: "";
-  display: block;
-  height: 0;
-  width: 100%;
-  border-bottom: 1px solid var(--separatorDropdownColor);
-  opacity: 0.5;
-  position: absolute;
-  bottom: -8.5px;
 }
 
 .changeView:global(.euiSuperSelectControl) {
@@ -272,19 +209,18 @@ $marginIcon: 12px;
 
 .buttonIcon {
   padding: 0 4px;
-  width: 32px;
   min-width: 32px;
   position: relative;
   z-index: 2;
 }
 
-.container :global(.euiFlexItem).viewTypeIcon {
+.container :global(.RI-flex-item).viewTypeIcon {
   width: 54px;
   min-width: 54px;
   margin: 0 calc($marginIcon/3) !important;
 }
 
-.container :global(.euiFlexItem).playIcon {
+.container :global(.RI-flex-item).playIcon {
   margin-right: calc($marginIcon/3) !important;
 }
 

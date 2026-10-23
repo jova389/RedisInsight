@@ -1,57 +1,55 @@
 import React, { useEffect, useState } from 'react'
-import cx from 'classnames'
-import { map } from 'lodash'
-import { useSelector } from 'react-redux'
-import { SearchInput } from 'uiSrc/components/base/inputs'
-import { Maybe } from 'uiSrc/utils'
-import { RiPopover, RiTooltip } from 'uiSrc/components/base'
-import { InstanceRedisCluster } from 'uiSrc/slices/interfaces'
-import { clusterSelector } from 'uiSrc/slices/instances/cluster'
-import validationErrors from 'uiSrc/constants/validationErrors'
+import type { Maybe } from 'uiSrc/utils'
+import { RiTooltip } from 'uiSrc/components/base'
+import type { InstanceRedisCluster } from 'uiSrc/slices/interfaces'
+import { getValidationErrors } from 'uiSrc/constants/validationErrors'
 import { AutodiscoveryPageTemplate } from 'uiSrc/templates'
+import { useTranslation } from 'uiSrc/i18n'
 
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Row } from 'uiSrc/components/base/layout/flex'
 import { InfoIcon } from 'uiSrc/components/base/icons'
+import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import {
-  DestructiveButton,
-  PrimaryButton,
-  SecondaryButton,
-} from 'uiSrc/components/base/forms/buttons'
-import { FormField } from 'uiSrc/components/base/forms/FormField'
-import { Title } from 'uiSrc/components/base/text/Title'
-import { Text } from 'uiSrc/components/base/text'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
-import styles from './styles.module.scss'
+  type ColumnDef,
+  type RowSelectionState,
+  Table,
+} from 'uiSrc/components/base/layout/table'
+import {
+  DatabaseContainer,
+  DatabaseWrapper,
+  EmptyState,
+  Footer,
+  Header,
+} from 'uiSrc/components/auto-discover'
+import { Spacer } from 'uiSrc/components/base/layout'
+import { CancelButton } from './components'
 
 interface Props {
-  columns: ColumnDefinition<InstanceRedisCluster>[]
+  columns: ColumnDef<InstanceRedisCluster>[]
   onClose: () => void
   onBack: () => void
   onSubmit: (uids: Maybe<number>[]) => void
+  instances: InstanceRedisCluster[]
+  loading: boolean
 }
 
-interface IPopoverProps {
-  isPopoverOpen: boolean
-}
-
-const loadingMsg = 'loading...'
-const notFoundMsg = 'Not found'
-const noResultsMessage =
-  'Your Redis Enterprise Cluster has no databases available.'
-
+const hasSelection = (selection: RowSelectionState) =>
+  Object.values(selection).some(Boolean)
 const RedisClusterDatabases = ({
   columns,
   onClose,
   onBack,
   onSubmit,
+  instances,
+  loading,
 }: Props) => {
+  const { t } = useTranslation()
+  const validationErrors = getValidationErrors(t)
   const [items, setItems] = useState<InstanceRedisCluster[]>([])
-  const [message, setMessage] = useState(loadingMsg)
+  const [message, setMessage] = useState(t('cluster.loadingMsg'))
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
 
-  const [selection, setSelection] = useState<InstanceRedisCluster[]>([])
-
-  const { data: instances, loading } = useSelector(clusterSelector)
+  const [selection, setSelection] = useState<RowSelectionState>({})
 
   useEffect(() => {
     if (instances !== null) {
@@ -61,12 +59,16 @@ const RedisClusterDatabases = ({
 
   useEffect(() => {
     if (instances?.length === 0) {
-      setMessage(noResultsMessage)
+      setMessage(t('cluster.databases.noResults'))
     }
   }, [instances])
 
   const handleSubmit = () => {
-    onSubmit(map(selection, 'uid'))
+    // Map rowSelection state to the selected items list using uid as row id
+    const selected = Object.entries(selection)
+      .filter(([_uid, isSelected]) => Boolean(isSelected))
+      .map(([uid]) => Number(uid))
+    onSubmit(selected)
   }
 
   const showPopover = () => {
@@ -77,17 +79,10 @@ const RedisClusterDatabases = ({
     setIsPopoverOpen(false)
   }
 
-  const isSubmitDisabled = () => selection.length < 1
+  const isSubmitDisabled = () => !hasSelection(selection)
 
-  const selectionValue = {
-    onSelectionChange: (selected: InstanceRedisCluster) =>
-      setSelection((previous) => {
-        const isSelected = previous.some((item) => item.uid === selected.uid)
-        if (isSelected) {
-          return previous.filter((item) => item.uid !== selected.uid)
-        }
-        return [...previous, selected]
-      }),
+  const onSelectionChange = (selection: RowSelectionState) => {
+    setSelection(selection)
   }
 
   const onQueryChange = (term: string) => {
@@ -101,145 +96,75 @@ const RedisClusterDatabases = ({
       ) ?? []
 
     if (!itemsTemp?.length) {
-      setMessage(notFoundMsg)
+      setMessage(t('cluster.notFound'))
     }
     setItems(itemsTemp)
   }
 
-  const CancelButton = ({ isPopoverOpen: popoverIsOpen }: IPopoverProps) => (
-    <RiPopover
-      anchorPosition="upCenter"
-      isOpen={popoverIsOpen}
-      closePopover={closePopover}
-      panelClassName={styles.panelCancelBtn}
-      panelPaddingSize="l"
-      button={
-        <SecondaryButton
-          onClick={showPopover}
-          className="btn-cancel"
-          data-testid="btn-back"
-        >
-          Cancel
-        </SecondaryButton>
-      }
-    >
-      <Text size="m">
-        Your changes have not been saved.&#10;&#13; Do you want to proceed to
-        the list of databases?
-      </Text>
-      <br />
-      <div>
-        <DestructiveButton
-          size="s"
-          onClick={onClose}
-          data-testid="btn-back-proceed"
-        >
-          Proceed
-        </DestructiveButton>
-      </div>
-    </RiPopover>
-  )
-
   return (
     <AutodiscoveryPageTemplate>
-      <div className="databaseContainer">
-        <Title size="M" className={styles.title} data-testid="title">
-          Auto-Discover Redis Enterprise Databases
-        </Title>
-        <Row align="end" responsive gap="s">
-          <FlexItem grow>
-            {!!items.length && (
-              <Text color="subdued" className={styles.subTitle}>
-                These are the {items.length > 1 ? 'databases ' : 'database '}
-                in your Redis Enterprise Cluster. Select the
-                {items.length > 1 ? ' databases ' : ' database '} that you want
-                to add.
-              </Text>
-            )}
-          </FlexItem>
-          <FlexItem>
-            <FormField className={styles.searchForm}>
-              <SearchInput
-                placeholder="Search..."
-                onChange={onQueryChange}
-                aria-label="Search"
-                data-testid="search"
-              />
-            </FormField>
-          </FlexItem>
-        </Row>
-        <br />
-        <div
-          className={cx(
-            'itemList databaseList clusterDatabaseList',
-            styles.databaseListWrapper,
-          )}
-        >
+      <DatabaseContainer>
+        <Header
+          title={t('cluster.databases.title')}
+          onBack={onBack}
+          onQueryChange={onQueryChange}
+          subTitle={
+            items.length
+              ? t('cluster.databases.subtitle', { count: items.length })
+              : null
+          }
+        />
+        <Spacer size="m" />
+        <DatabaseWrapper>
           <Table
             columns={columns}
             data={items}
-            onRowClick={selectionValue.onSelectionChange}
-            defaultSorting={[
-              {
-                id: 'name',
-                desc: false,
-              },
-            ]}
+            rowSelectionMode="multiple"
+            getRowId={(row) => `${row.uid}`}
+            onRowSelectionChange={onSelectionChange}
+            defaultSorting={[{ id: 'name', desc: false }]}
+            paginationEnabled={items.length > 10}
+            stripedRows
+            emptyState={() => <EmptyState message={message} />}
           />
-          {!items.length && (
-            <Text className={styles.noDatabases}>{message}</Text>
-          )}
-        </div>
-      </div>
-      <FlexItem>
-        <Row
-          justify="between"
-          className={cx(
-            styles.footer,
-            'footerAddDatabase',
-            styles.footerClusterDatabases,
-          )}
-        >
-          <SecondaryButton
-            onClick={onBack}
-            className="btn-cancel btn-back"
-            data-testid="btn-back-to-adding"
+        </DatabaseWrapper>
+      </DatabaseContainer>
+      <Footer>
+        <Row justify="end" gap="m">
+          <CancelButton
+            isPopoverOpen={isPopoverOpen}
+            onShowPopover={showPopover}
+            onClosePopover={closePopover}
+            onProceed={onClose}
+          />
+          <RiTooltip
+            position="top"
+            anchorClassName="euiToolTip__btn-disabled"
+            title={
+              isSubmitDisabled()
+                ? validationErrors.SELECT_AT_LEAST_ONE('database')
+                : null
+            }
+            content={
+              isSubmitDisabled() ? (
+                <span>{validationErrors.NO_DBS_SELECTED}</span>
+              ) : null
+            }
           >
-            Back to adding databases
-          </SecondaryButton>
-          <FlexItem direction="row" className={styles.footerButtonsGroup}>
-            <CancelButton isPopoverOpen={isPopoverOpen} />
-            <RiTooltip
-              position="top"
-              anchorClassName="euiToolTip__btn-disabled"
-              title={
-                isSubmitDisabled()
-                  ? validationErrors.SELECT_AT_LEAST_ONE('database')
-                  : null
-              }
-              content={
-                isSubmitDisabled() ? (
-                  <span>
-                    {validationErrors.NO_DBS_SELECTED}
-                  </span>
-                ) : null
-              }
+            <PrimaryButton
+              size="m"
+              disabled={isSubmitDisabled()}
+              onClick={handleSubmit}
+              loading={loading}
+              color="secondary"
+              icon={isSubmitDisabled() ? InfoIcon : undefined}
+              data-testid="btn-add-databases"
             >
-              <PrimaryButton
-                size="m"
-                disabled={isSubmitDisabled()}
-                onClick={handleSubmit}
-                loading={loading}
-                color="secondary"
-                icon={isSubmitDisabled() ? InfoIcon : undefined}
-                data-testid="btn-add-databases"
-              >
-                Add selected Databases
-              </PrimaryButton>
-            </RiTooltip>
-          </FlexItem>
+              {t('cluster.databases.addButton')}
+            </PrimaryButton>
+          </RiTooltip>
         </Row>
-      </FlexItem>
+      </Footer>
     </AutodiscoveryPageTemplate>
   )
 }

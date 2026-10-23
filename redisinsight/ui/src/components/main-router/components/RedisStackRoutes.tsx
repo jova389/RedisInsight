@@ -1,4 +1,4 @@
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import React, { useEffect, useState } from 'react'
 import { Switch, useHistory } from 'react-router-dom'
 
@@ -13,7 +13,7 @@ import { PagePlaceholder } from 'uiSrc/components'
 import ProtectedRoute from 'uiSrc/pages/redis-stack/components/protected-route/ProtectedRoute'
 import ROUTES from '../constants/redisStackRoutes'
 
-interface IProps {
+export interface IProps {
   databaseId?: string
 }
 
@@ -24,7 +24,7 @@ interface IConnectionState {
 
 const Router = ({ databaseId = '' }: IProps) => {
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const [connection, setConnection] = useState<IConnectionState>({
     loading: true,
     ready: false,

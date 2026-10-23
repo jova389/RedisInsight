@@ -1,11 +1,5 @@
-import cx from 'classnames'
-import React, {
-  FormEvent,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { FormEvent, useEffect, useRef, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import {
   appContextPubSub,
@@ -14,21 +8,26 @@ import {
 import { ConnectionType } from 'uiSrc/slices/interfaces'
 import { publishMessageAction } from 'uiSrc/slices/pubsub/pubsub'
 import { useConnectionType } from 'uiSrc/components/hooks/useConnectionType'
+import { useTranslation } from 'uiSrc/i18n'
 
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
-import { RiBadge } from 'uiSrc/components/base/display/badge/RiBadge'
-import { CheckThinIcon } from 'uiSrc/components/base/icons'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { ToastCheckIcon, Icon } from 'uiSrc/components/base/icons'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import styles from './styles.module.scss'
+import { Text } from 'uiSrc/components/base/text'
+import {
+  ButtonWrapper,
+  ChannelColumn,
+  ResultWrapper,
+} from './PublishMessage.styles'
 
 const HIDE_BADGE_TIMER = 3000
 
 const PublishMessage = () => {
+  const { t } = useTranslation()
   const { channel: channelContext, message: messageContext } =
-    useSelector(appContextPubSub)
+    useAppSelector(appContextPubSub)
   const connectionType = useConnectionType()
 
   const [channel, setChannel] = useState<string>(channelContext)
@@ -40,7 +39,7 @@ const PublishMessage = () => {
   const timeOutRef = useRef<NodeJS.Timeout>()
 
   const { instanceId } = useParams<{ instanceId: string }>()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(
     () => () => {
@@ -78,74 +77,74 @@ const PublishMessage = () => {
     dispatch(publishMessageAction(instanceId, channel, message, onSuccess))
   }
 
+  const getClientsText = (clients?: number) =>
+    typeof clients !== 'number'
+      ? t('pubsub.publish.published')
+      : t('pubsub.publish.publishedWithClients', { clients })
+
   return (
-    <form className={styles.container} onSubmit={onFormSubmit}>
-      <FlexItem
-        grow
-        className={cx('flexItemNoFullWidth', 'inlineFieldsNoSpace')}
-      >
-        <Row align="center">
-          <FlexItem className={styles.channelWrapper} grow>
+    <form onSubmit={onFormSubmit}>
+      <Row justify="between" gap="xl" align="end">
+        <Row grow={true} gap="m">
+          <ChannelColumn grow={false} gap="s">
+            <Text>{t('pubsub.publish.channelLabel')}</Text>
             <FormField>
               <TextInput
                 name="channel"
                 id="channel"
-                placeholder="Enter Channel Name"
+                placeholder={t('pubsub.publish.channelPlaceholder')}
                 value={channel}
-                onChange={value =>
-                  setChannel(value)
-                }
+                onChange={(value) => setChannel(value)}
                 autoComplete="off"
                 data-testid="field-channel-name"
               />
             </FormField>
-          </FlexItem>
-          <FlexItem className={styles.messageWrapper} grow>
-            <FormField>
-              <>
-                <TextInput
-                  className={cx(styles.messageField, {
-                    [styles.showBadge]: isShowBadge,
-                  })}
-                  name="message"
-                  id="message"
-                  placeholder="Enter Message"
-                  value={message}
-                  onChange={value =>
-                    setMessage(value)
-                  }
-                  autoComplete="off"
-                  data-testid="field-message"
-                />
-                <RiBadge
-                  withIcon
-                  icon={CheckThinIcon}
-                  className={cx(styles.badge, { [styles.show]: isShowBadge })}
-                  data-testid="affected-clients-badge"
-                >
-                  {connectionType !== ConnectionType.Cluster && (
-                    <Row align="center">
-                      <span
-                        className={styles.affectedClients}
-                        data-testid="affected-clients"
-                      >
-                        {affectedClients}
-                      </span>
-                      <RiIcon type="UserIcon" />
-                    </Row>
-                  )}
-                </RiBadge>
-              </>
-            </FormField>
-          </FlexItem>
+          </ChannelColumn>
+
+          <Col gap="s">
+            <Text>{t('pubsub.publish.messageLabel')}</Text>
+            <TextInput
+              name="message"
+              id="message"
+              placeholder={t('pubsub.publish.messagePlaceholder')}
+              value={message}
+              onChange={(value) => setMessage(value)}
+              autoComplete="off"
+              data-testid="field-message"
+            />
+          </Col>
         </Row>
-      </FlexItem>
-      <Row justify="end" style={{ marginTop: 6 }}>
-        <FlexItem>
-          <PrimaryButton type="submit" data-testid="publish-message-submit">
-            Publish
-          </PrimaryButton>
-        </FlexItem>
+
+        {isShowBadge && (
+          <ResultWrapper
+            grow={false}
+            align="center"
+            data-testid="publish-result"
+          >
+            <Icon icon={ToastCheckIcon} color="success500" />
+            <Text color="success">
+              {getClientsText(
+                connectionType !== ConnectionType.Cluster
+                  ? affectedClients
+                  : undefined,
+              )}
+            </Text>
+          </ResultWrapper>
+        )}
+
+        {!isShowBadge && (
+          <ButtonWrapper justify="end" grow={false}>
+            <FlexItem>
+              <PrimaryButton
+                size="large"
+                type="submit"
+                data-testid="publish-message-submit"
+              >
+                {t('pubsub.publish.button')}
+              </PrimaryButton>
+            </FlexItem>
+          </ButtonWrapper>
+        )}
       </Row>
     </form>
   )

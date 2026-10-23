@@ -29,12 +29,16 @@ import { ClientNotFoundErrorException } from 'src/modules/redis/exceptions/clien
 import { DatabaseRecommendationService } from 'src/modules/database-recommendation/database-recommendation.service';
 import { RedisClient } from 'src/modules/redis/client';
 import { DatabaseClientFactory } from 'src/modules/database/providers/database.client.factory';
+import { DatabaseService } from 'src/modules/database/database.service';
+import { Environment } from 'src/modules/database/entities/database.entity';
+import { DangerousCommandsProvider } from 'src/modules/database/providers/dangerous-commands.provider';
 import { v4 as uuidv4 } from 'uuid';
 import { getAnalyticsDataFromIndexInfo } from 'src/utils';
 import { OutputFormatterManager } from './output-formatter/output-formatter-manager';
 import { CliOutputFormatterTypes } from './output-formatter/output-formatter.interface';
 import { TextFormatterStrategy } from './output-formatter/strategies/text-formatter.strategy';
 import { RawFormatterStrategy } from './output-formatter/strategies/raw-formatter.strategy';
+import { ARRAY_U64_INTEGER_REPLY_COMMANDS } from 'src/modules/browser/constants/browser-tool-commands';
 
 @Injectable()
 export class CliBusinessService {
@@ -47,6 +51,8 @@ export class CliBusinessService {
     private recommendationService: DatabaseRecommendationService,
     private readonly commandsService: CommandsService,
     private databaseClientFactory: DatabaseClientFactory,
+    private readonly databaseService: DatabaseService,
+    private readonly dangerousCommandsProvider: DangerousCommandsProvider,
   ) {
     this.outputFormatterManager = new OutputFormatterManager();
     this.outputFormatterManager.addStrategy(
@@ -193,8 +199,20 @@ export class CliBusinessService {
       const client: RedisClient =
         await this.databaseClientFactory.getOrCreateClient(clientMetadata);
 
+      const environment =
+        (
+          await this.databaseService.get(
+            clientMetadata.sessionMetadata,
+            clientMetadata.databaseId,
+          )
+        ).environment ?? Environment.Unspecified;
+
       const formatter = this.outputFormatterManager.getStrategy(outputFormat);
       [command, ...args] = splitCliCommandLine(commandLine);
+      const isDangerous: 'true' | 'false' =
+        (await this.dangerousCommandsProvider.isDangerous(client, command))
+          ? 'true'
+          : 'false';
       const replyEncoding = checkHumanReadableCommands(`${command} ${args[0]}`)
         ? 'utf8'
         : undefined;
@@ -206,8 +224,14 @@ export class CliBusinessService {
         command,
       );
 
+      const integerReply = ARRAY_U64_INTEGER_REPLY_COMMANDS.has(
+        command.toLowerCase(),
+      )
+        ? 'bigint'
+        : undefined;
       const reply = await client.sendCommand([command, ...args], {
         replyEncoding,
+        integerReply,
       });
 
       this.cliAnalyticsService.sendCommandExecutedEvent(
@@ -216,6 +240,8 @@ export class CliBusinessService {
         {
           command,
           outputFormat,
+          environment,
+          isDangerous,
         },
       );
 
@@ -255,6 +281,8 @@ export class CliBusinessService {
           {
             command,
             outputFormat,
+            environment: Environment.Unspecified,
+            isDangerous: 'false',
           },
         );
 

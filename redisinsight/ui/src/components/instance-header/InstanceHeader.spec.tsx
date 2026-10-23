@@ -2,9 +2,10 @@ import { cloneDeep, set } from 'lodash'
 import React from 'react'
 import reactRouterDom from 'react-router-dom'
 import { instance, mock } from 'ts-mockito'
+import { Environment } from 'apiClient'
 import {
   cleanup,
-  userEvent,
+  act,
   fireEvent,
   initialStateDefault,
   mockedStore,
@@ -66,13 +67,18 @@ jest.mock('react-router-dom', () => ({
   }),
 }))
 
+const mockedConnectedInstanceSelector = connectedInstanceSelector as jest.Mock
+const mockedConnectedInstanceInfoSelector =
+  connectedInstanceInfoSelector as jest.Mock
+const mockedAppContextDbIndex = appContextDbIndex as jest.Mock
+
 describe('InstanceHeader', () => {
   it('should render', () => {
     expect(render(<InstanceHeader {...instance(mockedProps)} />)).toBeTruthy()
   })
 
   it('should render change index button with databases = 1', () => {
-    ;(connectedInstanceInfoSelector as jest.Mock).mockReturnValueOnce({
+    mockedConnectedInstanceInfoSelector.mockReturnValueOnce({
       databases: 1,
     })
 
@@ -114,7 +120,7 @@ describe('InstanceHeader', () => {
   })
 
   it('should be disabled db index button with loading state', () => {
-    ;(connectedInstanceSelector as jest.Mock).mockReturnValueOnce({
+    mockedConnectedInstanceSelector.mockReturnValueOnce({
       loading: true,
     })
 
@@ -124,7 +130,7 @@ describe('InstanceHeader', () => {
   })
 
   it('should be disabled db index button with disabled state', () => {
-    ;(appContextDbIndex as jest.Mock).mockReturnValueOnce({
+    mockedAppContextDbIndex.mockReturnValueOnce({
       disabled: true,
     })
 
@@ -195,7 +201,9 @@ describe('InstanceHeader', () => {
       store: mockStore(initialStoreState),
     })
 
-    await userEvent.click(screen.getByTestId('user-profile-btn'))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('user-profile-btn'))
+    })
     await waitFor(() => {
       expect(
         screen.queryByTestId('user-profile-popover-content'),
@@ -232,7 +240,9 @@ describe('InstanceHeader', () => {
       store: mockStore(initialStoreState),
     })
 
-    await userEvent.click(screen.getByTestId('user-profile-btn'))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('user-profile-btn'))
+    })
     await waitFor(() => {
       expect(
         screen.queryByTestId('user-profile-popover-content'),
@@ -250,6 +260,58 @@ describe('InstanceHeader', () => {
     expect(
       screen.queryByTestId('profile-account-40-selected'),
     ).toHaveTextContent('Test account #40')
+  })
+
+  describe('environment indicator', () => {
+    const renderWithEnv = (env: Environment) => {
+      mockedConnectedInstanceSelector.mockReturnValue({
+        username: 'username',
+        id: 'instanceId',
+        loading: false,
+        environment: env,
+      })
+
+      return render(<InstanceHeader {...instance(mockedProps)} />)
+    }
+
+    it('renders the PROD badge and marks the header as production', () => {
+      renderWithEnv(Environment.Production)
+
+      expect(screen.getByTestId('instance-header')).toHaveAttribute(
+        'data-environment',
+        Environment.Production,
+      )
+      expect(
+        screen.getByTestId(`environment-badge-${Environment.Production}`),
+      ).toBeInTheDocument()
+    })
+
+    it('renders the Development label without the production data attribute', () => {
+      renderWithEnv(Environment.Development)
+
+      expect(screen.getByTestId('instance-header')).toHaveAttribute(
+        'data-environment',
+        Environment.Development,
+      )
+      expect(
+        screen.getByTestId(`environment-badge-${Environment.Development}`),
+      ).toBeInTheDocument()
+    })
+
+    it('renders no environment badge for Unspecified', () => {
+      renderWithEnv(Environment.Unspecified)
+
+      expect(screen.getByTestId('instance-header')).toHaveAttribute(
+        'data-environment',
+        Environment.Unspecified,
+      )
+      expect(
+        screen.queryByTestId(`environment-badge-${Environment.Production}`),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId(`environment-badge-${Environment.Development}`),
+      ).not.toBeInTheDocument()
+    })
   })
 
   it('should not show sso user profile if cloud ads feature is off', async () => {

@@ -1,10 +1,13 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import cx from 'classnames'
 import { isNull } from 'lodash'
-import React, { useEffect, useRef, useState } from 'react'
-import { useSelector } from 'react-redux'
+import styled from 'styled-components'
+import { useAppSelector } from 'uiSrc/slices/hooks'
+import { Trans, useTranslation, escapeTrans } from 'uiSrc/i18n'
 
+import { formatLongName, isEqualBuffers, stringToBuffer } from 'uiSrc/utils'
 import InlineItemEditor from 'uiSrc/components/inline-item-editor/InlineItemEditor'
-import { TEXT_UNPRINTABLE_CHARACTERS } from 'uiSrc/constants'
+import { getTextUnprintableCharacters } from 'uiSrc/constants'
 import { AddCommonFieldsFormConfig } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
 import {
   initialKeyInfo,
@@ -14,27 +17,31 @@ import {
 } from 'uiSrc/slices/browser/keys'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
+
 import {
   getBasedOnViewTypeEvent,
   sendEventTelemetry,
   TelemetryEvent,
 } from 'uiSrc/telemetry'
-import {
-  formatLongName,
-  isEqualBuffers,
-  replaceSpaces,
-  stringToBuffer,
-} from 'uiSrc/utils'
-
-import { FlexItem, Grid } from 'uiSrc/components/base/layout/flex'
-import { IconButton } from 'uiSrc/components/base/forms/buttons'
-import { CopyIcon } from 'uiSrc/components/base/icons'
-import { Text } from 'uiSrc/components/base/text'
+import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { RiTooltip } from 'uiSrc/components'
+import { CopyButton } from 'uiSrc/components/copy-button'
 import { TextInput } from 'uiSrc/components/base/inputs'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
 import styles from './styles.module.scss'
+
+const StyledInputWrapper = styled(Row)`
+  min-width: 150px;
+`
+
+const StyledFlexWrapper = styled(FlexItem)`
+  max-width: 450px;
+  gap: ${({ theme }) => theme.core.space.space050};
+`
 
 export interface Props {
   onEditKey: (
@@ -47,20 +54,22 @@ export interface Props {
 const COPY_KEY_NAME_ICON = 'copyKeyNameIcon'
 
 const KeyDetailsHeaderName = ({ onEditKey }: Props) => {
-  const { loading } = useSelector(selectedKeySelector)
+  const { t } = useTranslation()
+  const { loading } = useAppSelector(selectedKeySelector)
   const {
     ttl: ttlProp,
     type,
     nameString: keyProp,
     name: keyBuffer,
-  } = useSelector(selectedKeyDataSelector) ?? initialKeyInfo
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { viewType } = useSelector(keysSelector)
+  } = useAppSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { viewType } = useAppSelector(keysSelector)
 
   const [key, setKey] = useState(keyProp)
   const [keyIsEditing, setKeyIsEditing] = useState(false)
   const [keyIsHovering, setKeyIsHovering] = useState(false)
   const [keyIsEditable, setKeyIsEditable] = useState(true)
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   useEffect(() => {
     setKey(keyProp)
@@ -98,7 +107,25 @@ const KeyDetailsHeaderName = ({ onEditKey }: Props) => {
       !isEqualBuffers(keyBuffer, newKeyBuffer) &&
       !isNull(keyProp)
     ) {
-      onEditKey(keyBuffer, newKeyBuffer, () => setKey(keyProp))
+      requestConfirmation({
+        title: t('browser.keyDetails.name.renameConfirm.title'),
+        actionDescription: (
+          <Trans
+            i18nKey="browser.keyDetails.name.renameConfirm.description"
+            values={{
+              oldName: escapeTrans(`${keyProp}`),
+              newName: escapeTrans(`${key}`),
+            }}
+            components={{ bold: <strong /> }}
+          />
+        ),
+        confirmButtonText: t('browser.keyDetails.name.renameConfirm.button'),
+        commandId: BrowserConfirmationCommandId.RenameKey,
+        disableConfirmationInput: true,
+        onConfirm: () =>
+          onEditKey(keyBuffer, newKeyBuffer, () => setKey(keyProp)),
+        onCancel: () => setKey(keyProp),
+      })
     }
   }
 
@@ -114,19 +141,10 @@ const KeyDetailsHeaderName = ({ onEditKey }: Props) => {
     event?.stopPropagation()
   }
 
-  const handleCopy = (
-    event: any,
-    text = '',
-    keyInputIsEditing: boolean,
-    keyNameInputRef: React.RefObject<HTMLInputElement>,
-  ) => {
-    navigator.clipboard.writeText(text)
-
-    if (keyInputIsEditing) {
-      keyNameInputRef?.current?.focus()
+  const handleCopy = useCallback(() => {
+    if (keyIsEditing) {
+      keyNameRef?.current?.focus()
     }
-
-    event.stopPropagation()
 
     sendEventTelemetry({
       event: getBasedOnViewTypeEvent(
@@ -139,101 +157,68 @@ const KeyDetailsHeaderName = ({ onEditKey }: Props) => {
         keyType: type,
       },
     })
-  }
-
-  const appendKeyEditing = () =>
-    !keyIsEditing ? <RiIcon type="EditIcon" color="informative400" /> : ''
+  }, [keyIsEditing, viewType, instanceId, type])
 
   return (
-    <FlexItem
+    <StyledFlexWrapper
+      direction="row"
       onMouseEnter={onMouseEnterKey}
       onMouseLeave={onMouseLeaveKey}
       onClick={onClickKey}
-      className={cx(
-        styles.keyFlexItem, // TODO with styles.keyFlexItemEditing
-        keyIsEditing || keyIsHovering ? styles.keyFlexItemEditing : null,
-      )}
       data-testid="edit-key-btn"
     >
-      {(keyIsEditing || keyIsHovering) && (
-        <Grid
-          className={styles.classNameGridComponent}
-          data-testid="edit-key-grid"
-        >
-          <FlexItem grow className={styles.flexItemKeyInput}>
-            <RiTooltip
-              title="Key Name"
-              position="left"
-              content={tooltipContent}
-              anchorClassName={styles.toolTipAnchorKey}
-            >
-              <>
-                <InlineItemEditor
-                  onApply={() => applyEditKey()}
-                  isDisabled={!keyIsEditable}
-                  disabledTooltipText={TEXT_UNPRINTABLE_CHARACTERS}
-                  onDecline={(event) => cancelEditKey(event)}
-                  viewChildrenMode={!keyIsEditing}
-                  isLoading={loading}
-                  declineOnUnmount={false}
-                >
-                  <FormField
-                    additionalText={appendKeyEditing()}
-                  >
-                    <TextInput
-                      name="key"
-                      id="key"
-                      ref={keyNameRef}
-                      className={cx(styles.keyInput, {
-                        [styles.keyInputEditing]: keyIsEditing,
-                        'input-warning': !keyIsEditable,
-                      })}
-                      placeholder={
-                        AddCommonFieldsFormConfig?.keyName?.placeholder
-                      }
-                      value={key!}
-                      loading={loading}
-                      onChange={onChangeKey}
-                      readOnly={!keyIsEditing}
-                      autoComplete="off"
-                      data-testid="edit-key-input"
-                    />
-                  </FormField>
-                </InlineItemEditor>
-                <p className={styles.keyHiddenText}>{key}</p>
-              </>
-            </RiTooltip>
-            {keyIsHovering && (
-              <RiTooltip
-                position="right"
-                content="Copy"
-                anchorClassName={styles.copyKey}
-              >
-                <IconButton
-                  icon={CopyIcon}
-                  id={COPY_KEY_NAME_ICON}
-                  aria-label="Copy key name"
-                  onClick={(event: any) =>
-                    handleCopy(event, key!, keyIsEditing, keyNameRef)
-                  }
-                  data-testid="copy-key-name-btn"
-                />
-              </RiTooltip>
-            )}
-          </FlexItem>
-        </Grid>
-      )}
-      <Text
-        className={cx(styles.key, {
-          [styles.hidden]: keyIsEditing || keyIsHovering,
-        })}
-        data-testid="key-name-text"
+      <RiTooltip
+        title={t('browser.keyDetails.name.tooltipTitle')}
+        position="left"
+        content={tooltipContent}
+        anchorClassName={styles.toolTipAnchorKey}
       >
-        <b className="truncateText">
-          {replaceSpaces(keyProp?.substring(0, 200))}
-        </b>
-      </Text>
-    </FlexItem>
+        <InlineItemEditor
+          onApply={() => applyEditKey()}
+          isDisabled={!keyIsEditable}
+          disabledTooltipText={getTextUnprintableCharacters(t)}
+          onDecline={(event) => cancelEditKey(event)}
+          viewChildrenMode={!keyIsEditing}
+          isLoading={loading}
+          declineOnUnmount={false}
+        >
+          <StyledInputWrapper align="center" style={{ maxWidth: 420 }}>
+            <TextInput
+              autoSize
+              name="key"
+              id="key"
+              ref={keyNameRef}
+              className={cx(styles.keyInput, {
+                [styles.keyInputEditing]: keyIsEditing,
+                'input-warning': !keyIsEditable,
+              })}
+              placeholder={AddCommonFieldsFormConfig?.keyName?.placeholder}
+              value={key!}
+              loading={loading}
+              onChange={onChangeKey}
+              readOnly={!keyIsEditing}
+              autoComplete="off"
+              data-testid="edit-key-input"
+              // todo: do not hardcode. align with other components in a single place
+              style={{ paddingLeft: 9, lineHeight: '31px' }}
+            />
+          </StyledInputWrapper>
+        </InlineItemEditor>
+      </RiTooltip>
+      {!keyIsEditing && keyIsHovering && (
+        <Row align="center">
+          <RiIcon size="M" type="EditIcon" />
+          <CopyButton
+            copy={key!}
+            onCopy={handleCopy}
+            id={COPY_KEY_NAME_ICON}
+            tooltipConfig={{ anchorClassName: styles.copyKey }}
+            data-testid="copy-key-name"
+            aria-label={t('browser.keyDetails.name.copyAria')}
+          />
+        </Row>
+      )}
+    </StyledFlexWrapper>
   )
 }
 

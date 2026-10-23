@@ -112,7 +112,6 @@ describe(`POST /databases/clone/:id`, () => {
     ].map(mainCheckFn);
   });
   describe('Common', () => {
-    const dbName = constants.getRandomString();
     [
       {
         name: 'Should return 424 error if incorrect connection data provided',
@@ -425,7 +424,7 @@ describe(`POST /databases/clone/:id`, () => {
 
         await validateApiCall({
           endpoint: () => endpoint(constants.TEST_INSTANCE_ID_2),
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -435,10 +434,10 @@ describe(`POST /databases/clone/:id`, () => {
             caCert: null,
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
 
@@ -451,7 +450,7 @@ describe(`POST /databases/clone/:id`, () => {
 
         await validateApiCall({
           endpoint: () => endpoint(constants.TEST_INSTANCE_ID_2),
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -464,10 +463,10 @@ describe(`POST /databases/clone/:id`, () => {
             },
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
 

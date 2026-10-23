@@ -1,11 +1,7 @@
 import { Factory } from 'fishery'
 import { faker } from '@faker-js/faker'
 import { FieldTypes } from 'uiSrc/pages/browser/components/create-redisearch-index/constants'
-import {
-  FieldStatisticsDto,
-  IndexAttibuteDto,
-  IndexInfoDto,
-} from 'apiSrc/modules/browser/redisearch/dto'
+import { FieldStatisticsDto, IndexAttibuteDto, IndexInfoDto } from 'apiClient'
 
 export const INDEX_INFO_SEPARATORS: string[] = [',', ';', '|', ':']
 
@@ -98,7 +94,7 @@ export const indexInfoAttributeFactory = Factory.define<
   return {
     identifier: `$.${name}`,
     attribute: name,
-    type: faker.helpers.enumValue(FieldTypes).toString(),
+    type: faker.helpers.enumValue(FieldTypes).toString().toUpperCase(),
 
     // Optional fields
     ...(includeWeight && {

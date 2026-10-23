@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 import { useHistory, useParams } from 'react-router-dom'
 import { FeatureFlags, Pages } from 'uiSrc/constants'
+import { useTranslation } from 'uiSrc/i18n'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 
 import { setDBConfigStorageField } from 'uiSrc/services'
 import { ConfigDBStorageItem } from 'uiSrc/constants/storage'
 import { FeatureFlagComponent } from 'uiSrc/components'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
+import { Row } from 'uiSrc/components/base/layout/flex'
 import {
   PrimaryButton,
   SecondaryButton,
@@ -21,6 +23,7 @@ interface Props {
 }
 
 const RunConfirmationPopover = ({ onApply }: Props) => {
+  const { t } = useTranslation()
   const [notShowAgain, setNotShowAgain] = useState(false)
 
   const { instanceId } = useParams<{ instanceId: string }>()
@@ -49,17 +52,14 @@ const RunConfirmationPopover = ({ onApply }: Props) => {
 
   return (
     <>
-      <Title size="XS">Run commands</Title>
+      <Title size="XS">{t('workbench.runConfirmation.title')}</Title>
       <Spacer size="s" />
-      <Text size="s">
-        This tutorial will change data in your database, are you sure you want
-        to run commands in this database?
-      </Text>
+      <Text size="s">{t('workbench.runConfirmation.body')}</Text>
       <Spacer size="s" />
       <Checkbox
         id="showAgain"
         name="showAgain"
-        label="Don't show again for this database"
+        label={t('workbench.runConfirmation.doNotShowAgain')}
         checked={notShowAgain}
         className={styles.showAgainCheckBox}
         onChange={(e) => setNotShowAgain(e.target.checked)}
@@ -67,7 +67,7 @@ const RunConfirmationPopover = ({ onApply }: Props) => {
         aria-label="checkbox do not show agan"
       />
       <div className={styles.popoverFooter}>
-        <div>
+        <Row gap="m" justify="end">
           <FeatureFlagComponent name={FeatureFlags.envDependent}>
             <SecondaryButton
               size="s"
@@ -75,7 +75,7 @@ const RunConfirmationPopover = ({ onApply }: Props) => {
               onClick={handleChangeDatabase}
               data-testid="tutorial-popover-change-db"
             >
-              Change Database
+              {t('workbench.runConfirmation.changeDatabase')}
             </SecondaryButton>
           </FeatureFlagComponent>
           <PrimaryButton
@@ -84,9 +84,9 @@ const RunConfirmationPopover = ({ onApply }: Props) => {
             onClick={handleApply}
             data-testid="tutorial-popover-apply-run"
           >
-            Run
+            {t('common.button.run')}
           </PrimaryButton>
-        </div>
+        </Row>
       </div>
     </>
   )

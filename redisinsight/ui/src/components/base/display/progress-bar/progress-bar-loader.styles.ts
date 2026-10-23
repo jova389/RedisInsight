@@ -3,12 +3,7 @@ import { ReactNode } from 'react'
 import styled, { css, keyframes } from 'styled-components'
 
 export type EuiColorNames =
-  | 'inherit'
-  | 'default'
-  | 'primary'
-  | 'danger'
-  | 'warning'
-  | 'success'
+  'inherit' | 'default' | 'primary' | 'danger' | 'warning' | 'success'
 
 interface LoaderBarProps {
   color?: string
@@ -66,10 +61,12 @@ interface LoaderContainerProps {
   children?: ReactNode
   style?: React.CSSProperties
   className?: string
+  absolute?: boolean
 }
 
 export const LoaderContainer = styled.div<LoaderContainerProps>`
-  position: relative;
+  position: ${({ absolute }) => (absolute ? 'absolute' : 'relative')};
+  width: 100%;
   height: 3px;
   overflow: hidden;
   border-radius: 2px;

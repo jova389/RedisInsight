@@ -29,6 +29,10 @@ export enum CustomErrorCodes {
   CloudCapiUnauthorized = 11_021,
   CloudCapiKeyUnauthorized = 11_022,
   CloudCapiKeyNotFound = 11_023,
+  AzureEntraIdTokenExpired = 11_024,
+  CloudApiMfaRequired = 11_025,
+  CloudApiMfaQuotaExceeded = 11_026,
+  CloudApiMfaInvalidCode = 11_027,
 
   // Cloud Job errors [11100, 11199]
   CloudJobUnexpectedError = 11_100,
@@ -47,6 +51,7 @@ export enum CustomErrorCodes {
   CloudJobNotFound = 11_113,
   CloudSubscriptionAlreadyExistsFree = 11_114,
   CloudDatabaseImportForbidden = 11_115,
+  CloudDatabaseEndpointInvalid = 11_116,
 
   // General database errors [11200, 11299]
   DatabaseAlreadyExists = 11_200,
@@ -77,4 +82,51 @@ export enum CustomErrorCodes {
   RdiResetPipelineFailure = 11_407,
   RdiStartPipelineFailure = 11_408,
   RdiStopPipelineFailure = 11_409,
+  RdiBadRequest = 11_410,
+  RdiTimeout = 11_411,
+
+  // SSH [11600, 11699]
+  UnableToCreateSshConnection = 11_600,
+  TunnelConnectionLost = 11_601,
+  UnableToCreateTunnel = 11_602,
+  UnableToCreateLocalServer = 11_603,
+
+  // Encryption [11800, 11899]
+  EncryptionServiceError = 11_800,
+  KeyDecryptionError = 11_801,
+  KeyEncryptionError = 11_802,
+  KeyUnavailable = 11_803,
+  KeytarDecryptionError = 11_804,
+  KeytarEncryptionError = 11_805,
+  KeytarUnavailable = 11_806,
+  UnsupportedEncryptionStrategy = 11_807,
+
+  // Database Import [11700, 11799]
+  DatabaseImportInvalidSshBody = 11_700,
+  DatabaseImportInvalidSshPrivateKeyBody = 11_701,
+  DatabaseImportInvalidCaCertificateBody = 11_702,
+  DatabaseImportInvalidClientCertificateBody = 11_703,
+  DatabaseImportInvalidClientPrivateKey = 11_704,
+  DatabaseImportInvalidCertificateName = 11_705,
+  DatabaseImportUnableToParseFile = 11_706,
+  DatabaseImportNoFileProvided = 11_707,
+  DatabaseImportSizeLimitExceeded = 11_708,
+  DatabaseImportInvalidCompressor = 11_709,
+  DatabaseImportSshAgentsNotSupported = 11_710,
+
+  // Misc / server [11900, 11999]
+  UnableToFetchRemoteConfig = 11_900,
+  ClientNotFound = 11_901,
+
+  // Generic fallbacks (injected by GlobalExceptionFilter); last 3 digits
+  // mirror the HTTP status, i.e. 12_000 + status [12400, 12599]
+  GenericBadRequest = 12_400,
+  GenericUnauthorized = 12_401,
+  GenericForbidden = 12_403,
+  GenericNotFound = 12_404,
+  GenericConflict = 12_409,
+  GenericServerError = 12_500,
+
+  // Validation, class-validator failures [12100, 12199]
+  ValidationError = 12_100,
 }

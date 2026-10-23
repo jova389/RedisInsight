@@ -7,13 +7,8 @@ import { CommonProps } from 'uiSrc/components/base/theme/types'
 export type BodyProps = React.ComponentProps<typeof Typography.Body>
 
 export type EuiColorNames =
-  | 'default'
-  | 'subdued'
-  | 'danger'
-  | 'ghost'
-  | 'accent'
-  | 'warning'
-  | 'success'
+  'default' | 'subdued' | 'danger' | 'ghost' | 'accent' | 'warning' | 'success'
+
 export type ColorType = BodyProps['color'] | EuiColorNames | (string & {})
 export interface MapProps extends HTMLAttributes<HTMLElement> {
   $color?: ColorType
@@ -91,10 +86,36 @@ const getAlignValue = (align?: MapProps['$align']) => {
 export const StyledColorText = styled(Typography.Body)<MapProps>`
   ${useColorTextStyles}
 `
+
 export const StyledText = styled(Typography.Body)<MapProps>`
   ${useColorTextStyles};
   ${({ $align }) => getAlignValue($align)};
 `
+
+const useStatusColorStyles = ({ $color }: MapProps = {}) => {
+  const theme = useTheme()
+  const colors = theme.semantic.color
+
+  const getColorValue = (color?: ColorType) => {
+    switch (color) {
+      case 'informative':
+        return colors.text.informative400
+      case 'danger':
+        return colors.text.danger500
+      case 'warning':
+        return colors.text.attention500
+      case 'success':
+        return colors.text.success500
+      default:
+        return color // any supported color value e.g #fff
+    }
+  }
+
+  return css`
+    background-color: ${getColorValue($color)};
+  `
+}
+
 export const Indicator = styled.div<
   {
     $color: ColorType
@@ -103,7 +124,7 @@ export const Indicator = styled.div<
   width: 0.8rem;
   height: 0.8rem;
   border-radius: 50%;
-  background-color: ${({ $color }) => $color || 'inherit'};
+  ${useStatusColorStyles};
 `
 
 export const mapSize = (size: TextSizeType): BodyProps['size'] => {

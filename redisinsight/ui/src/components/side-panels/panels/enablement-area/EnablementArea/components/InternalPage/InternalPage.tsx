@@ -1,13 +1,19 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react'
-import JsxParser from 'react-jsx-parser'
+import React, {
+  useRef,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import cx from 'classnames'
 import { debounce } from 'lodash'
 import { useLocation, useParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
-import { ChevronLeftIcon } from 'uiSrc/components/base/icons'
-import { ExternalLink, HorizontalRule, LoadingContent } from 'uiSrc/components'
+import { ChevronLeftIcon, RocketIcon } from 'uiSrc/components/base/icons'
+import { HorizontalRule, LoadingContent } from 'uiSrc/components'
 import { RiPopover } from 'uiSrc/components/base'
+import { Link } from 'uiSrc/components/base/link/Link'
 import { IEnablementAreaItem } from 'uiSrc/slices/interfaces'
 import {
   sendEventTelemetry,
@@ -16,7 +22,6 @@ import {
 } from 'uiSrc/telemetry'
 import { getTutorialCapability, Nullable } from 'uiSrc/utils'
 
-import RocketIcon from 'uiSrc/assets/img/icons/rocket.svg?react'
 import { appContextCapability } from 'uiSrc/slices/app/context'
 import {
   isShowCapabilityTutorialPopover,
@@ -29,12 +34,32 @@ import {
   CloudLink,
   RedisInsightLink,
 } from 'uiSrc/components/markdown'
+import {
+  MarkdownRenderer,
+  MarkdownLeafComponents,
+} from 'uiSrc/components/markdown/MarkdownRenderer'
 import { EmptyButton } from 'uiSrc/components/base/forms/buttons'
 import { Text } from 'uiSrc/components/base/text'
 import { getTutorialSection } from '../../utils'
 import { EmptyPrompt, Pagination, Code } from '..'
 
 import styles from './styles.module.scss'
+
+// External link leaf rendered for absolute-path markdown links. Defined at
+// module scope (not per render) so its function identity is stable across
+// re-renders and react-markdown doesn't remount the link's DOM node on every
+// scroll/popover update. The base Link already adds target/rel on its own.
+const TutorialExternalLink = ({
+  href,
+  children,
+}: {
+  href: string
+  children?: ReactNode
+}) => (
+  <Link external variant="inline" size="S" href={href}>
+    {children}
+  </Link>
+)
 
 export interface Props {
   onClose: () => void
@@ -68,18 +93,27 @@ const InternalPage = (props: Props) => {
     manifestPath,
     sourcePath,
   } = props
-  const components: any = {
-    Image,
-    Code,
-    RedisUploadButton,
-    CloudLink,
-    RedisInsightLink,
-    ExternalLink,
-  }
+  // Defined per render (not at module scope) because Code is re-exported
+  // through the components barrel that InternalPage itself is part of;
+  // capturing it at module-eval time would see it as undefined mid-cycle.
+  // Memoized with no deps: every value below is a stable module-level
+  // import, so the object identity stays stable across re-renders and
+  // MarkdownRenderer/ReactMarkdown don't re-render the whole tutorial tree.
+  const markdownComponents: Partial<MarkdownLeafComponents> = useMemo(
+    () => ({
+      RedisCode: Code,
+      RedisUpload: RedisUploadButton,
+      ExternalLink: TutorialExternalLink,
+      CloudLink,
+      RedisInsightLink,
+      Image,
+    }),
+    [],
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const { instanceId = '' } = useParams<{ instanceId: string }>()
-  const { source } = useSelector(appContextCapability)
-  const { free = false } = useSelector(connectedInstanceCDSelector) ?? {}
+  const { source } = useAppSelector(appContextCapability)
+  const { free = false } = useAppSelector(connectedInstanceCDSelector) ?? {}
   const [showCapabilityPopover, setShowCapabilityPopover] = useState(false)
   const tutorialCapability = getTutorialCapability(source!)
 
@@ -148,21 +182,6 @@ const InternalPage = (props: Props) => {
     }
   }, [isLoading, location])
 
-  const contentComponent = useMemo(
-    () => (
-      // @ts-ignore
-      <JsxParser
-        bindings={{ path }}
-        components={components}
-        blacklistedTags={['iframe', 'script']}
-        autoCloseVoidElements
-        jsx={content}
-        onError={(e) => console.error(e)}
-      />
-    ),
-    [content],
-  )
-
   return (
     <div className={styles.container} data-test-subj="internal-page">
       <div className={styles.header}>
@@ -222,7 +241,11 @@ const InternalPage = (props: Props) => {
           />
         )}
         {!isLoading && error && <EmptyPrompt />}
-        {!isLoading && !error && contentComponent}
+        {!isLoading && !error && (
+          <MarkdownRenderer path={path} components={markdownComponents}>
+            {content ?? ''}
+          </MarkdownRenderer>
+        )}
       </div>
       {!!pagination?.length && (
         <>

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import {
@@ -16,19 +16,21 @@ import { SCAN_COUNT_DEFAULT } from 'uiSrc/constants/api'
 import { SortOrder } from 'uiSrc/constants'
 import { selectedKeyDataSelector } from 'uiSrc/slices/browser/keys'
 import Tabs, { TabInfo } from 'uiSrc/components/base/layout/tabs'
-import { ConsumerGroupDto } from 'apiSrc/modules/browser/stream/dto'
+import { useTranslation } from 'uiSrc/i18n'
+import { ConsumerGroupDto } from 'apiClient'
 
 const StreamTabs = () => {
-  const { viewType } = useSelector(streamSelector)
-  const { name: key } = useSelector(selectedKeyDataSelector) ?? { name: '' }
+  const { t } = useTranslation()
+  const { viewType } = useAppSelector(streamSelector)
+  const { name: key } = useAppSelector(selectedKeyDataSelector) ?? { name: '' }
   const { nameString: selectedGroupName = '' } =
-    useSelector(selectedGroupSelector) ?? {}
+    useAppSelector(selectedGroupSelector) ?? {}
   const { nameString: selectedConsumerName = '' } =
-    useSelector(selectedConsumerSelector) ?? {}
+    useAppSelector(selectedConsumerSelector) ?? {}
 
   const { instanceId } = useParams<{ instanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const onSuccessLoadedConsumerGroups = (data: ConsumerGroupDto[]) => {
     sendEventTelemetry({
@@ -56,12 +58,12 @@ const StreamTabs = () => {
     const baseTabs: TabInfo[] = [
       {
         value: StreamViewType.Data,
-        label: 'Stream Data',
+        label: t('browser.stream.tabs.data'),
         content: null,
       },
       {
         value: StreamViewType.Groups,
-        label: 'Consumer Groups',
+        label: t('browser.stream.tabs.groups'),
         content: null,
       },
     ]
@@ -87,7 +89,7 @@ const StreamTabs = () => {
     }
 
     return baseTabs
-  }, [viewType, selectedGroupName, selectedConsumerName])
+  }, [viewType, selectedGroupName, selectedConsumerName, t])
 
   return (
     <Tabs

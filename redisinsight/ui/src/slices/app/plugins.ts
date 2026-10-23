@@ -1,4 +1,5 @@
 import { flatMap, isEmpty, reject } from 'lodash'
+import { AxiosError } from 'axios'
 import { createSlice } from '@reduxjs/toolkit'
 
 import {
@@ -15,10 +16,9 @@ import {
   PluginsResponse,
   StateAppPlugins,
 } from 'uiSrc/slices/interfaces'
-import { SendCommandResponse } from 'apiSrc/modules/cli/dto/cli.dto'
-import { PluginState } from 'apiSrc/modules/workbench/models/plugin-state'
 
 import { AppDispatch, RootState } from '../store'
+import { SendCommandResponse, PluginState } from 'apiClient'
 
 export const initialState: StateAppPlugins = {
   loading: false,
@@ -94,7 +94,7 @@ export function loadPluginsAction() {
         dispatch(getAllPluginsSuccess(data))
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
+      const errorMessage = getApiErrorMessage(error as AxiosError)
       dispatch(getAllPluginsFailure(errorMessage))
     }
   }

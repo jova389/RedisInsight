@@ -12,7 +12,9 @@ import { ReplyError } from 'src/models';
 import { CommandExecutionStatus } from 'src/modules/cli/dto/cli.dto';
 import { CommandParsingError } from 'src/modules/cli/constants/errors';
 import { CommandsService } from 'src/modules/commands/commands.service';
+import { Environment } from 'src/modules/database/entities/database.entity';
 import { WorkbenchAnalytics } from './workbench.analytics';
+import { CommandExecutionType } from './models/command-execution';
 
 const redisReplyError: ReplyError = {
   ...mockRedisWrongTypeError,
@@ -81,10 +83,16 @@ describe('WorkbenchAnalytics', () => {
   });
 
   describe('sendIndexInfoEvent', () => {
-    it('should emit index info event', async () => {
-      service.sendIndexInfoEvent(mockSessionMetadata, instanceId, {
-        any: 'fields',
-      });
+    it('should emit index info event for Workbench commands', async () => {
+      await service.sendIndexInfoEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        {
+          any: 'fields',
+          environment: Environment.Unspecified,
+        },
+      );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
         mockSessionMetadata,
@@ -92,25 +100,57 @@ describe('WorkbenchAnalytics', () => {
         {
           databaseId: instanceId,
           any: 'fields',
+          environment: Environment.Unspecified,
+        },
+      );
+    });
+    it('should emit index info event for Search commands', async () => {
+      await service.sendIndexInfoEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Search,
+        {
+          any: 'fields',
+          environment: Environment.Unspecified,
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.SearchIndexInfoSubmitted,
+        {
+          databaseId: instanceId,
+          any: 'fields',
+          environment: Environment.Unspecified,
         },
       );
     });
     it('should not fail and should not emit when no data to send', async () => {
-      service.sendIndexInfoEvent(mockSessionMetadata, instanceId, null);
+      await service.sendIndexInfoEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        null,
+      );
 
       expect(sendEventMethod).not.toHaveBeenCalled();
     });
   });
   describe('sendCommandExecutedEvents', () => {
-    it('should emit multiple events', async () => {
+    it('should emit multiple Workbench events', async () => {
       await service.sendCommandExecutedEvents(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         [
           { response: 'OK', status: CommandExecutionStatus.Success },
           { response: 'OK', status: CommandExecutionStatus.Success },
         ],
-        { command: 'set' },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledTimes(2);
@@ -123,6 +163,39 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Core,
           moduleName: 'n/a',
           capability: 'string',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+    });
+    it('should emit multiple Search events', async () => {
+      await service.sendCommandExecutedEvents(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Search,
+        [
+          { response: 'OK', status: CommandExecutionStatus.Success },
+          { response: 'OK', status: CommandExecutionStatus.Success },
+        ],
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledTimes(2);
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.SearchCommandExecuted,
+        {
+          databaseId: instanceId,
+          command: 'set',
+          commandType: CommandType.Core,
+          moduleName: 'n/a',
+          capability: 'string',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -132,8 +205,13 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         { response: 'OK', status: CommandExecutionStatus.Success },
-        { command: 'set' },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -145,6 +223,8 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Core,
           moduleName: 'n/a',
           capability: 'string',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -156,8 +236,13 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         { response: 'OK', status: CommandExecutionStatus.Success },
-        { command: 'set' },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -166,6 +251,8 @@ describe('WorkbenchAnalytics', () => {
         {
           databaseId: instanceId,
           command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -173,8 +260,13 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         { response: 'OK', status: CommandExecutionStatus.Success },
-        { command: 'bF.rEsErvE' },
+        {
+          command: 'bF.rEsErvE',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -186,6 +278,8 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Module,
           moduleName: 'redisbloom',
           capability: 'bf',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -193,8 +287,13 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         { response: 'OK', status: CommandExecutionStatus.Success },
-        { command: 'CUSTOM.COMMAnd' },
+        {
+          command: 'CUSTOM.COMMAnd',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -206,6 +305,8 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Module,
           moduleName: 'custommodule',
           capability: 'n/a',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -213,8 +314,13 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         { response: 'OK', status: CommandExecutionStatus.Success },
-        { command: 'some.command' },
+        {
+          command: 'some.command',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -226,20 +332,30 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Module,
           moduleName: 'custom',
           capability: 'n/a',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
     it('should emit WorkbenchCommandExecuted event without additional data', async () => {
-      await service.sendCommandExecutedEvent(mockSessionMetadata, instanceId, {
-        response: 'OK',
-        status: CommandExecutionStatus.Success,
-      });
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        {
+          response: 'OK',
+          status: CommandExecutionStatus.Success,
+        },
+        { environment: Environment.Unspecified, isDangerous: 'false' },
+      );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
         mockSessionMetadata,
         TelemetryEvents.WorkbenchCommandExecuted,
         {
           databaseId: instanceId,
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
@@ -247,12 +363,17 @@ describe('WorkbenchAnalytics', () => {
       await service.sendCommandExecutedEvent(
         mockSessionMetadata,
         instanceId,
+        CommandExecutionType.Workbench,
         {
           response: 'Error',
           error: redisReplyError,
           status: CommandExecutionStatus.Fail,
         },
-        { command: 'set', data: 'Some data' },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
@@ -265,16 +386,23 @@ describe('WorkbenchAnalytics', () => {
           commandType: CommandType.Core,
           moduleName: 'n/a',
           capability: 'string',
-          data: 'Some data',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
     it('should emit WorkbenchCommandError event without additional data', async () => {
-      await service.sendCommandExecutedEvent(mockSessionMetadata, instanceId, {
-        response: 'Error',
-        error: redisReplyError,
-        status: CommandExecutionStatus.Fail,
-      });
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        {
+          response: 'Error',
+          error: redisReplyError,
+          status: CommandExecutionStatus.Fail,
+        },
+        { environment: Environment.Unspecified, isDangerous: 'false' },
+      );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
         mockSessionMetadata,
@@ -283,16 +411,24 @@ describe('WorkbenchAnalytics', () => {
           databaseId: instanceId,
           error: ReplyError.name,
           command: 'sadd',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
     it('should emit WorkbenchCommandError event for custom error', async () => {
       const error: any = CommandParsingError;
-      await service.sendCommandExecutedEvent(mockSessionMetadata, instanceId, {
-        response: 'Error',
-        status: CommandExecutionStatus.Fail,
-        error,
-      });
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        {
+          response: 'Error',
+          status: CommandExecutionStatus.Fail,
+          error,
+        },
+        { environment: Environment.Unspecified, isDangerous: 'false' },
+      );
 
       expect(sendEventMethod).toHaveBeenCalledWith(
         mockSessionMetadata,
@@ -301,25 +437,138 @@ describe('WorkbenchAnalytics', () => {
           databaseId: instanceId,
           error: CommandParsingError.name,
           command: undefined,
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
         },
       );
     });
     it('should emit WorkbenchCommandError event for HttpException', async () => {
       const error = new ServiceUnavailableException();
-      await service.sendCommandExecutedEvent(mockSessionMetadata, instanceId, {
-        response: 'Error',
-        status: CommandExecutionStatus.Fail,
-        error,
-      });
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        {
+          response: 'Error',
+          status: CommandExecutionStatus.Fail,
+          error,
+        },
+        { environment: Environment.Unspecified, isDangerous: 'false' },
+      );
 
       expect(sendFailedEventMethod).toHaveBeenCalledWith(
         mockSessionMetadata,
         TelemetryEvents.WorkbenchCommandErrorReceived,
         error,
-        { databaseId: instanceId },
+        {
+          databaseId: instanceId,
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+    });
+    it('should emit SearchCommandExecuted event', async () => {
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Search,
+        { response: 'OK', status: CommandExecutionStatus.Success },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.SearchCommandExecuted,
+        {
+          databaseId: instanceId,
+          command: 'set',
+          commandType: CommandType.Core,
+          moduleName: 'n/a',
+          capability: 'string',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+    });
+    it('should emit SearchCommandError event', async () => {
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Search,
+        {
+          response: 'Error',
+          error: redisReplyError,
+          status: CommandExecutionStatus.Fail,
+        },
+        {
+          command: 'set',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.SearchCommandErrorReceived,
+        {
+          databaseId: instanceId,
+          error: ReplyError.name,
+          command: 'set',
+          commandType: CommandType.Core,
+          moduleName: 'n/a',
+          capability: 'string',
+          environment: Environment.Unspecified,
+          isDangerous: 'false',
+        },
       );
     });
   });
+  describe('environment and isDangerous flag enrichment', () => {
+    it('should emit environment=production when database is marked production', async () => {
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        { response: 'OK', status: CommandExecutionStatus.Success },
+        {
+          command: 'set',
+          environment: Environment.Production,
+          isDangerous: 'false',
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.WorkbenchCommandExecuted,
+        expect.objectContaining({ environment: Environment.Production }),
+      );
+    });
+
+    it('should emit isDangerous=true when caller marks the command as dangerous', async () => {
+      await service.sendCommandExecutedEvent(
+        mockSessionMetadata,
+        instanceId,
+        CommandExecutionType.Workbench,
+        { response: 'OK', status: CommandExecutionStatus.Success },
+        {
+          command: 'flushdb',
+          environment: Environment.Unspecified,
+          isDangerous: 'true',
+        },
+      );
+
+      expect(sendEventMethod).toHaveBeenCalledWith(
+        mockSessionMetadata,
+        TelemetryEvents.WorkbenchCommandExecuted,
+        expect.objectContaining({ isDangerous: 'true' }),
+      );
+    });
+  });
+
   describe('sendCommandDeletedEvent', () => {
     it('should emit WorkbenchCommandDeleted event', () => {
       service.sendCommandDeletedEvent(mockSessionMetadata, instanceId, {

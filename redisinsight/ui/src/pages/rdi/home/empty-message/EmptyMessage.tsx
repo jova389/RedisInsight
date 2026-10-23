@@ -1,23 +1,17 @@
 import React, { useContext } from 'react'
 
-import { EXTERNAL_LINKS, UTM_MEDIUMS } from 'uiSrc/constants/links'
-import { getUtmExternalLink } from 'uiSrc/utils/links'
 import EmptyListDarkIcon from 'uiSrc/assets/img/rdi/empty_list_dark.svg'
 import EmptyListLightIcon from 'uiSrc/assets/img/rdi/empty_list_light.svg'
 import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import { Theme } from 'uiSrc/constants'
 
-import { Text } from 'uiSrc/components/base/text'
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Text, Title } from 'uiSrc/components/base/text'
+import { Col, FlexItem } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { Link } from 'uiSrc/components/base/link/Link'
 import { RiImage } from 'uiSrc/components/base/display'
-import styles from './styles.module.scss'
-
-const subTitleText =
-  "Redis Data Integration (RDI) synchronizes data from your existing database into Redis in near-real-time. We've done the heavy lifting so you can turn slow data into fast data without coding."
+import { EmptyPageContainer } from 'uiSrc/pages/rdi/home/empty-message/styles'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   onAddInstanceClick: () => void
@@ -25,44 +19,39 @@ export interface Props {
 
 const EmptyMessage = ({ onAddInstanceClick }: Props) => {
   const { theme } = useContext(ThemeContext)
+  const { t } = useTranslation()
   return (
-    <div
-      className={styles.noResultsContainer}
-      data-testid="empty-rdi-instance-list"
-    >
-      <Spacer size="xl" />
-      <Text className={styles.title}>Redis Data Integration</Text>
-      <RiImage
-        src={theme === Theme.Dark ? EmptyListDarkIcon : EmptyListLightIcon}
-        className={styles.icon}
-        alt="empty"
-      />
-      <Text className={styles.subTitle}>{subTitleText}</Text>
-      <Row align="center" gap="m" responsive style={{ lineHeight: '20px' }}>
-        <FlexItem grow>
+    <EmptyPageContainer grow>
+      <Col data-testid="empty-rdi-instance-list" align="center" gap="xxl">
+        <Spacer size="space400" />
+        <FlexItem>
+          <Col align="center" gap="m">
+            <Title color="primary">{t('rdi.home.empty.title')}</Title>
+            <FlexItem>
+              <Col align="center">
+                <Text color="primary">{t('rdi.home.empty.description')}</Text>
+              </Col>
+            </FlexItem>
+          </Col>
+        </FlexItem>
+        <FlexItem>
           <PrimaryButton
             data-testid="empty-rdi-instance-button"
-            size="small"
+            size="l"
             onClick={onAddInstanceClick}
           >
-            + Add RDI Endpoint
+            {t('rdi.home.empty.button')}
           </PrimaryButton>
         </FlexItem>
-        or
-        <FlexItem grow>
-          <Link
-            data-testid="empty-rdi-quickstart-button"
-            target="_blank"
-            href={getUtmExternalLink(EXTERNAL_LINKS.rdiQuickStart, {
-              medium: UTM_MEDIUMS.Rdi,
-              campaign: 'rdi_list',
-            })}
-          >
-            RDI Quickstart <RiIcon type="ArrowDiagonalIcon" />
-          </Link>
+        <Spacer size="space600" />
+        <FlexItem>
+          <RiImage
+            src={theme === Theme.Dark ? EmptyListDarkIcon : EmptyListLightIcon}
+            alt="empty"
+          />
         </FlexItem>
-      </Row>
-    </div>
+      </Col>
+    </EmptyPageContainer>
   )
 }
 

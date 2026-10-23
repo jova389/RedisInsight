@@ -1,4 +1,4 @@
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
 import { useParams } from 'react-router-dom'
@@ -28,9 +28,12 @@ import {
 } from 'uiSrc/components/base/forms/buttons'
 import { PlayFilledIcon, ContractsIcon } from 'uiSrc/components/base/icons'
 import { Text } from 'uiSrc/components/base/text'
-import { RiPopover } from 'uiSrc/components/base'
+import { RiPopover, RiTooltip } from 'uiSrc/components/base'
 import { Link } from 'uiSrc/components/base/link/Link'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { Environment } from 'apiClient'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -39,13 +42,16 @@ export interface Props {
 }
 
 const RedisUploadButton = ({ label, path }: Props) => {
-  const { pathsInProgress } = useSelector(customTutorialsBulkUploadSelector)
+  const { t } = useTranslation()
+  const { pathsInProgress } = useAppSelector(customTutorialsBulkUploadSelector)
 
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId } = useParams<{ instanceId: string }>()
+  const { environment } = useDatabaseEnvironment()
+  const isProduction = environment === Environment.Production
 
   const urlToFile = getPathToResource(path)
 
@@ -118,18 +124,28 @@ const RedisUploadButton = ({ label, path }: Props) => {
         anchorClassName={styles.popoverAnchor}
         panelPaddingSize="none"
         button={
-          <SecondaryButton
-            loading={isLoading}
-            iconSide="right"
-            icon={ContractsIcon}
-            size="s"
-            className={styles.button}
-            onClick={openPopover}
-            color="secondary"
-            data-testid="upload-data-bulk-btn"
+          <RiTooltip
+            content={
+              isProduction
+                ? t('workbench.codeButton.productionDisabledTooltip')
+                : undefined
+            }
+            data-testid="upload-data-bulk-btn-tooltip"
           >
-            {truncateText(label, 86)}
-          </SecondaryButton>
+            <SecondaryButton
+              loading={isLoading}
+              disabled={isProduction}
+              iconSide="right"
+              icon={ContractsIcon}
+              size="s"
+              className={styles.button}
+              onClick={openPopover}
+              color="secondary"
+              data-testid="upload-data-bulk-btn"
+            >
+              {truncateText(label, 86)}
+            </SecondaryButton>
+          </RiTooltip>
         }
       >
         {instanceId ? (
@@ -140,13 +156,11 @@ const RedisUploadButton = ({ label, path }: Props) => {
           >
             <RiIcon type="ToastDangerIcon" className={styles.popoverIcon} />
             <div className={cx(styles.popoverItem, styles.popoverItemTitle)}>
-              Execute commands in bulk
+              {t('workbench.redisUpload.title')}
             </div>
             <Spacer size="s" />
             <div className={styles.popoverItem}>
-              All commands from the file in your tutorial will be automatically
-              executed against your database. Avoid executing them in production
-              databases.
+              {t('workbench.redisUpload.body')}
             </div>
             <Spacer size="m" />
             <div className={styles.popoverActions}>
@@ -155,7 +169,7 @@ const RedisUploadButton = ({ label, path }: Props) => {
                 className={styles.link}
                 data-testid="download-redis-upload-file"
               >
-                Download file
+                {t('workbench.redisUpload.downloadFile')}
               </Link>
               <PrimaryButton
                 size="s"
@@ -165,7 +179,7 @@ const RedisUploadButton = ({ label, path }: Props) => {
                 onClick={uploadData}
                 data-testid="upload-data-bulk-apply-btn"
               >
-                Execute
+                {t('common.button.execute')}
               </PrimaryButton>
             </div>
           </Text>

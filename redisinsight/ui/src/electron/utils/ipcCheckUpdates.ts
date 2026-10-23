@@ -1,12 +1,32 @@
 import { Dispatch } from 'react'
 import { omit } from 'lodash'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import { ReleaseNotesSource } from 'uiSrc/constants/telemetry'
+import { ReleaseNotesSource, WhatsNewSource } from 'uiSrc/constants/telemetry'
 import { setElectronInfo, setReleaseNotesViewed } from 'uiSrc/slices/app/info'
 import { addMessageNotification } from 'uiSrc/slices/app/notifications'
+import { openWhatsNew } from 'uiSrc/slices/app/whatsNew'
+import { isWhatsNewEligible } from 'uiSrc/utils'
+import { localStorageService } from 'uiSrc/services'
+import { BrowserStorageItem } from 'uiSrc/constants'
 import successMessages from 'uiSrc/components/notifications/success-messages'
-import { GetServerInfoResponse } from 'apiSrc/modules/server/dto/server.dto'
-import { ElectronStorageItem, IpcInvokeEvent } from '../constants'
+import { GetServerInfoResponse } from 'apiClient'
+import {
+  AppUpdateStrategy,
+  ElectronStorageItem,
+  IpcInvokeEvent,
+} from '../constants'
+
+/**
+ * Whether the What's New modal should replace the update toast for the just
+ * installed version. Flag-gated cards render as "Coming soon", so no card
+ * visibility check is needed.
+ */
+const shouldOpenWhatsNew = (version: string): boolean => {
+  const lastVersionSeen =
+    localStorageService?.get(BrowserStorageItem.whatsNewLastVersionSeen) ?? null
+
+  return isWhatsNewEligible(version, lastVersionSeen)
+}
 
 export const ipcCheckUpdates = async (
   serverInfo: GetServerInfoResponse,
@@ -26,7 +46,19 @@ export const ipcCheckUpdates = async (
   )
 
   if (isUpdateDownloaded && !isUpdateAvailable) {
-    if (serverInfo.appVersion === updateDownloadedVersion) {
+    if (
+      serverInfo.appVersion === updateDownloadedVersion &&
+      shouldOpenWhatsNew(updateDownloadedVersion)
+    ) {
+      dispatch(openWhatsNew(updateDownloadedVersion))
+      sendEventTelemetry({
+        event: TelemetryEvent.WHATS_NEW_OPENED,
+        eventData: {
+          source: WhatsNewSource.autoUpdate,
+          version: updateDownloadedVersion,
+        },
+      })
+    } else if (serverInfo.appVersion === updateDownloadedVersion) {
       dispatch(
         addMessageNotification(
           successMessages.INSTALLED_NEW_UPDATE(updateDownloadedVersion, () => {
@@ -78,12 +110,17 @@ export const ipcSendEvents = async (serverInfo: GetServerInfoResponse) => {
       IpcInvokeEvent.getStoreValue,
       ElectronStorageItem.updatePreviousVersion,
     )
+    const strategy = await window.app.ipc.invoke(
+      IpcInvokeEvent.getStoreValue,
+      ElectronStorageItem.updateDownloadedStrategy,
+    )
     sendEventTelemetry({
       event: TelemetryEvent.APPLICATION_UPDATED,
       eventData: {
         ...omit(serverInfo, ['id', 'createDateTime']),
         fromVersion: prevVer,
         toVersion: newVer,
+        strategy: strategy ?? AppUpdateStrategy.auto,
       },
     })
     await window.app.ipc.invoke(

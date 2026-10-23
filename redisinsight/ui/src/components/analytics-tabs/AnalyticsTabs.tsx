@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams, useHistory } from 'react-router-dom'
 
 import { Pages } from 'uiSrc/constants'
@@ -20,16 +20,18 @@ import { useConnectionType } from 'uiSrc/components/hooks/useConnectionType'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import Tabs, { TabInfo } from 'uiSrc/components/base/layout/tabs'
 import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 
 const AnalyticsTabs = () => {
-  const { viewTab } = useSelector(analyticsSettingsSelector)
+  const { t } = useTranslation()
+  const { viewTab } = useAppSelector(analyticsSettingsSelector)
   const connectionType = useConnectionType()
-  const { currentStep } = useSelector(appFeatureOnboardingSelector)
+  const { currentStep } = useAppSelector(appFeatureOnboardingSelector)
   const history = useHistory()
 
   const { instanceId } = useParams<{ instanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (
@@ -46,7 +48,7 @@ const AnalyticsTabs = () => {
         value: AnalyticsViewTab.DatabaseAnalysis,
         content: null,
         label: renderOnboardingTourWithChild(
-          <Text>Database Analysis</Text>,
+          <Text>{t('analytics.nav.databaseAnalysis')}</Text>,
           {
             options: ONBOARDING_FEATURES?.ANALYTICS_DATABASE_ANALYSIS,
             anchorPosition: 'downLeft',
@@ -59,7 +61,7 @@ const AnalyticsTabs = () => {
         value: AnalyticsViewTab.SlowLog,
         content: null,
         label: renderOnboardingTourWithChild(
-          <Text>Slow Log</Text>,
+          <Text>{t('analytics.nav.slowLog')}</Text>,
           {
             options: ONBOARDING_FEATURES?.ANALYTICS_SLOW_LOG,
             anchorPosition: 'downLeft',
@@ -75,7 +77,7 @@ const AnalyticsTabs = () => {
         value: AnalyticsViewTab.ClusterDetails,
         content: null,
         label: renderOnboardingTourWithChild(
-          <Text>Overview</Text>,
+          <Text>{t('analytics.nav.overview')}</Text>,
           {
             options: ONBOARDING_FEATURES?.ANALYTICS_OVERVIEW,
             anchorPosition: 'downLeft',
@@ -87,7 +89,7 @@ const AnalyticsTabs = () => {
     }
 
     return visibleTabs
-  }, [viewTab, connectionType])
+  }, [t, viewTab, connectionType])
 
   const handleTabChange = (id: string) => {
     if (viewTab === id) return

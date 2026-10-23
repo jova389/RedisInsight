@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { SearchInput } from 'uiSrc/components/base/inputs'
 import { RdiInstance } from 'uiSrc/slices/interfaces'
@@ -9,11 +9,13 @@ import {
 } from 'uiSrc/slices/rdi/instances'
 import { TelemetryEvent, sendEventTelemetry } from 'uiSrc/telemetry'
 import { lastConnectionFormat } from 'uiSrc/utils'
+import { useTranslation } from 'uiSrc/i18n'
 
 const SearchRdiList = () => {
-  const { data: instances } = useSelector(instancesSelector)
+  const { t } = useTranslation()
+  const { data: instances } = useAppSelector(instancesSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const onQueryChange = (term: string) => {
     const value = term?.toLowerCase()
@@ -41,9 +43,9 @@ const SearchRdiList = () => {
 
   return (
     <SearchInput
-      placeholder="Endpoint List Search"
+      placeholder={t('rdi.home.search.placeholder')}
       onChange={onQueryChange}
-      aria-label="Search rdi instance list"
+      aria-label={t('rdi.home.search.ariaLabel')}
       data-testid="search-rdi-instance-list"
     />
   )

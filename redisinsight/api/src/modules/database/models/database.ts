@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Expose, Transform, Type } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 import config from 'src/utils/config';
 import { CaCertificate } from 'src/modules/certificate/models/ca-certificate';
 import { ClientCertificate } from 'src/modules/certificate/models/client-certificate';
@@ -7,7 +7,9 @@ import {
   Compressor,
   ConnectionType,
   Encoding,
+  Environment,
   HostingProvider,
+  RedisConnectionFamily,
 } from 'src/modules/database/entities/database.entity';
 import {
   IsBoolean,
@@ -29,6 +31,7 @@ import { AdditionalRedisModule } from 'src/modules/database/models/additional.re
 import { SshOptions } from 'src/modules/ssh/models/ssh-options';
 import { CloudDatabaseDetails } from 'src/modules/cloud/database/models/cloud-database-details';
 import { Tag } from 'src/modules/tag/models/tag';
+import { AzureProviderDetails } from './provider-details';
 
 const CONNECTIONS_CONFIG = config.get('connections');
 
@@ -120,6 +123,8 @@ export class Database {
     description: 'Connection Type',
     default: ConnectionType.STANDALONE,
     enum: ConnectionType,
+
+    enumName: 'ConnectionType',
   })
   @Expose()
   @IsEnum(ConnectionType)
@@ -142,16 +147,16 @@ export class Database {
   @IsString()
   provider?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Time of the last connection to the database.',
-    type: String,
+    type: Date,
     format: 'date-time',
     example: '2021-01-06T12:44:39.000Z',
   })
   @Expose()
   lastConnection?: Date;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Date of creation',
     type: Date,
   })
@@ -283,9 +288,22 @@ export class Database {
   cloudDetails?: CloudDatabaseDetails;
 
   @ApiPropertyOptional({
+    description: 'Provider-specific metadata',
+    type: AzureProviderDetails,
+  })
+  @Expose()
+  @IsOptional()
+  @IsNotEmptyObject()
+  @Type(() => AzureProviderDetails)
+  @ValidateNested()
+  providerDetails?: AzureProviderDetails;
+
+  @ApiPropertyOptional({
     description: 'Database compressor',
     default: Compressor.NONE,
     enum: Compressor,
+
+    enumName: 'Compressor',
   })
   @Expose()
   @IsEnum(Compressor, {
@@ -300,6 +318,8 @@ export class Database {
     description: 'Key name format',
     default: Encoding.UNICODE,
     enum: Encoding,
+
+    enumName: 'Encoding',
   })
   @Expose()
   @IsEnum(Encoding, {
@@ -349,4 +369,36 @@ export class Database {
   @IsBoolean()
   @IsOptional()
   isPreSetup?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Environment classification for the database connection. Controls confirmation friction for risky operations.',
+    default: Environment.Unspecified,
+    enum: Environment,
+    enumName: 'Environment',
+  })
+  @Expose()
+  @IsEnum(Environment, {
+    message: `environment must be a valid enum value. Valid values: ${Object.values(
+      Environment,
+    )}.`,
+  })
+  @IsOptional()
+  environment?: Environment = Environment.Unspecified;
+
+  @ApiPropertyOptional({
+    description:
+      'IP protocol family to use when connecting. "auto" resolves both IPv4 and IPv6 (dual-stack), "ipv4" forces IPv4, "ipv6" forces IPv6.',
+    default: RedisConnectionFamily.Auto,
+    enum: RedisConnectionFamily,
+    enumName: 'RedisConnectionFamily',
+  })
+  @Expose()
+  @IsEnum(RedisConnectionFamily, {
+    message: `connectionFamily must be a valid enum value. Valid values: ${Object.values(
+      RedisConnectionFamily,
+    )}.`,
+  })
+  @IsOptional()
+  connectionFamily?: RedisConnectionFamily = RedisConnectionFamily.Auto;
 }

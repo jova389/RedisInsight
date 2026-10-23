@@ -46,6 +46,7 @@ import {
   setPipelineJobs,
 } from 'uiSrc/slices/rdi/pipeline'
 import { resetOutput } from 'uiSrc/slices/cli/cli-output'
+import { setConnectivityError } from 'uiSrc/slices/app/connectivity'
 import { SearchMode } from '../interfaces/keys'
 import {
   AppWorkspace,
@@ -68,6 +69,7 @@ export const initialState: StateAppContext = {
     slowLogDurationUnit: DEFAULT_SLOWLOG_DURATION_UNIT,
     showHiddenRecommendations: DEFAULT_SHOW_HIDDEN_RECOMMENDATIONS,
     shownColumns: DEFAULT_SHOWN_COLUMNS,
+    treeViewDelimiterPrefixLength: 0,
   },
   dbIndex: {
     disabled: false,
@@ -177,6 +179,8 @@ const appContextSlice = createSlice({
         payload?.showHiddenRecommendations
       state.dbConfig.shownColumns =
         payload?.shownColumns ?? DEFAULT_SHOWN_COLUMNS
+      state.dbConfig.treeViewDelimiterPrefixLength =
+        payload?.treeViewDelimiterPrefixLength ?? 0
     },
     setSlowLogUnits: (state, { payload }) => {
       state.dbConfig.slowLogDurationUnit = payload
@@ -194,6 +198,14 @@ const appContextSlice = createSlice({
       setDBConfigStorageField(
         state.contextInstanceId,
         BrowserStorageItem.treeViewDelimiter,
+        payload,
+      )
+    },
+    setBrowserTreePrefixLength: (state, { payload }: { payload: number }) => {
+      state.dbConfig.treeViewDelimiterPrefixLength = payload
+      setDBConfigStorageField(
+        state.contextInstanceId,
+        BrowserStorageItem.treeViewPrefixLength,
         payload,
       )
     },
@@ -373,6 +385,7 @@ export const {
   setBrowserPanelSizes,
   setBrowserTreeNodesOpen,
   setBrowserTreeDelimiter,
+  setBrowserTreePrefixLength,
   resetBrowserTree,
   setWorkbenchScript,
   setWorkbenchVerticalPanelSizes,
@@ -448,6 +461,7 @@ export function resetDatabaseContext() {
     dispatch(setRedisearchInitialState())
     dispatch(setInitialRecommendationsState())
     dispatch(clearExpertChatHistory())
+    dispatch(setConnectivityError(null))
     setTimeout(() => {
       dispatch(resetOutput())
     }, 0)

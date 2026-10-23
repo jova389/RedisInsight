@@ -36,11 +36,14 @@ export class ImportDatabaseDto extends PickType(Database, [
   'ssh',
   'sshOptions',
   'provider',
+  'providerDetails',
   'compressor',
   'modules',
   'tlsServername',
   'forceStandalone',
   'tags',
+  'environment',
+  'connectionFamily',
 ] as const) {
   @Expose()
   @IsNotEmpty()

@@ -30,7 +30,6 @@ import { FeatureServerEvents } from 'src/modules/feature/constants';
 import { KeyEncryptionStrategy } from 'src/modules/encryption/strategies/key-encryption.strategy';
 import { DatabaseDiscoveryService } from 'src/modules/database-discovery/database-discovery.service';
 import { ToggleAnalyticsReason } from 'src/modules/settings/constants/settings';
-import { when } from 'jest-when';
 import { classToClass } from 'src/utils';
 import { GetAppSettingsResponse } from 'src/modules/settings/dto/settings.dto';
 import { EncryptionService } from 'src/modules/encryption/encryption.service';
@@ -49,7 +48,6 @@ describe('SettingsService', () => {
   let settingsRepository: MockType<SettingsRepository>;
   let analyticsService: SettingsAnalytics;
   let keytarStrategy: MockType<KeytarEncryptionStrategy>;
-  let encryptionService: MockType<EncryptionService>;
   let eventEmitter: EventEmitter2;
 
   beforeEach(async () => {
@@ -102,7 +100,6 @@ describe('SettingsService', () => {
     analyticsService = module.get(SettingsAnalytics);
     service = module.get(SettingsService);
     eventEmitter = module.get(EventEmitter2);
-    encryptionService = module.get(EncryptionService);
   });
 
   describe('getAppSettings', () => {
@@ -114,6 +111,7 @@ describe('SettingsService', () => {
 
       expect(result).toEqual({
         theme: null,
+        language: null,
         scanThreshold: REDIS_SCAN_CONFIG.scanThreshold,
         batchSize: WORKBENCH_CONFIG.countBatch,
         dateFormat: null,
@@ -133,6 +131,7 @@ describe('SettingsService', () => {
 
       expect(result).toEqual({
         ...mockSettings.data,
+        language: null,
         acceptTermsAndConditionsOverwritten: false,
         agreements: {
           version: mockAgreements.version,
@@ -154,10 +153,11 @@ describe('SettingsService', () => {
       // Create a custom instance of the service with an override method
       const customService = {
         // Preserve the same data structure expected from the method
-        getAppSettings: async () => classToClass(GetAppSettingsResponse, {
-          ...mockSettings.data,
-          agreements: preselectedAgreements,
-        }),
+        getAppSettings: async () =>
+          classToClass(GetAppSettingsResponse, {
+            ...mockSettings.data,
+            agreements: preselectedAgreements,
+          }),
       };
 
       // Call the customized method

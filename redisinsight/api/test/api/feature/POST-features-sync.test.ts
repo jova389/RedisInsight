@@ -19,11 +19,10 @@ const endpoint = () => request(server).post('/features/sync');
 const mainCheckFn = getMainCheckFn(endpoint);
 
 let featureConfigRepository;
-let featureRepository;
 describe('POST /features/sync', () => {
   before(async () => {
     featureConfigRepository = await getRepository(repositories.FEATURES_CONFIG);
-    featureRepository = await getRepository(repositories.FEATURE);
+    await getRepository(repositories.FEATURE);
   });
 
   [
@@ -35,7 +34,7 @@ describe('POST /features/sync', () => {
           .remove(constants.TEST_FEATURE_FLAG_REMOTE_CONFIG_PATH)
           .catch(console.error);
         // remove all configs
-        await featureConfigRepository.delete({});
+        await featureConfigRepository.deleteAll();
 
         const [config] = await featureConfigRepository.find();
         expect(config).to.eq(undefined);
@@ -55,15 +54,12 @@ describe('POST /features/sync', () => {
         await fsExtra
           .remove(constants.TEST_FEATURE_FLAG_REMOTE_CONFIG_PATH)
           .catch(console.error);
-        await featureConfigRepository.update(
-          {},
-          {
-            data: JSON.stringify({
-              ...defaultConfig,
-              version: defaultConfig.version - 0.1,
-            }),
-          },
-        );
+        await featureConfigRepository.updateAll({
+          data: JSON.stringify({
+            ...defaultConfig,
+            version: defaultConfig.version - 0.1,
+          }),
+        });
 
         const [config, empty] = await featureConfigRepository.find();
 
@@ -98,7 +94,7 @@ describe('POST /features/sync', () => {
           .catch(console.error);
 
         // remove all configs
-        await featureConfigRepository.delete({});
+        await featureConfigRepository.deleteAll();
 
         const [config] = await featureConfigRepository.find();
 
@@ -134,15 +130,12 @@ describe('POST /features/sync', () => {
           )
           .catch(console.error);
         // remove all configs
-        await featureConfigRepository.update(
-          {},
-          {
-            data: JSON.stringify({
-              ...defaultConfig,
-              version: defaultConfig.version - 0.1,
-            }),
-          },
-        );
+        await featureConfigRepository.updateAll({
+          data: JSON.stringify({
+            ...defaultConfig,
+            version: defaultConfig.version - 0.1,
+          }),
+        });
 
         const [config, empty] = await featureConfigRepository.find();
 

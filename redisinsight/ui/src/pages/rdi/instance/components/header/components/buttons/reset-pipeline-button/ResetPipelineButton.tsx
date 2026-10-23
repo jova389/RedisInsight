@@ -1,10 +1,11 @@
 import React from 'react'
 
-import { RiResetIcon } from 'uiSrc/components/base/icons'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import { SecondaryButton } from 'uiSrc/components/base/forms/buttons'
 import { RiTooltip } from 'uiSrc/components'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from '../styles.module.scss'
+import { Button, TextButton } from '@redis-ui/components'
+import { ResetIcon } from '@redis-ui/icons'
 
 export interface PipelineButtonProps {
   onClick: () => void
@@ -16,37 +17,33 @@ const ResetPipelineButton = ({
   onClick,
   disabled,
   loading,
-}: PipelineButtonProps) => (
-  <RiTooltip
-    content={
-      !(disabled || loading) ? (
-        <>
-          <p>
-            The pipeline will take a new snapshot of the data and process it,
-            then continue tracking changes.
-          </p>
-          <Spacer size="m" />
-          <p>
-            Before resetting the RDI pipeline, consider stopping the pipeline
-            and flushing the target Redis database.
-          </p>
-        </>
-      ) : null
-    }
-    anchorClassName={disabled || loading ? styles.disabled : styles.tooltip}
-  >
-    <SecondaryButton
-      aria-label="Reset pipeline button"
-      size="s"
-      icon={RiResetIcon}
-      data-testid="reset-pipeline-btn"
-      onClick={onClick}
-      disabled={disabled}
-      loading={loading}
+}: PipelineButtonProps) => {
+  const { t } = useTranslation()
+
+  return (
+    <RiTooltip
+      content={
+        !(disabled || loading) ? (
+          <>
+            <p>{t('rdi.instance.reset.tooltipLine1')}</p>
+            <Spacer size="m" />
+            <p>{t('rdi.instance.reset.tooltipLine2')}</p>
+          </>
+        ) : null
+      }
+      anchorClassName={disabled || loading ? styles.disabled : styles.tooltip}
     >
-      Reset Pipeline
-    </SecondaryButton>
-  </RiTooltip>
-)
+      <TextButton
+        aria-label={t('rdi.instance.reset.ariaLabel')}
+        data-testid="reset-pipeline-btn"
+        onClick={onClick}
+        disabled={disabled}
+      >
+        <Button.Icon icon={ResetIcon} />
+        {t('rdi.instance.reset.button')}
+      </TextButton>
+    </RiTooltip>
+  )
+}
 
 export default ResetPipelineButton

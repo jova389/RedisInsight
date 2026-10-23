@@ -1,15 +1,11 @@
-import { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useContext, useEffect } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useLocation } from 'react-router-dom'
 import { isNumber } from 'lodash'
-import { BrowserStorageItem, FeatureFlags, Theme } from 'uiSrc/constants'
+import { BrowserStorageItem, FeatureFlags } from 'uiSrc/constants'
 import { BuildType } from 'uiSrc/constants/env'
 import { BUILD_FEATURES } from 'uiSrc/constants/featuresHighlighting'
-import {
-  localStorageService,
-  setObjectStorage,
-  themeService,
-} from 'uiSrc/services'
+import { localStorageService, setObjectStorage } from 'uiSrc/services'
 
 import {
   appFeatureFlagsFeaturesSelector,
@@ -38,25 +34,29 @@ import { fetchCustomTutorials } from 'uiSrc/slices/workbench/wb-custom-tutorials
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
 import { fetchContentRecommendations } from 'uiSrc/slices/recommendations/recommendations'
 import { fetchGuideLinksAction } from 'uiSrc/slices/content/guide-links'
-import { setCapability } from 'uiSrc/slices/app/context'
+import { setCapability, setDbConfig } from 'uiSrc/slices/app/context'
 
 import { fetchProfile } from 'uiSrc/slices/oauth/cloud'
 import { fetchDBSettings } from 'uiSrc/slices/app/db-settings'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { DatabaseSettingsData } from 'uiSrc/slices/interfaces'
+import { ThemeContext } from 'uiSrc/contexts/themeContext'
+import i18n from 'uiSrc/i18n'
 
 const SETTINGS_PAGE_PATH = '/settings'
 const Config = () => {
-  const serverInfo = useSelector(appServerInfoSelector)
-  const { id } = useSelector(connectedInstanceSelector)
-  const { config, spec } = useSelector(userSettingsSelector)
+  const serverInfo = useAppSelector(appServerInfoSelector)
+  const { id } = useAppSelector(connectedInstanceSelector)
+  const { config, spec } = useAppSelector(userSettingsSelector)
   const {
     [FeatureFlags.cloudSso]: cloudSsoFeature,
     [FeatureFlags.envDependent]: envDependentFeature,
-  } = useSelector(appFeatureFlagsFeaturesSelector)
+    [FeatureFlags.customTutorials]: customTutorialsFeature,
+  } = useAppSelector(appFeatureFlagsFeaturesSelector)
+  const { changeTheme } = useContext(ThemeContext)
   const { pathname } = useLocation()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   useEffect(() => {
     dispatch(
       setCapability(localStorageService?.get(BrowserStorageItem.capability)),
@@ -64,7 +64,9 @@ const Config = () => {
     if (envDependentFeature?.flag) {
       dispatch(fetchServerInfo())
       dispatch(fetchNotificationsAction())
-      dispatch(fetchCustomTutorials())
+      if (customTutorialsFeature?.flag) {
+        dispatch(fetchCustomTutorials())
+      }
     } else {
       dispatch(setServerLoaded())
     }
@@ -101,6 +103,8 @@ const Config = () => {
               BrowserStorageItem.dbConfig + payload.id,
               payload.data,
             )
+            // Update Redux state with the fetched config
+            dispatch(setDbConfig(payload.data))
           },
         ),
       )
@@ -110,6 +114,7 @@ const Config = () => {
   useEffect(() => {
     if (config) {
       checkAndSetTheme()
+      checkAndSetLanguage()
     }
   }, [config])
 
@@ -203,7 +208,9 @@ const Config = () => {
     const appliedConsents = config?.agreements
     dispatch(
       setSettingsPopupState(
-        config?.acceptTermsAndConditionsOverwritten ? false : isDifferentConsentsExists(specConsents, appliedConsents),
+        config?.acceptTermsAndConditionsOverwritten
+          ? false
+          : isDifferentConsentsExists(specConsents, appliedConsents),
       ),
     )
   }
@@ -211,7 +218,14 @@ const Config = () => {
   const checkAndSetTheme = () => {
     const theme = config?.theme
     if (theme && localStorageService.get(BrowserStorageItem.theme) !== theme)
-      themeService.applyTheme(theme as Theme)
+      changeTheme(theme)
+  }
+
+  const checkAndSetLanguage = () => {
+    const language = config?.language
+    if (language && i18n.language !== language) {
+      i18n.changeLanguage(language)
+    }
   }
 
   return null

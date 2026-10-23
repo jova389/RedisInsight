@@ -6,11 +6,10 @@ import { Spacer } from 'uiSrc/components/base/layout/spacer'
 
 import { Text } from 'uiSrc/components/base/text'
 import { SwitchInput } from 'uiSrc/components/base/inputs'
+import { useTranslation } from 'uiSrc/i18n'
 
 import { ItemDescription } from './components'
 import { IConsent } from '../ConsentsSettings'
-
-import styles from '../styles.module.scss'
 
 interface Props {
   consent: IConsent
@@ -29,14 +28,30 @@ const ConsentOption = (props: Props) => {
     withoutSpacer = false,
   } = props
 
+  const { t } = useTranslation()
+
+  // Localize the backend-supplied copy by its stable agreement code, falling
+  // back to the English text shipped in the spec (mirrors the error-code i18n).
+  const label = consent.code
+    ? t(`api.agreement.${consent.code}.label` as never, {
+        defaultValue: consent.label,
+      })
+    : consent.label
+  const description =
+    consent.code && consent.description
+      ? t(`api.agreement.${consent.code}.description` as never, {
+          defaultValue: consent.description,
+        })
+      : consent.description
+
   return (
     <FlexItem key={consent.agreementName} grow>
-      {isSettingsPage && consent.description && (
+      {isSettingsPage && description && (
         <>
           <Spacer size="s" />
-          <Text size="s" className={styles.smallText} color="primary">
+          <Text size="M" color="primary">
             <ItemDescription
-              description={consent.description}
+              description={description}
               withLink={consent.linkToPrivacyPolicy}
             />
           </Text>
@@ -45,7 +60,7 @@ const ConsentOption = (props: Props) => {
       )}
       <Row gap="m">
         <FlexItem>
-          <Spacer size="xxs" />
+          <Spacer size="xs" />
           <SwitchInput
             checked={checked}
             onCheckedChange={(checked) =>
@@ -56,13 +71,15 @@ const ConsentOption = (props: Props) => {
           />
         </FlexItem>
         <FlexItem>
-          <Text className={styles.smallText}>{parse(consent.label)}</Text>
-          {!isSettingsPage && consent.description && (
+          <Text size="M" color="primary">
+            {parse(label)}
+          </Text>
+          {!isSettingsPage && description && (
             <>
-              <Spacer size="s" />
-              <Text size="s" className={styles.smallText} color="primary">
+              <Spacer size="xs" />
+              <Text size="s" color="secondary">
                 <ItemDescription
-                  description={consent.description}
+                  description={description}
                   withLink={consent.linkToPrivacyPolicy}
                 />
               </Text>

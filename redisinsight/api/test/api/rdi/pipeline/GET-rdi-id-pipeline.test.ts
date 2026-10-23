@@ -47,8 +47,8 @@ const expectedPipeline: RdiPipeline = Object.assign(new RdiPipeline(), {
     sources: { psql: {} },
   },
   jobs: {
-    [job1.name]: (({ name, ...job }) => job)(job1),
-    [job2.name]: (({ name, ...job }) => job)(job2),
+    [job1.name]: (({ name: _name, ...job }) => job)(job1),
+    [job2.name]: (({ name: _name, ...job }) => job)(job2),
   },
 });
 
@@ -111,6 +111,7 @@ describe('GET /rdi/:id/pipeline/', () => {
           errorCode: 11402,
           message: 'Unauthorized',
           statusCode: 401,
+          resource: { detail: 'Unauthorized' },
         });
       },
       before: async () => {

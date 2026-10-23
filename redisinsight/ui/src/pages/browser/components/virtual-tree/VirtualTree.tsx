@@ -1,64 +1,41 @@
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import AutoSizer from 'react-virtualized-auto-sizer'
 import { debounce, get, set } from 'lodash'
 import { TreeWalker, TreeWalkerValue, FixedSizeTree as Tree } from 'react-vtree'
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 
-import { bufferToString, Maybe, Nullable } from 'uiSrc/utils'
+import { bufferToString, Nullable } from 'uiSrc/utils'
+import { splitWithPrefixThreshold } from 'uiSrc/helpers'
 import { useDisposableWebworker } from 'uiSrc/services'
-import { IKeyPropTypes } from 'uiSrc/constants/prop-types/keys'
-import {
-  DEFAULT_TREE_SORTING,
-  KeyTypes,
-  ModulesKeyTypes,
-  SortOrder,
-} from 'uiSrc/constants'
-import { RedisResponseBuffer, RedisString } from 'uiSrc/slices/interfaces'
+import { DEFAULT_TREE_SORTING, KeyTypes } from 'uiSrc/constants'
+import { RedisString } from 'uiSrc/slices/interfaces'
 import { fetchKeysMetadataTree } from 'uiSrc/slices/browser/keys'
-import { Loader, ProgressBarLoader, RiImage } from 'uiSrc/components/base/display'
+import {
+  Loader,
+  ProgressBarLoader,
+  RiImage,
+} from 'uiSrc/components/base/display'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { GetKeyInfoResponse } from 'apiSrc/modules/browser/keys/dto'
+import { GetKeyInfoResponse } from 'apiClient'
 
 import { Node } from './components/Node'
-import { NodeMeta, TreeData, TreeNode } from './interfaces'
+import {
+  NodeMeta,
+  TreeData,
+  TreeNode,
+  VirtualTreeProps,
+} from './VirtualTree.types'
 
 import styles from './styles.module.scss'
 
-export interface Props {
-  items: IKeyPropTypes[]
-  delimiterPattern: string
-  delimiters: string[]
-  loadingIcon?: string
-  loading: boolean
-  deleting: boolean
-  sorting: Maybe<SortOrder>
-  commonFilterType: Nullable<KeyTypes>
-  statusSelected: Nullable<string>
-  statusOpen: OpenedNodes
-  webworkerFn: (...args: any) => any
-  onStatusOpen?: (name: string, value: boolean) => void
-  onStatusSelected?: (key: RedisString) => void
-  setConstructingTree: (status: boolean) => void
-  onDeleteLeaf: (key: RedisResponseBuffer) => void
-  onDeleteClicked: (type: KeyTypes | ModulesKeyTypes) => void
-}
-
-interface OpenedNodes {
-  [key: string]: boolean
-}
-
 export const KEYS = 'keys'
 
-const VirtualTree = (props: Props) => {
+const VirtualTree = (props: VirtualTreeProps) => {
   const {
     items,
     delimiterPattern,
     delimiters,
+    prefixLength = 0,
     loadingIcon = 'empty',
     statusOpen = {},
     statusSelected,
@@ -69,9 +46,14 @@ const VirtualTree = (props: Props) => {
     onStatusOpen,
     onStatusSelected,
     setConstructingTree,
-    webworkerFn = () => { },
+    webworkerFn = () => {},
     onDeleteClicked,
     onDeleteLeaf,
+    onDeleteFolder,
+    visibleColumns,
+    showFolderMetadata,
+    showDeleteAction,
+    showSelectedIndicator,
   } = props
 
   const [rerenderState, rerender] = useState({})
@@ -81,7 +63,7 @@ const VirtualTree = (props: Props) => {
 
   const { result, run: runWebworker } = useDisposableWebworker(webworkerFn)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(
     () => () => {
@@ -110,13 +92,25 @@ const VirtualTree = (props: Props) => {
       nodes.current = []
       elements.current = {}
       rerender({})
-      runWebworker?.({ items: [], delimiterPattern, delimiters, sorting })
+      runWebworker?.({
+        items: [],
+        delimiterPattern,
+        delimiters,
+        sorting,
+        prefixLength,
+      })
       return
     }
 
     setConstructingTree(true)
-    runWebworker?.({ items, delimiterPattern, delimiters, sorting })
-  }, [items, delimiterPattern])
+    runWebworker?.({
+      items,
+      delimiterPattern,
+      delimiters,
+      sorting,
+      prefixLength,
+    })
+  }, [items, delimiterPattern, prefixLength])
 
   const handleUpdateSelected = useCallback(
     (name: RedisString) => {
@@ -198,37 +192,49 @@ const VirtualTree = (props: Props) => {
   const getNodeData = (
     node: TreeNode,
     nestingLevel: number,
-  ): TreeWalkerValue<TreeData, NodeMeta> => ({
-    data: {
-      id: node.id.toString(),
-      isLeaf: node.isLeaf,
-      keyCount: node.keyCount,
-      name: node.name,
-      nameString: node.nameString,
-      nameBuffer: node.nameBuffer,
-      ttl: node.ttl,
-      size: node.size,
-      type: node.type,
-      fullName: node.fullName,
-      shortName: node.nameString
-        ?.split(new RegExp(delimiterPattern, 'g'))
-        .pop(),
-      delimiters,
+  ): TreeWalkerValue<TreeData, NodeMeta> => {
+    return {
+      data: {
+        id: node.id.toString(),
+        isLeaf: node.isLeaf,
+        keyCount: node.keyCount,
+        name: node.name,
+        nameString: node.nameString,
+        nameBuffer: node.nameBuffer,
+        ttl: node.ttl,
+        size: node.size,
+        type: node.type,
+        fullName: node.fullName,
+        shortName:
+          node.nameString != null
+            ? splitWithPrefixThreshold(
+                node.nameString,
+                delimiterPattern,
+                prefixLength,
+              ).pop()
+            : undefined,
+        delimiters,
+        nestingLevel,
+        deleting,
+        path: node.path,
+        getMetadata: getMetadataNode,
+        onDeleteClicked,
+        updateStatusSelected: handleUpdateSelected,
+        updateStatusOpen: handleUpdateOpen,
+        onDelete: onDeleteLeaf,
+        onDeleteFolder,
+        keyApproximate: node.keyApproximate,
+        isSelected: !!node.isLeaf && statusSelected === node?.nameString,
+        isOpenByDefault: statusOpen[node.fullName],
+        visibleColumns,
+        showFolderMetadata,
+        showDeleteAction,
+        showSelectedIndicator,
+      },
       nestingLevel,
-      deleting,
-      path: node.path,
-      getMetadata: getMetadataNode,
-      onDeleteClicked,
-      updateStatusSelected: handleUpdateSelected,
-      updateStatusOpen: handleUpdateOpen,
-      onDelete: onDeleteLeaf,
-      keyApproximate: node.keyApproximate,
-      isSelected: !!node.isLeaf && statusSelected === node?.nameString,
-      isOpenByDefault: statusOpen[node.fullName],
-    },
-    nestingLevel,
-    node,
-  })
+      node,
+    }
+  }
 
   const openSingleFolderNode = useCallback(
     (treeNodes?: TreeNode[]) => {
@@ -266,12 +272,12 @@ const VirtualTree = (props: Props) => {
         }
       }
     },
-    [statusSelected, statusOpen, rerenderState],
+    [statusSelected, statusOpen, rerenderState, visibleColumns, prefixLength],
   )
 
   return (
     <AutoSizer>
-      {({ height, width }) => (
+      {({ height, width }: { height: number; width: number }) => (
         <div data-testid="virtual-tree" style={{ position: 'relative' }}>
           {nodes.current.length > 0 && (
             <>
@@ -279,7 +285,8 @@ const VirtualTree = (props: Props) => {
                 <ProgressBarLoader
                   color="primary"
                   data-testid="progress-key-tree"
-                  style={{ width }}
+                  absolute
+                  style={{ width, zIndex: 1 }}
                 />
               )}
               <Tree
@@ -301,10 +308,7 @@ const VirtualTree = (props: Props) => {
               data-testid="virtual-tree-spinner"
             >
               <div className={styles.loadingBody}>
-                <Loader
-                  size="xl"
-                  className={styles.loadingSpinner}
-                />
+                <Loader size="xl" className={styles.loadingSpinner} />
                 {loadingIcon ? (
                   <RiImage
                     className={styles.loadingIcon}

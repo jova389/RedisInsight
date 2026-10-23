@@ -1,8 +1,7 @@
 import React from 'react'
-import cx from 'classnames'
 import { differenceInDays } from 'date-fns'
 
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { getTutorialCapability, Maybe } from 'uiSrc/utils'
 
 import { appContextCapability } from 'uiSrc/slices/app/context'
@@ -13,13 +12,15 @@ import {
   TelemetryEvent,
 } from 'uiSrc/telemetry'
 import { RiTooltip } from 'uiSrc/components'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { Indicator } from 'uiSrc/components/base/text/text.styles'
+import { Col } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
 import {
-  CHECK_CLOUD_DATABASE,
-  WARNING_WITH_CAPABILITY,
-  WARNING_WITHOUT_CAPABILITY,
+  CheckCloudDatabase,
+  WarningWithCapability,
+  WarningWithoutCapability,
 } from './texts'
-import styles from './styles.module.scss'
+import { IconWrapper, InfoIcon } from './DbStatus.styles'
 
 export interface Props {
   id: string
@@ -46,9 +47,10 @@ const LAST_CONNECTION_SM = 3
 const LAST_CONNECTION_L = 16
 
 const DbStatus = (props: Props) => {
+  const { t } = useTranslation()
   const { id, lastConnection, createdAt, isNew, isFree } = props
 
-  const { source } = useSelector(appContextCapability)
+  const { source } = useAppSelector(appContextCapability)
   const capability = getTutorialCapability(source!)
   const isCapabilityNotShown = Boolean(isShowCapabilityTutorialPopover(isFree))
   let daysDiff = 0
@@ -75,27 +77,27 @@ const DbStatus = (props: Props) => {
         />
       }
       position="right"
-      className={styles.tooltip}
-      anchorClassName={cx(styles.statusAnchor, styles.warning)}
     >
-      <div
-        className={cx(styles.status, styles.warning)}
-        data-testid={`database-status-${type}-${id}`}
-      >
-        !
-      </div>
+      <IconWrapper data-testid={`database-status-${type}-${id}`}>
+        <InfoIcon />
+      </IconWrapper>
     </RiTooltip>
   )
 
   if (isFree && daysDiff >= LAST_CONNECTION_L) {
-    return renderWarningTooltip(CHECK_CLOUD_DATABASE, 'checkIfDeleted')
+    return renderWarningTooltip(
+      <CheckCloudDatabase />,
+      WarningTypes.CheckIfDeleted,
+    )
   }
 
   if (isFree && daysDiff >= LAST_CONNECTION_SM) {
     return renderWarningTooltip(
-      isCapabilityNotShown && capability.name
-        ? WARNING_WITH_CAPABILITY(capability.name)
-        : WARNING_WITHOUT_CAPABILITY,
+      isCapabilityNotShown && capability.name ? (
+        <WarningWithCapability capability={capability.name} />
+      ) : (
+        <WarningWithoutCapability />
+      ),
       'tryDatabase',
     )
   }
@@ -103,14 +105,12 @@ const DbStatus = (props: Props) => {
   if (isNew) {
     return (
       <RiTooltip
-        content="New"
+        content={t('home.databaseList.dbStatus.tooltip.new')}
         position="top"
-        anchorClassName={cx(styles.statusAnchor)}
       >
-        <div
-          className={cx(styles.status, styles.new)}
-          data-testid={`database-status-new-${id}`}
-        />
+        <IconWrapper data-testid={`database-status-new-${id}`}>
+          <Indicator $color="var(--euiColorPrimary)" />
+        </IconWrapper>
       </RiTooltip>
     )
   }
@@ -133,12 +133,7 @@ const WarningTooltipContent = (props: WarningTooltipProps) => {
     },
   })
 
-  return (
-    <div className={styles.warningTooltipContent}>
-      <RiIcon type="AlarmIcon" customSize="50px" />
-      <div>{content}</div>
-    </div>
-  )
+  return <Col>{content}</Col>
 }
 
 export default DbStatus

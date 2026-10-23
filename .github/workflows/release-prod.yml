@@ -3,38 +3,18 @@ name: ❗ Release (prod)
 on:
   push:
     branches:
-      - 'latest'
+      - "latest"
 
 jobs:
-  tests-prod:
-    name: Run all tests
-    uses: ./.github/workflows/tests.yml
-    secrets: inherit
-    with:
-      group_tests: 'without_e2e'
-      short_rte_list: false
-      pre_release: true
-
+  # Tests run on the release PR (tests.yml), not here — the build is gated by
+  # that PR's run.
   builds-prod:
     name: Create all builds for release
     uses: ./.github/workflows/build.yml
-    needs: tests-prod
     secrets: inherit
     with:
-      environment: 'production'
-      target: 'all'
-
-  e2e-docker-tests:
-    name: E2E Docker tests
-    needs: builds-prod
-    uses: ./.github/workflows/tests-e2e-docker.yml
-    secrets: inherit
-
-  e2e-appimage-tests:
-    name: E2E AppImage tests
-    needs: builds-prod
-    uses: ./.github/workflows/tests-e2e-appimage.yml
-    secrets: inherit
+      environment: "production"
+      target: "all"
 
   virustotal-prod:
     name: Virustotal
@@ -56,14 +36,19 @@ jobs:
     needs: aws-upload-prod
     secrets: inherit
 
+  github-release:
+    name: Upload to GitHub Release
+    uses: ./.github/workflows/github-release-upload.yml
+    needs: aws-upload-prod
+
   # Remove artifacts from github actions
   remove-artifacts:
     name: Remove artifacts
-    needs: [aws-upload-prod, e2e-docker-tests, e2e-appimage-tests]
+    needs: [aws-upload-prod, github-release]
     if: always()
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Remove all artifacts
         uses: ./.github/actions/remove-artifacts

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams, useLocation } from 'react-router-dom'
 import { Pages } from 'uiSrc/constants'
 import {
@@ -11,8 +11,6 @@ import { useConnectionType } from 'uiSrc/components/hooks/useConnectionType'
 
 import AnalyticsPageRouter from './AnalyticsPageRouter'
 
-import styles from './styles.module.scss'
-
 export interface Props {
   routes: any[]
 }
@@ -22,10 +20,10 @@ const AnalyticsPage = ({ routes = [] }: Props) => {
   const { instanceId } = useParams<{ instanceId: string }>()
   const { pathname } = useLocation()
   const connectionType = useConnectionType()
-  const { lastViewedPage } = useSelector(appContextAnalytics)
+  const { lastViewedPage } = useAppSelector(appContextAnalytics)
   const pathnameRef = useRef<string>('')
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(
     () => () => {
@@ -67,11 +65,7 @@ const AnalyticsPage = ({ routes = [] }: Props) => {
       pathname === Pages.analytics(instanceId) ? '' : pathname
   }, [pathname])
 
-  return (
-    <div className={styles.main}>
-      <AnalyticsPageRouter routes={routes} />
-    </div>
-  )
+  return <AnalyticsPageRouter routes={routes} />
 }
 
 export default AnalyticsPage

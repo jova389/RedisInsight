@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import TemplateForm from 'uiSrc/pages/rdi/pipeline-management/components/template-form'
@@ -9,6 +9,7 @@ import { OutsideClickDetector } from 'uiSrc/components/base/utils'
 
 import { SecondaryButton } from 'uiSrc/components/base/forms/buttons'
 import { RiPopover } from 'uiSrc/components/base'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -21,6 +22,7 @@ export interface Props {
 }
 
 const TemplatePopover = (props: Props) => {
+  const { t } = useTranslation()
   const {
     isPopoverOpen,
     setIsPopoverOpen,
@@ -32,7 +34,7 @@ const TemplatePopover = (props: Props) => {
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleOpen = () => {
     dispatch(fetchPipelineStrategies(rdiInstanceId))
@@ -56,12 +58,12 @@ const TemplatePopover = (props: Props) => {
             inverted
             size="s"
             className={styles.btn}
-            aria-label="Insert template"
+            aria-label={t('rdi.pipeline.template.insertAria')}
             disabled={loading}
             onClick={handleOpen}
             data-testid={`template-trigger-${source}`}
           >
-            Insert template
+            {t('rdi.pipeline.template.insertButton')}
           </SecondaryButton>
         }
       >

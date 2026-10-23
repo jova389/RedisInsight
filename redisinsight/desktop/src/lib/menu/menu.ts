@@ -13,6 +13,8 @@ import {
   WindowType,
   windowFactory,
   electronStore,
+  shouldShowManualUpdateCheck,
+  triggerManualUpdateCheck,
 } from 'desktopSrc/lib'
 import { ElectronStorageItem } from 'uiSrc/electron/constants'
 
@@ -66,6 +68,16 @@ export class MenuBuilder {
           label: `About ${app.name}`,
           selector: 'orderFrontStandardAboutPanel:',
         },
+        ...(shouldShowManualUpdateCheck()
+          ? [
+              {
+                label: 'Check for Updates…',
+                click: () => {
+                  triggerManualUpdateCheck()
+                },
+              },
+            ]
+          : []),
         { type: 'separator' },
         {
           label: `Hide ${app.name}`,
@@ -216,7 +228,7 @@ export class MenuBuilder {
           label: 'Learn More',
           click() {
             shell.openExternal(
-              'https://redis.io/docs/ui/insight/?utm_source=redisinsight&utm_medium=main&utm_campaign=learn_more',
+              'https://redis.io/docs/latest/develop/tools/insight/?utm_source=redisinsight&utm_medium=main&utm_campaign=learn_more',
             )
           },
         },
@@ -339,10 +351,20 @@ export class MenuBuilder {
             label: 'Learn More',
             click() {
               shell.openExternal(
-                'https://redis.io/docs/ui/insight/?utm_source=redisinsight&utm_medium=main&utm_campaign=learn_more',
+                'https://redis.io/docs/latest/develop/tools/insight/?utm_source=redisinsight&utm_medium=main&utm_campaign=learn_more',
               )
             },
           },
+          ...(shouldShowManualUpdateCheck()
+            ? [
+                {
+                  label: 'Check for Updates…',
+                  click: () => {
+                    triggerManualUpdateCheck()
+                  },
+                },
+              ]
+            : []),
           { type: 'separator' },
           {
             label: `About ${app.name}`,

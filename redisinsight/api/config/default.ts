@@ -1,9 +1,27 @@
 import { join, posix } from 'path';
 import * as os from 'os';
+import { execSync } from 'child_process';
 import { trim } from 'lodash';
 import { version } from '../package.json';
 
 const homedir = join(__dirname, '..');
+
+const resolveBuildCommitSha = (): string | undefined => {
+  if (process.env.RI_APP_BUILD_COMMIT_SHA) {
+    return process.env.RI_APP_BUILD_COMMIT_SHA;
+  }
+  try {
+    return (
+      execSync('git rev-parse --short HEAD', {
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .toString()
+        .trim() || undefined
+    );
+  } catch {
+    return undefined;
+  }
+};
 
 const buildInfoFileName = 'build.json';
 const dataZipFileName = 'data.zip';
@@ -80,6 +98,7 @@ export default {
     env: process.env.NODE_ENV || 'development',
     host: process.env.RI_APP_HOST ?? '0.0.0.0',
     port: parseInt(process.env.RI_APP_PORT, 10) || 5540,
+    externalUrl: process.env.RI_EXTERNAL_URL, // External URL for OAuth callbacks when running behind proxy or custom port
     docPrefix: 'api/docs',
     globalPrefix: 'api',
     customPluginsUri,
@@ -107,11 +126,19 @@ export default {
       : true,
     buildType: process.env.RI_BUILD_TYPE || 'DOCKER_ON_PREMISE',
     appType: process.env.RI_APP_TYPE,
-    appVersion: process.env.RI_APP_VERSION || '2.72.0',
+    appVersion: process.env.RI_APP_VERSION || '3.8.0',
+    buildCommitSha: resolveBuildCommitSha(),
     requestTimeout: parseInt(process.env.RI_REQUEST_TIMEOUT, 10) || 25000,
     excludeRoutes: [],
     excludeAuthRoutes: [],
     databaseManagement: process.env.RI_DATABASE_MANAGEMENT !== 'false',
+    // Custom tutorials are deprecated (RED-194229) and disabled by default.
+    customTutorials: process.env.RI_CUSTOM_TUTORIALS_ENABLED === 'true',
+    maxPayloadSize: process.env.RI_MAX_PAYLOAD_SIZE || '512MB',
+    cors: {
+      origin: process.env.RI_CORS_ORIGIN ? process.env.RI_CORS_ORIGIN : '*',
+      credentials: process.env.RI_CORS_CREDENTIALS === 'true',
+    },
   },
   statics: {
     initDefaults: process.env.RI_STATICS_INIT_DEFAULTS

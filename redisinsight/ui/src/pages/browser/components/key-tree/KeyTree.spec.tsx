@@ -54,10 +54,11 @@ const propsMock = {
   loadMoreItems: jest.fn(),
   onDelete: jest.fn(),
   onAddKeyPanel: jest.fn(),
+  onBulkActionsPanel: jest.fn(),
 }
 
 const leafRootFullName = 'test'
-const folderFullName = 'car:'
+const folderFullName = 'car'
 const leaf1FullName = 'car:110'
 const leaf2FullName = 'car:210'
 

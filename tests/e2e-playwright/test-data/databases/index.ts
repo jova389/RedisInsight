@@ -1,0 +1,114 @@
+import { Factory } from 'fishery';
+import { faker } from '@faker-js/faker';
+import { redisConfig } from 'e2eSrc/config';
+import { AddDatabaseConfig, ConnectionType } from 'e2eSrc/types';
+
+/**
+ * Test database name prefix - used by cleanup to identify test databases
+ * IMPORTANT: All test database names MUST start with this prefix
+ */
+export const TEST_DB_PREFIX = 'test-';
+
+/**
+ * Standalone database configuration factory
+ */
+export const StandaloneConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standalone.host,
+  port: redisConfig.standalone.port,
+  name: `${TEST_DB_PREFIX}standalone-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Standalone V5 database configuration factory (no Search module)
+ */
+export const StandaloneV5ConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneV5.host,
+  port: redisConfig.standaloneV5.port,
+  name: `${TEST_DB_PREFIX}standalone-v5-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Standalone V7 database configuration factory
+ */
+export const StandaloneV7ConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneV7.host,
+  port: redisConfig.standaloneV7.port,
+  name: `${TEST_DB_PREFIX}standalone-v7-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Standalone V8 database configuration factory
+ */
+export const StandaloneV8ConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneV8.host,
+  port: redisConfig.standaloneV8.port,
+  name: `${TEST_DB_PREFIX}standalone-v8-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Standalone Redis 8.8.0 database configuration factory
+ */
+export const StandaloneV880ConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneV880.host,
+  port: redisConfig.standaloneV880.port,
+  name: `${TEST_DB_PREFIX}standalone-v8-8-0-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Cluster database configuration factory
+ */
+export const ClusterConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.cluster.host,
+  port: redisConfig.cluster.port,
+  name: `${TEST_DB_PREFIX}cluster-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Cluster database with cluster-announce-hostname configuration factory
+ */
+export const ClusterHostnameConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.clusterHostname.host,
+  port: redisConfig.clusterHostname.port,
+  name: `${TEST_DB_PREFIX}cluster-hostname-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Sentinel database configuration factory
+ */
+export const SentinelConfigFactory = Factory.define<AddDatabaseConfig & { masterName: string }>(() => ({
+  host: redisConfig.sentinel.host,
+  port: redisConfig.sentinel.port,
+  password: redisConfig.sentinel.password,
+  name: `${TEST_DB_PREFIX}sentinel-${faker.string.alphanumeric(8)}`,
+  masterName: redisConfig.sentinel.masterName,
+}));
+
+/**
+ * Standalone Empty database configuration factory
+ * Dedicated server (port 8105) for tests that need an isolated, empty Redis instance
+ */
+export const StandaloneEmptyConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneEmpty.host,
+  port: redisConfig.standaloneEmpty.port,
+  name: `${TEST_DB_PREFIX}standalone-empty-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Standalone Big database configuration factory
+ * Uses a pre-seeded large database (port 8103) for tests requiring many keys
+ */
+export const StandaloneBigConfigFactory = Factory.define<AddDatabaseConfig>(() => ({
+  host: redisConfig.standaloneBig.host,
+  port: redisConfig.standaloneBig.port,
+  name: `${TEST_DB_PREFIX}standalone-big-${faker.string.alphanumeric(8)}`,
+}));
+
+/**
+ * Database factories by connection type
+ */
+export const databaseFactories = {
+  [ConnectionType.Standalone]: StandaloneConfigFactory,
+  [ConnectionType.Cluster]: ClusterConfigFactory,
+  [ConnectionType.Sentinel]: SentinelConfigFactory,
+  [ConnectionType.StandaloneBig]: StandaloneBigConfigFactory,
+};

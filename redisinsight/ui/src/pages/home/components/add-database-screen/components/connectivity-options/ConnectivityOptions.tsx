@@ -1,98 +1,81 @@
-import React from 'react'
-import cx from 'classnames'
+import React, { useState } from 'react'
 
-import styled from 'styled-components'
 import { AddDbType } from 'uiSrc/pages/home/constants'
 import { FeatureFlagComponent, OAuthSsoHandlerDialog } from 'uiSrc/components'
+import { useAzureAuth } from 'uiSrc/components/hooks/useAzureAuth'
 import { getUtmExternalLink } from 'uiSrc/utils/links'
 import { EXTERNAL_LINKS, UTM_CAMPAINGS } from 'uiSrc/constants/links'
 import { FeatureFlags } from 'uiSrc/constants'
-import { OAuthSocialAction, OAuthSocialSource } from 'uiSrc/slices/interfaces'
-
-import CloudIcon from 'uiSrc/assets/img/oauth/cloud_centered.svg?react'
-import RocketIcon from 'uiSrc/assets/img/oauth/rocket.svg?react'
-
-import { Col, FlexItem, Grid } from 'uiSrc/components/base/layout/flex'
+import {
+  AzureLoginSource,
+  OAuthSocialAction,
+  OAuthSocialSource,
+} from 'uiSrc/slices/interfaces'
+import { Col, FlexItem, Grid, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
+import { Text } from 'uiSrc/components/base/text/Text'
+import { RiIcon } from 'uiSrc/components/base/icons'
+import { Loader } from 'uiSrc/components/base/display'
 import { SecondaryButton } from 'uiSrc/components/base/forms/buttons'
-import { Title } from 'uiSrc/components/base/text/Title'
-import { RiBadge } from 'uiSrc/components/base/display/badge/RiBadge'
+import { AzureSignInDialog } from 'uiSrc/components/azure-sign-in-dialog'
+import { useTranslation } from 'uiSrc/i18n'
+import { useConnectivityOptions } from '../../hooks/useConnectivityOptions'
 
-import { Link } from 'uiSrc/components/base/link/Link'
-import { CONNECTIVITY_OPTIONS } from '../../constants'
-
-import styles from './styles.module.scss'
+import {
+  StyledBadge,
+  StyledConnectivityLink,
+  StyledIcon,
+} from './ConnectivityOptions.styles'
 
 export interface Props {
   onClickOption: (type: AddDbType) => void
   onClose?: () => void
 }
 
-const NewCloudLink = styled(Link)`
-  min-width: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none !important;
-  & * {
-    text-decoration: none !important;
-  }
-  position: relative;
-  width: 100%;
-  height: 84px !important;
-  padding: 0 12px;
-  color: var(--buttonSecondaryTextColor) !important;
-  border: 1px solid ${({ theme }) => theme.semantic.color.border.primary500};
-  border-radius: 5px;
-  & .freeBadge {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-
-    text-transform: uppercase;
-    background-color: var(--euiColorLightestShade);
-    border: 1px solid var(--euiColorPrimary);
-    border-radius: 2px !important;
-  }
-
-  & .btnIcon {
-    margin-bottom: 8px;
-    width: 24px;
-    height: 24px;
-    fill: currentColor;
-  }
-`
-
 const ConnectivityOptions = (props: Props) => {
+  const { t } = useTranslation()
   const { onClickOption, onClose } = props
+  const [isAzureDialogOpen, setIsAzureDialogOpen] = useState(false)
+  const { initiateLogin, loading: azureLoading } = useAzureAuth()
+
+  const connectivityOptions = useConnectivityOptions({
+    onClickOption,
+    onRequestAzureSignIn: () => setIsAzureDialogOpen(true),
+  })
+
+  const handleAzureSignIn = (tenantId?: string) => {
+    setIsAzureDialogOpen(false)
+    initiateLogin(AzureLoginSource.Autodiscovery, tenantId)
+  }
+
+  const loadingOption = connectivityOptions.find(
+    (option) => option.loading && option.onCancel,
+  )
 
   return (
     <>
-      <section className={styles.cloudSection}>
-        <Title size="XS" className={styles.sectionTitle}>
-          Get started with Redis Cloud account
-        </Title>
+      <section>
+        <Text color="primary">{t('addDatabase.cloud.title')}</Text>
         <Spacer />
         <Grid gap="l" columns={3} responsive>
           <FlexItem>
-            <SecondaryButton
-              className={styles.typeBtn}
+            <StyledConnectivityLink
               onClick={() => onClickOption(AddDbType.cloud)}
               data-testid="discover-cloud-btn"
             >
-              <Col align="center">
-                <CloudIcon className={styles.btnIcon} />
-                Add databases
+              <Col align="center" gap="s">
+                <StyledIcon type="CloudIcon" size="xl" />
+                <Text color="primary">
+                  {t('addDatabase.cloud.addDatabases')}
+                </Text>
               </Col>
-            </SecondaryButton>
+            </StyledConnectivityLink>
           </FlexItem>
           <FeatureFlagComponent name={FeatureFlags.cloudAds}>
             <FlexItem>
               <OAuthSsoHandlerDialog>
                 {(ssoCloudHandlerClick, isSSOEnabled) => (
-                  <NewCloudLink
+                  <StyledConnectivityLink
                     data-testid="create-free-db-btn"
                     color="primary"
                     onClick={(e: React.MouseEvent) => {
@@ -107,41 +90,67 @@ const ConnectivityOptions = (props: Props) => {
                     })}
                     target="_blank"
                   >
-                    <RiBadge className="freeBadge" label="Free" />
-                    <Col align="center">
-                      <RocketIcon className="btnIcon" />
-                      New database
+                    <StyledBadge
+                      label={t('addDatabase.cloud.freeBadge')}
+                      variant="notice"
+                    />
+                    <Col align="center" gap="s">
+                      <StyledIcon type="RocketIcon" size="xl" />
+                      <Text color="primary">
+                        {t('addDatabase.cloud.newDatabase')}
+                      </Text>
                     </Col>
-                  </NewCloudLink>
+                  </StyledConnectivityLink>
                 )}
               </OAuthSsoHandlerDialog>
             </FlexItem>
           </FeatureFlagComponent>
-          <FlexItem grow />
         </Grid>
       </section>
       <Spacer size="xxl" />
       <section>
-        <Title size="XS" className={styles.sectionTitle}>
-          More connectivity options
-        </Title>
+        <Text color="primary">{t('addDatabase.moreOptions.title')}</Text>
         <Spacer />
-        <Grid gap="l" responsive columns={3}>
-          {CONNECTIVITY_OPTIONS.map(({ id, type, title, icon }) => (
-            <FlexItem key={id}>
-              <SecondaryButton
-                color="secondary"
-                className={cx(styles.typeBtn, styles.small)}
-                onClick={() => onClickOption(type)}
-                data-testid={`option-btn-${id}`}
+        <Grid gap="l" responsive columns={4}>
+          {connectivityOptions.map((option) => (
+            <FlexItem key={option.id}>
+              <StyledConnectivityLink
+                onClick={() => !option.loading && option.onClick()}
+                data-testid={`option-btn-${option.id}`}
               >
-                {icon?.({ className: styles.btnIcon })}
-                {title}
-              </SecondaryButton>
+                <Row gap="s" align="center" justify="center">
+                  {option.loading ? (
+                    <Loader size="xl" />
+                  ) : (
+                    <RiIcon type={option.icon} size="xl" />
+                  )}
+                  <Text color="primary">{t(option.title)}</Text>
+                </Row>
+              </StyledConnectivityLink>
             </FlexItem>
           ))}
         </Grid>
+        {loadingOption && (
+          <>
+            <Spacer size="m" />
+            <Row justify="center">
+              <SecondaryButton
+                size="s"
+                onClick={loadingOption.onCancel}
+                data-testid="cancel-azure-login-btn"
+              >
+                {t('addDatabase.button.cancel')}
+              </SecondaryButton>
+            </Row>
+          </>
+        )}
       </section>
+      <AzureSignInDialog
+        isOpen={isAzureDialogOpen}
+        loading={azureLoading}
+        onClose={() => setIsAzureDialogOpen(false)}
+        onSignIn={handleAzureSignIn}
+      />
     </>
   )
 }

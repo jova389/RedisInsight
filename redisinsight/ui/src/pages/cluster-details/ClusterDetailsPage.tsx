@@ -1,8 +1,8 @@
 import { orderBy } from 'lodash'
-import React, { useContext, useEffect, useState } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import React, { useContext, useEffect, useState, useMemo } from 'react'
+import { useAppSelector, useAppDispatch } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
-import { ClusterNodeDetails } from 'src/modules/cluster-monitor/models'
+import { ClusterNodeDetails } from 'apiClient'
 
 import { Theme } from 'uiSrc/constants'
 import { ThemeContext } from 'uiSrc/contexts/themeContext'
@@ -21,19 +21,19 @@ import {
   formatLongName,
   getDbIndex,
   getLetterByIndex,
-  Nullable,
   setTitle,
 } from 'uiSrc/utils'
 import { ColorScheme, getRGBColorByScheme, RGBColor } from 'uiSrc/utils/colors'
 
 import { ConnectionType } from 'uiSrc/slices/interfaces'
+import { useTranslation } from 'uiSrc/i18n'
 import {
   ClusterDetailsHeader,
   ClusterDetailsGraphics,
   ClusterNodesTable,
 } from './components'
 
-import styles from './styles.module.scss'
+import * as S from './ClusterDetailsPage.styles'
 
 export interface ModifiedClusterNodes extends ClusterNodeDetails {
   letter: string
@@ -44,24 +44,24 @@ export interface ModifiedClusterNodes extends ClusterNodeDetails {
 const POLLING_INTERVAL = 5_000
 
 const ClusterDetailsPage = () => {
+  const { t } = useTranslation()
   let interval: NodeJS.Timeout
   const { instanceId } = useParams<{ instanceId: string }>()
   const {
     db,
     name: connectedInstanceName,
     connectionType,
-  } = useSelector(connectedInstanceSelector)
-  const { viewTab } = useSelector(analyticsSettingsSelector)
-  const { loading, data } = useSelector(clusterDetailsSelector)
+  } = useAppSelector(connectedInstanceSelector)
+  const { viewTab } = useAppSelector(analyticsSettingsSelector)
+  const { loading, data } = useAppSelector(clusterDetailsSelector)
 
   const [isPageViewSent, setIsPageViewSent] = useState(false)
-  const [nodes, setNodes] = useState<Nullable<ModifiedClusterNodes[]>>(null)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { theme } = useContext(ThemeContext)
 
   const dbName = `${formatLongName(connectedInstanceName, 33, 0, '...')} ${getDbIndex(db)}`
-  setTitle(`${dbName} - Overview`)
+  setTitle(t('analytics.clusterDetails.pageTitle', { dbName }))
 
   const colorScheme: ColorScheme = {
     cHueStart: 180,
@@ -103,18 +103,20 @@ const ClusterDetailsPage = () => {
     return () => clearInterval(interval)
   }, [instanceId, loading])
 
-  useEffect(() => {
+  const nodes = useMemo(() => {
     if (data) {
       const nodes = orderBy(data.nodes, ['asc', 'host'])
       const shift = colorScheme.cHueRange / nodes.length
-      const modifiedNodes = nodes.map((d, index) => ({
+
+      return nodes.map((d, index) => ({
         ...d,
         letter: getLetterByIndex(index),
         index,
         color: getRGBColorByScheme(index, shift, colorScheme),
-      }))
-      setNodes(modifiedNodes)
+      })) as ModifiedClusterNodes[]
     }
+
+    return [] as ModifiedClusterNodes[]
   }, [data])
 
   useEffect(() => {
@@ -134,13 +136,11 @@ const ClusterDetailsPage = () => {
   }
 
   return (
-    <div className={styles.main} data-testid="cluster-details-page">
+    <S.ClusterDetailsPageWrapper as="div" data-testid="cluster-details-page">
       <ClusterDetailsHeader />
-      <div className={styles.wrapper}>
-        <ClusterDetailsGraphics nodes={nodes} loading={loading} />
-        <ClusterNodesTable nodes={nodes} loading={loading} />
-      </div>
-    </div>
+      <ClusterDetailsGraphics nodes={nodes} dataLoaded={!!data} />
+      <ClusterNodesTable nodes={nodes} dataLoaded={!!data} />
+    </S.ClusterDetailsPageWrapper>
   )
 }
 

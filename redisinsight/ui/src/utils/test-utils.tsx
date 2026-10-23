@@ -2,20 +2,24 @@
 import React from 'react'
 import { cloneDeep, first, map } from 'lodash'
 import { Provider } from 'react-redux'
-import thunk from 'redux-thunk'
+import { thunk } from 'redux-thunk'
 import { BrowserRouter } from 'react-router-dom'
-import configureMockStore from 'redux-mock-store'
+import configureMockStore, { MockStoreEnhanced } from 'redux-mock-store'
+import type { EnhancedStore } from '@reduxjs/toolkit'
 import {
   render as rtlRender,
   renderHook as rtlRenderHook,
   waitFor,
   screen,
+  within,
 } from '@testing-library/react'
 
 import { ThemeProvider } from 'styled-components'
-import { themeLight } from '@redis-ui/styles'
+import { theme } from '@redis-ui/styles'
+import { I18nextProvider } from 'react-i18next'
 import userEvent from '@testing-library/user-event'
-import type { RootState, ReduxStore } from 'uiSrc/slices/store'
+import i18n from 'uiSrc/i18n'
+import type { RootState } from 'uiSrc/slices/store'
 import { initialState as initialStateInstances } from 'uiSrc/slices/instances/instances'
 import { initialState as initialStateTags } from 'uiSrc/slices/instances/tags'
 import { initialState as initialStateCaCerts } from 'uiSrc/slices/instances/caCerts'
@@ -23,6 +27,7 @@ import { initialState as initialStateClientCerts } from 'uiSrc/slices/instances/
 import { initialState as initialStateCluster } from 'uiSrc/slices/instances/cluster'
 import { initialState as initialStateCloud } from 'uiSrc/slices/instances/cloud'
 import { initialState as initialStateSentinel } from 'uiSrc/slices/instances/sentinel'
+import { initialState as initialStateAzureInstances } from 'uiSrc/slices/instances/azure'
 import { initialState as initialStateKeys } from 'uiSrc/slices/browser/keys'
 import { initialState as initialStateString } from 'uiSrc/slices/browser/string'
 import { initialState as initialStateZSet } from 'uiSrc/slices/browser/zset'
@@ -31,6 +36,8 @@ import { initialState as initialStateHash } from 'uiSrc/slices/browser/hash'
 import { initialState as initialStateList } from 'uiSrc/slices/browser/list'
 import { initialState as initialStateRejson } from 'uiSrc/slices/browser/rejson'
 import { initialState as initialStateStream } from 'uiSrc/slices/browser/stream'
+import { initialState as initialStateVectorSet } from 'uiSrc/slices/browser/vectorSet'
+import { initialState as initialStateArray } from 'uiSrc/slices/browser/array'
 import { initialState as initialStateBulkActions } from 'uiSrc/slices/browser/bulkActions'
 import { initialState as initialStateNotifications } from 'uiSrc/slices/app/notifications'
 import { initialState as initialStateAppInfo } from 'uiSrc/slices/app/info'
@@ -39,6 +46,7 @@ import { initialState as initialStateAppRedisCommands } from 'uiSrc/slices/app/r
 import { initialState as initialStateAppPluginsReducer } from 'uiSrc/slices/app/plugins'
 import { initialState as initialStateAppSocketConnectionReducer } from 'uiSrc/slices/app/socket-connection'
 import { initialState as initialStateAppFeaturesReducer } from 'uiSrc/slices/app/features'
+import { initialState as initialStateAppWhatsNewReducer } from 'uiSrc/slices/app/whatsNew'
 import { initialState as initialStateAppUrlHandlingReducer } from 'uiSrc/slices/app/url-handling'
 import { initialState as initialStateAppCsrfReducer } from 'uiSrc/slices/app/csrf'
 import { initialState as initialStateCliSettings } from 'uiSrc/slices/cli/cli-settings'
@@ -60,6 +68,7 @@ import { initialState as initialStatePubSub } from 'uiSrc/slices/pubsub/pubsub'
 import { initialState as initialStateRedisearch } from 'uiSrc/slices/browser/redisearch'
 import { initialState as initialStateRecommendations } from 'uiSrc/slices/recommendations/recommendations'
 import { initialState as initialStateOAuth } from 'uiSrc/slices/oauth/cloud'
+import { initialState as initialStateAzureAuth } from 'uiSrc/slices/oauth/azure'
 import { initialState as initialStateSidePanels } from 'uiSrc/slices/panels/sidePanels'
 import { initialState as initialStateRdiPipeline } from 'uiSrc/slices/rdi/pipeline'
 import { initialState as initialStateRdi } from 'uiSrc/slices/rdi/instances'
@@ -77,7 +86,12 @@ import { setStoreRef } from './test-store'
 
 interface Options {
   initialState?: RootState
-  store?: ReduxStore
+  // `EnhancedStore<any>` covers both the production `ReduxStore` and any
+  // narrow `configureStore` produced inside a spec (e.g. vector-search
+  // specs that wire only the slices they read). `MockStoreEnhanced` is
+  // the separate branch because `redux-mock-store` doesn't extend
+  // `EnhancedStore`.
+  store?: EnhancedStore<any> | MockStoreEnhanced<RootState>
   withRouter?: boolean
   [property: string]: any
 }
@@ -92,6 +106,7 @@ const initialStateDefault: RootState = {
     plugins: cloneDeep(initialStateAppPluginsReducer),
     socketConnection: cloneDeep(initialStateAppSocketConnectionReducer),
     features: cloneDeep(initialStateAppFeaturesReducer),
+    whatsNew: cloneDeep(initialStateAppWhatsNewReducer),
     urlHandling: cloneDeep(initialStateAppUrlHandlingReducer),
     csrf: cloneDeep(initialStateAppCsrfReducer),
     init: cloneDeep(initialStateAppInit),
@@ -105,6 +120,7 @@ const initialStateDefault: RootState = {
     cluster: cloneDeep(initialStateCluster),
     cloud: cloneDeep(initialStateCloud),
     sentinel: cloneDeep(initialStateSentinel),
+    azure: cloneDeep(initialStateAzureInstances),
     tags: cloneDeep(initialStateTags),
   },
   browser: {
@@ -116,6 +132,8 @@ const initialStateDefault: RootState = {
     list: cloneDeep(initialStateList),
     rejson: cloneDeep(initialStateRejson),
     stream: cloneDeep(initialStateStream),
+    vectorSet: cloneDeep(initialStateVectorSet),
+    array: cloneDeep(initialStateArray),
     bulkActions: cloneDeep(initialStateBulkActions),
     redisearch: cloneDeep(initialStateRedisearch),
   },
@@ -150,6 +168,7 @@ const initialStateDefault: RootState = {
   pubsub: cloneDeep(initialStatePubSub),
   oauth: {
     cloud: cloneDeep(initialStateOAuth),
+    azure: cloneDeep(initialStateAzureAuth),
   },
   panels: {
     sidePanels: cloneDeep(initialStateSidePanels),
@@ -168,6 +187,11 @@ const initialStateDefault: RootState = {
 export const mockStore = configureMockStore<RootState>([thunk])
 export const mockedStore = mockStore(initialStateDefault)
 export const mockedStoreFn = () => mockStore(initialStateDefault)
+export const createMockedStore = () => {
+  const store = mockStore(initialStateDefault)
+  setStoreRef(store)
+  return store
+}
 
 // Set the mock store reference for the dynamic store wrapper
 // This ensures that store-dynamic works correctly in tests
@@ -177,7 +201,7 @@ setStoreRef(mockedStore)
 const render = (
   ui: JSX.Element,
   {
-    initialState,
+    initialState: _initialState,
     store = mockedStore,
     withRouter,
     ...renderOptions
@@ -188,9 +212,11 @@ const render = (
   }
 
   const Wrapper = ({ children }: { children: JSX.Element }) => (
-    <ThemeProvider theme={themeLight}>
-      <Provider store={store}>{children}</Provider>
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeProvider theme={theme}>
+        <Provider store={store}>{children}</Provider>
+      </ThemeProvider>
+    </I18nextProvider>
   )
 
   const wrapper = !withRouter ? Wrapper : BrowserRouter
@@ -198,10 +224,10 @@ const render = (
   return rtlRender(ui, { wrapper, ...renderOptions })
 }
 
-const renderHook = (
-  hook: (initialProps: unknown) => unknown,
+const renderHook = <T,>(
+  hook: (initialProps: unknown) => T,
   {
-    initialState,
+    initialState: _initialState,
     store = mockedStore,
     withRouter,
     ...renderOptions
@@ -212,7 +238,9 @@ const renderHook = (
   }
 
   const Wrapper = ({ children }: { children: JSX.Element }) => (
-    <Provider store={store}>{children}</Provider>
+    <I18nextProvider i18n={i18n}>
+      <Provider store={store}>{children}</Provider>
+    </I18nextProvider>
   )
 
   const wrapper = !withRouter ? Wrapper : BrowserRouter
@@ -231,11 +259,10 @@ const clearStoreActions = (actions: any[]) => {
   const newActions = map(actions, (action) => {
     const newAction = { ...action }
     if (newAction?.payload) {
-      const payload =
-        {
-          ...first<any>(newAction.payload),
-          key: '',
-        } || {}
+      const payload = {
+        ...first<any>(newAction.payload),
+        key: '',
+      }
       newAction.payload = [payload]
     }
     return newAction
@@ -303,8 +330,11 @@ export const waitForStack = async (timeout = 0) => {
 export const toggleAccordion = async (testId: string) => {
   const accordion = screen.getByTestId(testId)
   expect(accordion).toBeInTheDocument()
-  const btn = accordion.querySelector('button')
-  await userEvent.click(btn!)
+  // Find the collapse button by aria-label (RiAccordion renders ActionButton before CollapseButton)
+  const btn = within(accordion).getByLabelText(
+    /Expand Section|Collapse Section/,
+  )
+  await userEvent.click(btn)
 }
 
 // mock useHistory
@@ -375,6 +405,7 @@ jest.mock('uiSrc/utils/routing', () => ({
 export const localStorageMock = {
   getItem: jest.fn(),
   setItem: jest.fn(),
+  removeItem: jest.fn(),
   clear: jest.fn(),
 }
 Object.defineProperty(window, 'localStorage', { value: localStorageMock })
@@ -382,6 +413,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock })
 export const sessionStorageMock = {
   getItem: jest.fn(),
   setItem: jest.fn(),
+  removeItem: jest.fn(),
   clear: jest.fn(),
 }
 Object.defineProperty(window, 'sessionStorage', { value: sessionStorageMock })
@@ -389,7 +421,7 @@ Object.defineProperty(window, 'sessionStorage', { value: sessionStorageMock })
 const scrollIntoViewMock = jest.fn()
 window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock
 
-const matchMediaMock = () => ({
+const matchMediaMock = (_: any) => ({
   matches: false,
   addEventListener: jest.fn(),
   removeEventListener: jest.fn(),
@@ -402,6 +434,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 export const getMswResourceURL = (path: string = '') =>
   RESOURCES_BASE_URL.concat(path)
+
 export const getMswURL = (path: string = '') =>
   apiService.defaults.baseURL?.concat(
     path.startsWith('/') ? path.slice(1) : path,
@@ -441,6 +474,30 @@ export const mockFeatureFlags = (
     })
 }
 
+/**
+ * Helper function to check if expected actions are contained within actual store actions
+ * @param actualActions - The actual actions dispatched to the store
+ * @param expectedActions - The expected actions that should be present
+ */
+const expectActionsToContain = (
+  actualActions: any[],
+  expectedActions: any[],
+) => {
+  expect(actualActions).toEqual(expect.arrayContaining(expectedActions))
+}
+
+/**
+ * Helper function to check if actions are not contained within actual store actions
+ * @param actualActions - The actual actions dispatched to the store
+ * @param expectedActions - The expected actions that should not be presented
+ */
+const expectActionsToNotContain = (
+  actualActions: any[],
+  expectedActions: any[],
+) => {
+  expect(actualActions).not.toEqual(expect.arrayContaining(expectedActions))
+}
+
 // re-export everything
 export * from '@testing-library/react'
 // override render method
@@ -454,4 +511,6 @@ export {
   waitForRiTooltipVisible,
   waitForRiTooltipHidden,
   waitForRiPopoverVisible,
+  expectActionsToContain,
+  expectActionsToNotContain,
 }

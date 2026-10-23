@@ -61,7 +61,7 @@ describe('recommendations slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)
@@ -332,7 +332,6 @@ describe('recommendations slice', () => {
     describe('getContentRecommendationsFailure', () => {
       it('should properly set error', () => {
         // Arrange
-        const error = 'Some error'
         const state = {
           ...initialState,
           loading: false,

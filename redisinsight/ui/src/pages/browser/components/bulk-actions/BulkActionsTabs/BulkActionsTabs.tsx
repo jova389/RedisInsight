@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { BulkActionsType } from 'uiSrc/constants'
 import { selectedBulkActionsSelector } from 'uiSrc/slices/browser/bulkActions'
@@ -12,12 +12,11 @@ import {
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { DEFAULT_SEARCH_MATCH } from 'uiSrc/constants/api'
 import { keysSelector } from 'uiSrc/slices/browser/keys'
-import Tabs, { TabInfo } from 'uiSrc/components/base/layout/tabs'
-
+import { TabInfo } from 'uiSrc/components/base/layout/tabs'
 import { Text } from 'uiSrc/components/base/text'
-import styles from './styles.module.scss'
-import { RiIcon } from 'uiSrc/components/base/icons'
-import { Row } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { StyledTabs } from './BulkActionsTabs.styles'
 
 export interface Props {
   onChangeType: (id: BulkActionsType) => void
@@ -25,9 +24,10 @@ export interface Props {
 
 const BulkActionsTabs = (props: Props) => {
   const { onChangeType } = props
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { filter, search } = useSelector(keysSelector)
-  const { type } = useSelector(selectedBulkActionsSelector)
+  const { t } = useTranslation()
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { filter, search } = useAppSelector(keysSelector)
+  const { type } = useAppSelector(selectedBulkActionsSelector)
 
   const onSelectedTabChanged = (id: string) => {
     const eventData: Record<string, any> = {
@@ -56,34 +56,23 @@ const BulkActionsTabs = (props: Props) => {
     () => [
       {
         value: BulkActionsType.Delete,
-        label: (
-          <Row align="center" gap="m" grow={false}>
-            <RiIcon type="DeleteIcon" />
-            <Text size="XS">Delete Keys</Text>
-          </Row>
-        ),
+        label: <Text size="S">{t('browser.bulkActions.tab.deleteKeys')}</Text>,
         content: null,
       },
       {
         value: BulkActionsType.Upload,
-        label: (
-          <Row align="center" gap="m" grow={false}>
-            <RiIcon type="BulkUploadIcon" />
-            <Text size="XS">Upload Data</Text>
-          </Row>
-        ),
+        label: <Text size="S">{t('browser.bulkActions.tab.uploadData')}</Text>,
         content: null,
       },
     ],
-    [],
+    [t],
   )
 
   return (
-    <Tabs
+    <StyledTabs
       tabs={tabs}
       value={type ?? undefined}
       onChange={onSelectedTabChanged}
-      className={styles.tabs}
       data-testid="bulk-actions-tabs"
     />
   )

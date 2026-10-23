@@ -68,7 +68,7 @@ export const ApplyButton = styled(IconButton).attrs({
   color: 'primary',
   'aria-label': 'Apply',
 })`
-  vertical-align: initial;
+  vertical-align: top;
   &:hover:not([class*='isDisabled']) {
     color: ${({ theme }: { theme: Theme }) =>
       theme.semantic.color.text.neutral500};
@@ -91,8 +91,10 @@ const positions = {
   right: css`
     top: 0;
     left: 100%;
+    height: 100%;
     border-radius: 0 10px 10px 0;
     box-shadow: 0 3px 3px var(--controlsBoxShadowColor);
+    align-items: center;
   `,
   left: css`
     top: 0;
@@ -114,19 +116,20 @@ const designs = {
     border-radius: 0;
     box-shadow: none;
     background-color: inherit !important;
-    text-align: right;
     width: 60px;
     z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     .popoverWrapper,
     ${DeclineButton}, ${ApplyButton} {
-      margin: 6px 3px;
       height: 24px !important;
       width: 24px !important;
-    }
-
-    ${ApplyButton} {
-      margin-top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     svg {
@@ -156,7 +159,6 @@ export const ActionsContainer = styled(Row)<ActionsContainerProps>`
   ${({ $design }) => designs[$design || 'default']}
 `
 
-
 export const StyledTextInput = styled(TextInput)<{
   $width?: string
   $height?: string
@@ -165,10 +167,12 @@ export const StyledTextInput = styled(TextInput)<{
   height: ${({ $height }) => $height || 'auto'};
   max-height: ${({ $height }) => $height || 'auto'};
   min-height: ${({ $height }) => $height || 'auto'};
+  padding: 0;
 
   // Target the actual input element inside
   input {
     width: 100%;
-    height: ${({ $height }) => $height || 'auto'};  
-  }  
+    height: ${({ $height }) => $height || 'auto'};
+    padding: 0 5px;
+  }
 `

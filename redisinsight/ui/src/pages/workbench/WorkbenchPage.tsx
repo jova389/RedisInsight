@@ -1,23 +1,28 @@
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { formatLongName, getDbIndex, setTitle } from 'uiSrc/utils'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { sendPageViewTelemetry, TelemetryPageView } from 'uiSrc/telemetry'
 import WBViewWrapper from './components/wb-view'
 
 const WorkbenchPage = () => {
+  const { t } = useTranslation()
   const [isPageViewSent, setIsPageViewSent] = useState(false)
 
-  const { name: connectedInstanceName, db } = useSelector(
+  const { name: connectedInstanceName, db } = useAppSelector(
     connectedInstanceSelector,
   )
 
   const { instanceId } = useParams<{ instanceId: string }>()
 
   setTitle(
-    `${formatLongName(connectedInstanceName, 33, 0, '...')} ${getDbIndex(db)} - Workbench`,
+    t('workbench.pageTitle', {
+      name: formatLongName(connectedInstanceName, 33, 0, '...'),
+      db: getDbIndex(db),
+    }),
   )
 
   useEffect(() => {

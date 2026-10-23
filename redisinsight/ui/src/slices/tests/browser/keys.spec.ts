@@ -1,4 +1,5 @@
 import { cloneDeep } from 'lodash'
+import { faker } from '@faker-js/faker'
 import { AxiosError } from 'axios'
 import { configureStore } from '@reduxjs/toolkit'
 import { getConfig } from 'uiSrc/config'
@@ -8,6 +9,16 @@ import {
   KeyValueFormat,
   ModulesKeyTypes,
 } from 'uiSrc/constants'
+import {
+  ListElementDestination,
+  CreateArrayWithExpireDto,
+  CreateHashWithExpireDto,
+  CreateListWithExpireDto,
+  CreateRejsonRlWithExpireDto,
+  CreateSetWithExpireDto,
+  CreateZSetWithExpireDto,
+  SetStringWithExpireDto,
+} from 'apiClient'
 import { apiService } from 'uiSrc/services'
 import {
   parseKeysListResponse,
@@ -26,36 +37,29 @@ import {
 } from 'uiSrc/slices/app/notifications'
 import successMessages from 'uiSrc/components/notifications/success-messages'
 import { SearchHistoryItem, SearchMode } from 'uiSrc/slices/interfaces/keys'
-import {
-  resetBrowserTree,
-  setBrowserSelectedKey,
-} from 'uiSrc/slices/app/context'
+import { setBrowserSelectedKey } from 'uiSrc/slices/app/context'
 import { MOCK_TIMESTAMP } from 'uiSrc/mocks/data/dateNow'
 import {
   setEditorType,
   setIsWithinThreshold,
 } from 'uiSrc/slices/browser/rejson'
 import { EditorType } from 'uiSrc/slices/interfaces'
-import { CreateHashWithExpireDto } from 'apiSrc/modules/browser/hash/dto'
-import {
-  CreateListWithExpireDto,
-  ListElementDestination,
-} from 'apiSrc/modules/browser/list/dto'
-import { CreateRejsonRlWithExpireDto } from 'apiSrc/modules/browser/rejson-rl/dto'
-import { CreateSetWithExpireDto } from 'apiSrc/modules/browser/set/dto'
-import { CreateZSetWithExpireDto } from 'apiSrc/modules/browser/z-set/dto'
-import { SetStringWithExpireDto } from 'apiSrc/modules/browser/string/dto'
+
 import { rootReducer } from '../../store'
+import { loadVectorSetElements } from '../../browser/vectorSet'
+import { mockVectorSetKeyInfo } from 'uiSrc/mocks/factories/browser/vectorSet/vectorSetElement.factory'
 import { getString, getStringSuccess } from '../../browser/string'
 import reducer, {
   addHashKey,
   addKey,
   addKeyFailure,
   addKeySuccess,
+  addArrayKey,
   addListKey,
   addReJSONKey,
   addSetKey,
   addStringKey,
+  addVectorSetKey,
   addZsetKey,
   defaultSelectedKeyAction,
   defaultSelectedKeyActionFailure,
@@ -70,6 +74,7 @@ import reducer, {
   deleteKeyAction,
   deletePatternHistoryAction,
   deletePatternKeyFromList,
+  deleteKeysByPattern,
   deleteSearchHistory,
   deleteSearchHistoryAction,
   deleteSearchHistoryFailure,
@@ -141,7 +146,7 @@ describe('keys slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)
@@ -508,7 +513,7 @@ describe('keys slice', () => {
         selectedKey: {
           ...initialState.selectedKey,
           refreshing: false,
-          data: { ...initialState.selectedKey.data, ...data },
+          data: { ...data, nameString: 'keyName' },
         },
       }
 
@@ -520,6 +525,45 @@ describe('keys slice', () => {
         browser: { keys: nextState },
       })
       expect(keysSelector(rootState)).toEqual(state)
+    })
+
+    it('should drop type-specific fields absent from the new payload', () => {
+      // Refresh after a key is overwritten as a different type should
+      // not leak stale type-specific fields (count from Array,
+      // vectorDim/quantType from Vector Set, etc.). Reducer replaces
+      // `data` outright instead of merging the payload over it.
+      const previous = {
+        ...initialState,
+        selectedKey: {
+          ...initialState.selectedKey,
+          data: {
+            name: stringToBuffer('keyName'),
+            type: KeyTypes.Array,
+            ttl: -1,
+            size: 100,
+            length: 6,
+            count: '7',
+            nameString: 'keyName',
+          },
+        },
+      }
+      // Simulates the same key being overwritten as a String — the BE's
+      // string key-info strategy omits `count`.
+      const refreshed = {
+        name: stringToBuffer('keyName'),
+        type: KeyTypes.String,
+        ttl: -1,
+        size: 5,
+        length: 5,
+      }
+
+      const nextState = reducer(previous, refreshKeyInfoSuccess(refreshed))
+
+      expect(nextState.selectedKey.data).toEqual({
+        ...refreshed,
+        nameString: 'keyName',
+      })
+      expect(nextState.selectedKey.data?.count).toBeUndefined()
     })
   })
 
@@ -774,6 +818,88 @@ describe('keys slice', () => {
         browser: { keys: nextState },
       })
       expect(keysSelector(rootState)).toEqual(state)
+    })
+  })
+
+  describe('deleteKeysByPattern', () => {
+    it('should remove keys matching pattern using buffer comparison', () => {
+      // Arrange
+      const currentState = {
+        ...initialState,
+        data: {
+          ...initialState.data,
+          total: 100,
+          scanned: 50,
+          keys: [
+            { name: stringToBuffer('user:session:1'), type: KeyTypes.String },
+            { name: stringToBuffer('user:session:2'), type: KeyTypes.String },
+            { name: stringToBuffer('user:profile:1'), type: KeyTypes.Hash },
+            { name: stringToBuffer('other:key'), type: KeyTypes.String },
+          ],
+        },
+      }
+
+      // Act
+      const nextState = reducer(
+        currentState,
+        deleteKeysByPattern({ pattern: 'user:session:*', deletedCount: 10 }),
+      )
+
+      // Assert - matching keys are removed
+      expect(nextState.data.keys).toHaveLength(2)
+      // Total is updated based on deletedCount from server
+      expect(nextState.data.total).toEqual(90) // 100 - 10 (deletedCount)
+    })
+
+    it('should not go below zero for total count', () => {
+      // Arrange
+      const currentState = {
+        ...initialState,
+        data: {
+          ...initialState.data,
+          total: 5,
+          scanned: 2,
+          keys: [{ name: stringToBuffer('key:1'), type: KeyTypes.String }],
+        },
+      }
+
+      // Act
+      const nextState = reducer(
+        currentState,
+        deleteKeysByPattern({ pattern: 'key:*', deletedCount: 100 }),
+      )
+
+      // Assert
+      expect(nextState.data.keys).toHaveLength(0) // Key removed
+      expect(nextState.data.total).toEqual(0) // Clamped to 0
+    })
+
+    it('should skip local key removal for "*" pattern (all keys) but update total', () => {
+      // Arrange
+      const currentState = {
+        ...initialState,
+        data: {
+          ...initialState.data,
+          total: 100,
+          scanned: 50,
+          keys: [
+            { name: stringToBuffer('user:1'), type: KeyTypes.String },
+            { name: stringToBuffer('session:1'), type: KeyTypes.Hash },
+            { name: stringToBuffer('other:key'), type: KeyTypes.String },
+          ],
+        },
+      }
+
+      // Act
+      const nextState = reducer(
+        currentState,
+        deleteKeysByPattern({ pattern: '*', deletedCount: 50 }),
+      )
+
+      // Assert - keys should NOT be removed for '*' pattern
+      expect(nextState.data.keys).toHaveLength(3)
+      // Total should still be updated
+      expect(nextState.data.total).toEqual(50)
     })
   })
 
@@ -1453,6 +1579,21 @@ describe('keys slice', () => {
           ]),
         )
       })
+
+      it('should dispatch loadVectorSetElements for VectorSet key type', async () => {
+        const data = mockVectorSetKeyInfo
+        const responsePayload = { data, status: 200 }
+
+        apiService.post = jest.fn().mockResolvedValue(responsePayload)
+
+        await store.dispatch<any>(fetchKeyInfo(data.name))
+
+        expect(store.getActions()).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining(loadVectorSetElements(undefined)),
+          ]),
+        )
+      })
     })
 
     describe('refreshKeyInfoAction', () => {
@@ -1505,6 +1646,34 @@ describe('keys slice', () => {
         ]
         expect(store.getActions()).toEqual(expectedActions)
       })
+
+      it('should reset key info and clear selected key when key not found (404)', async () => {
+        // Arrange
+        const keyName = stringToBuffer('deletedKey')
+        const errorMessage = 'Key with this name does not exist.'
+        const responsePayload = {
+          response: {
+            status: 404,
+            data: { message: errorMessage },
+          },
+        }
+
+        apiService.post = jest.fn().mockRejectedValue(responsePayload)
+
+        // Act
+        await store.dispatch<any>(refreshKeyInfoAction(keyName))
+
+        // Assert
+        const expectedActions = [
+          refreshKeyInfo(),
+          refreshKeyInfoFail(),
+          addErrorNotification(responsePayload as AxiosError),
+          resetKeyInfo(),
+          deletePatternKeyFromList(keyName),
+          setBrowserSelectedKey(null),
+        ]
+        expect(store.getActions()).toEqual(expectedActions)
+      })
     })
 
     describe('addHashKey', () => {
@@ -1525,7 +1694,6 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'hash' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
         ]
@@ -1551,7 +1719,6 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'zset' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
         ]
@@ -1577,7 +1744,6 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'set' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
         ]
@@ -1603,7 +1769,6 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'string' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
         ]
@@ -1630,9 +1795,35 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'list' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
+        ]
+        expect(store.getActions()).toEqual(expectedActions)
+      })
+    })
+
+    describe('addArrayKey', () => {
+      it('success to add key', async () => {
+        // Arrange
+        const keyName = stringToBuffer(faker.string.alphanumeric(10))
+        const data = {
+          keyName,
+          mode: 'sparse',
+          elements: [{ index: '5', value: 'value' }],
+        } as unknown as CreateArrayWithExpireDto
+        const responsePayload = { data, status: 200 }
+
+        apiService.post = jest.fn().mockResolvedValue(responsePayload)
+
+        // Act
+        await store.dispatch<any>(addArrayKey(data, jest.fn()))
+
+        // Assert
+        const expectedActions = [
+          addKey(),
+          addKeySuccess(),
+          updateKeyList({ keyName: data.keyName, keyType: KeyTypes.Array }),
+          addMessageNotification(successMessages.ADDED_NEW_KEY(keyName)),
         ]
         expect(store.getActions()).toEqual(expectedActions)
       })
@@ -1656,11 +1847,62 @@ describe('keys slice', () => {
         const expectedActions = [
           addKey(),
           addKeySuccess(),
-          resetBrowserTree(),
           updateKeyList({ keyName: data.keyName, keyType: 'ReJSON-RL' }),
           addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
         ]
         expect(store.getActions()).toEqual(expectedActions)
+      })
+    })
+
+    describe('addVectorSetKey', () => {
+      it('success to add vector set key', async () => {
+        const data = {
+          keyName: stringToBuffer('myVectorSet'),
+          elements: [
+            { name: stringToBuffer('el-1'), vectorValues: [0.1, 0.2, 0.3] },
+          ],
+        }
+        const responsePayload = { status: 200 }
+
+        apiService.post = jest.fn().mockResolvedValue(responsePayload)
+
+        await store.dispatch<any>(addVectorSetKey(data, jest.fn()))
+
+        const expectedActions = [
+          addKey(),
+          addKeySuccess(),
+          updateKeyList({
+            keyName: data.keyName,
+            keyType: KeyTypes.VectorSet,
+          }),
+          addMessageNotification(successMessages.ADDED_NEW_KEY(data.keyName)),
+        ]
+        expect(store.getActions()).toEqual(expectedActions)
+      })
+
+      it('calls onFailAction and dispatches failure on error', async () => {
+        const data = {
+          keyName: stringToBuffer('myVectorSet'),
+          elements: [
+            { name: stringToBuffer('el-1'), vectorValues: [0.1, 0.2, 0.3] },
+          ],
+        }
+        const errorMessage = 'Something went wrong'
+        const responsePayload = {
+          response: { status: 500, data: { message: errorMessage } },
+        }
+
+        apiService.post = jest.fn().mockRejectedValue(responsePayload)
+        const onFail = jest.fn()
+
+        await store.dispatch<any>(addVectorSetKey(data, jest.fn(), onFail))
+
+        expect(onFail).toHaveBeenCalled()
+        expect(
+          store
+            .getActions()
+            .some((action) => action.type === 'keys/addKeyFailure'),
+        ).toBe(true)
       })
     })
 
@@ -1747,6 +1989,10 @@ describe('keys slice', () => {
         const responsePayload = { status: 200 }
 
         apiService.patch = jest.fn().mockResolvedValue(responsePayload)
+        apiService.post = jest.fn().mockResolvedValue({
+          data: { data: '{}', keyName: 'keyName' },
+          status: 200,
+        })
 
         // Act
         await store.dispatch<any>(editKeyTTL(key, ttl))
@@ -1973,7 +2219,6 @@ describe('keys slice', () => {
 
         // Assert
         const expectedActions = [
-          resetBrowserTree(),
           updateKeyList({ keyName: 'key', keyType: 'hash' }),
         ]
         expect(store.getActions()).toEqual(expectedActions)

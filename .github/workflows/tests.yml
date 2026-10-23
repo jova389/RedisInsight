@@ -1,14 +1,15 @@
 name: ✅ Tests
 
+# Runs on every pull request. The changed files pick the suites; the
+# `run-*-tests` labels can widen that.
+#
+# Do not add `labeled` here. `tests-on-demand.yml` owns that trigger. A label
+# reaching this workflow reports a second `All required checks pass` on the same
+# commit, green while the real suite is still running.
+
 on:
-  push:
-    branches:
-      - 'fe/**'
-      - 'be/**'
-      - 'fe-be/**'
-      - 'feature/**'
-      - 'bugfix/**'
-      - 'ric/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
 
   workflow_dispatch:
     inputs:
@@ -45,24 +46,32 @@ on:
         default: false
         type: boolean
 
-# Cancel a previous run workflow
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # One run per PR. A new commit replaces the one in progress.
+  group: tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   changes:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
       desktop: ${{ steps.filter.outputs.desktop }}
+      docker: ${{ steps.filter.outputs.docker }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3.0.2
+      - uses: actions/checkout@v7.0.1
+      - uses: dorny/paths-filter@v4.0.3
         id: filter
         with:
-          base: ${{ github.ref }}
+          # Compare against main so each push's gating reflects the
+          # cumulative branch diff, not just the latest commit. Keeps
+          # the merge-gate aligned with what would actually land.
+          base: main
           filters: |
             frontend:
               - 'redisinsight/ui/**'
@@ -70,15 +79,128 @@ jobs:
               - 'redisinsight/api/**'
             desktop:
               - 'redisinsight/desktop/**'
+            docker:
+              - 'Dockerfile*'
+              - '.dockerignore'
+              - '*docker*.sh'
+            # Shared toolchain / CI config — when these change, run everything.
+            infra:
+              - 'package.json'
+              - 'package-lock.json'
+              - '.npmrc'
+              - '.nvmrc'
+              - '.eslintrc*'
+              - '.eslintignore'
+              - 'babel.config*'
+              - 'jest.config*'
+              - 'jest-resolver.js'
+              - 'configs/**'
+              - 'scripts/**'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+
+  # Compute per-consumer "should this run" decisions from changes, labels,
+  # pre-release input, and manual dispatch. One job, one source of truth.
+  should-run:
+    needs: changes
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.eval.outputs.ui }}
+      api: ${{ steps.eval.outputs.api }}
+      desktop: ${{ steps.eval.outputs.desktop }}
+      integration: ${{ steps.eval.outputs.integration }}
+      docker: ${{ steps.eval.outputs.docker }}
+      short_rte: ${{ steps.eval.outputs.short_rte }}
+    steps:
+      - id: eval
+        env:
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+          # Release-branch PRs (head or target release/** or latest) get the
+          # full suite + full RTE list.
+          IS_RELEASE: ${{ startsWith(github.head_ref, 'release/') || github.head_ref == 'latest' || startsWith(github.base_ref, 'release/') || github.base_ref == 'latest' }}
+          INPUT_SHORT_RTE: ${{ inputs.short_rte_list }}
+          PRE_RELEASE: ${{ inputs.pre_release == true }}
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          LABEL_ALL: ${{ contains(github.event.pull_request.labels.*.name, 'run-all-tests') }}
+          LABEL_FE: ${{ contains(github.event.pull_request.labels.*.name, 'run-frontend-tests') }}
+          LABEL_BE: ${{ contains(github.event.pull_request.labels.*.name, 'run-backend-tests') }}
+          LABEL_IT: ${{ contains(github.event.pull_request.labels.*.name, 'run-integration-tests') }}
+          CHG_FRONTEND: ${{ needs.changes.outputs.frontend }}
+          CHG_BACKEND: ${{ needs.changes.outputs.backend }}
+          CHG_DESKTOP: ${{ needs.changes.outputs.desktop }}
+          CHG_DOCKER: ${{ needs.changes.outputs.docker }}
+          CHG_INFRA: ${{ needs.changes.outputs.infra }}
+        run: |
+          # "Run everything" — pre-release builds, release-branch PRs, manual
+          # dispatch, the run-all-tests label, or shared toolchain/CI changes.
+          if [[ "$PRE_RELEASE" == "true" || "$IS_RELEASE" == "true" || "$DISPATCH" == "true" || "$LABEL_ALL" == "true" || "$CHG_INFRA" == "true" ]]; then
+            ALL=true
+          else
+            ALL=false
+          fi
+
+          # Full RTE list for release testing; short list otherwise, unless a
+          # caller overrides it.
+          short_rte=true
+          if [[ "$PRE_RELEASE" == "true" || "$IS_RELEASE" == "true" || "$INPUT_SHORT_RTE" == "false" ]]; then
+            short_rte=false
+          fi
+
+          ui=$ALL
+          api=$ALL
+          desktop=$ALL
+          integration=$ALL
+          docker=$ALL
+
+          [[ "$CHG_FRONTEND" == "true" || "$LABEL_FE" == "true" ]] && ui=true
+          [[ "$CHG_BACKEND"  == "true" || "$LABEL_BE" == "true" ]] && api=true
+          [[ "$CHG_DESKTOP"  == "true" ]] && desktop=true
+          [[ "$CHG_BACKEND"  == "true" || "$LABEL_IT" == "true" ]] && integration=true
+          [[ "$CHG_FRONTEND" == "true" || "$CHG_BACKEND" == "true" || "$CHG_DOCKER" == "true" ]] && docker=true
+
+          # Forks run in isolation with no secrets, so the secret/infra suites
+          # can't run there. Keep lint/type-check/unit on; force the rest off.
+          if [[ "$IS_FORK" == "true" ]]; then
+            integration=false
+            docker=false
+          fi
+
+          {
+            echo "ui=$ui"
+            echo "api=$api"
+            echo "desktop=$desktop"
+            echo "integration=$integration"
+            echo "docker=$docker"
+            echo "short_rte=$short_rte"
+          } >> "$GITHUB_OUTPUT"
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+    secrets: inherit
+
+  type-check:
+    needs: should-run
+    uses: ./.github/workflows/type-check.yml
+    with:
+      run-ui: ${{ needs.should-run.outputs.ui == 'true' }}
+      run-api: ${{ needs.should-run.outputs.api == 'true' }}
+      run-desktop: ${{ needs.should-run.outputs.desktop == 'true' }}
+    secrets: inherit
+
+  docker-build:
+    needs: should-run
+    if: needs.should-run.outputs.docker == 'true'
+    uses: ./.github/workflows/docker-build.yml
 
   frontend-tests:
-    needs: changes
-    if: startsWith(github.ref_name, 'fe/') || startsWith(github.ref_name, 'fe-be/') || startsWith(github.ref_name, 'feature/') || startsWith(github.ref_name, 'bugfix/') || startsWith(github.ref_name, 'ric/')
+    needs: [should-run, lint, type-check]
+    if: needs.should-run.outputs.ui == 'true'
     uses: ./.github/workflows/tests-frontend.yml
     secrets: inherit
 
   frontend-tests-coverage:
     needs: frontend-tests
+    if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
     uses: ./.github/workflows/code-coverage.yml
     secrets: inherit
     with:
@@ -86,13 +208,14 @@ jobs:
       type: unit
 
   backend-tests:
-    needs: changes
-    if: startsWith(github.ref_name, 'be/') || startsWith(github.ref_name, 'fe-be/') || startsWith(github.ref_name, 'feature/') || startsWith(github.ref_name, 'bugfix/') || startsWith(github.ref_name, 'ric/')
+    needs: [should-run, lint, type-check]
+    if: needs.should-run.outputs.api == 'true'
     uses: ./.github/workflows/tests-backend.yml
     secrets: inherit
 
   backend-tests-coverage:
     needs: backend-tests
+    if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
     uses: ./.github/workflows/code-coverage.yml
     secrets: inherit
     with:
@@ -100,17 +223,22 @@ jobs:
       type: unit
 
   integration-tests:
-    needs: changes
-    if: startsWith(github.ref_name, 'be/') || startsWith(github.ref_name, 'fe-be/') || startsWith(github.ref_name, 'feature/') || startsWith(github.ref_name, 'bugfix/') || startsWith(github.ref_name, 'ric/')
+    needs: [should-run, lint, type-check]
+    if: needs.should-run.outputs.integration == 'true'
     uses: ./.github/workflows/tests-integration.yml
     secrets: inherit
+    permissions:
+      actions: write
+      contents: read
+      checks: write
     with:
-      short_rte_list: ${{ inputs.short_rte_list || true }}
+      short_rte_list: ${{ needs.should-run.outputs.short_rte == 'true' }}
       redis_client: ${{ inputs.redis_client || '' }}
       debug: ${{ inputs.debug || false }}
 
   integration-tests-coverage:
     needs: integration-tests
+    if: ${{ github.actor != 'dependabot[bot]' }}
     uses: ./.github/workflows/code-coverage.yml
     secrets: inherit
     with:
@@ -119,25 +247,60 @@ jobs:
 
   clean:
     uses: ./.github/workflows/clean-deployments.yml
-    if: always()
-    needs:
-      [
-        frontend-tests,
-        backend-tests,
-        integration-tests,
-      ]
+    # `always()` runs this even when every test job skips, so it needs its own
+    # guard against deleting deployments for a run that did no work.
+    if: ${{ always() && needs.changes.result != 'skipped' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+    permissions:
+      actions: write
+      contents: read
+      deployments: write
+    needs: [changes, frontend-tests, backend-tests, integration-tests]
 
   # Remove artifacts from github actions
   remove-artifacts:
     name: Remove artifacts
-    needs:
-      [
-        frontend-tests,
-        backend-tests,
-        integration-tests,
-      ]
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    needs: [frontend-tests, backend-tests, integration-tests]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Remove all artifacts
         uses: ./.github/actions/remove-artifacts
+
+  # The one check to read, and the one to require on protected branches. Red if
+  # any job below failed or was cancelled. A skipped job passes: skipping is a
+  # decision made from the changed files.
+  #
+  # A job left out of `needs` cannot block a merge, so add new suites here.
+  # Coverage and cleanup are out on purpose.
+  required-checks-passed:
+    name: All required checks pass
+    if: always()
+    needs:
+      - changes
+      - should-run
+      - lint
+      - type-check
+      - docker-build
+      - frontend-tests
+      - backend-tests
+      - integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the jobs this waits on
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failing=$(jq -r '
+            to_entries[]
+            | select(.value.result != "success" and .value.result != "skipped")
+            | "  \(.key): \(.value.result)"
+          ' <<< "$NEEDS_JSON")
+
+          if [ -n "$failing" ]; then
+            echo "These jobs did not pass:"
+            echo "$failing"
+            exit 1
+          fi
+
+          echo "Every job passed or was skipped."

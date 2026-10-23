@@ -1,33 +1,48 @@
-import React from 'react'
+import { ParseKeys } from 'i18next'
 
+import { AllIconsType } from 'uiSrc/components/base/icons'
 import { AddDbType } from 'uiSrc/pages/home/constants'
-import ShieldIcon from 'uiSrc/assets/img/shield.svg?react'
-import RedisSoftwareIcon from 'uiSrc/assets/img/redis-software.svg?react'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 
 export interface Values {
   connectionURL: string
 }
 
-export const CONNECTIVITY_OPTIONS = [
+export interface ConnectivityOptionConfig {
+  id: string
+  title: ParseKeys
+  type: AddDbType
+  icon: AllIconsType
+}
+
+export interface ConnectivityOption extends ConnectivityOptionConfig {
+  onClick: () => void
+  loading?: boolean
+  onCancel?: () => void
+}
+
+export const CONNECTIVITY_OPTIONS_CONFIG: ConnectivityOptionConfig[] = [
   {
     id: 'sentinel',
-    title: 'Redis Sentinel',
+    title: 'addDatabase.option.sentinel',
     type: AddDbType.sentinel,
-    icon: (props: Record<string, any> = {}) => <ShieldIcon {...props} />,
+    icon: 'ShieldIcon',
   },
   {
     id: 'software',
-    title: 'Redis Software',
+    title: 'addDatabase.option.software',
     type: AddDbType.software,
-    icon: (props: Record<string, any> = {}) => <RedisSoftwareIcon {...props} />,
+    icon: 'RedisSoftwareIcon',
+  },
+  {
+    id: 'azure',
+    title: 'addDatabase.option.azure',
+    type: AddDbType.azure,
+    icon: 'CloudIcon',
   },
   {
     id: 'import',
-    title: 'Import from file',
+    title: 'addDatabase.option.import',
     type: AddDbType.import,
-    icon: (props: Record<string, any> = {}) => (
-      <RiIcon type="DownloadIcon" {...props} />
-    ),
+    icon: 'DownloadIcon',
   },
 ]

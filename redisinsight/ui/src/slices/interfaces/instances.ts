@@ -2,23 +2,24 @@ import { RedisResponseBuffer, RedisString } from 'uiSrc/slices/interfaces/app'
 import { Maybe, Nullable } from 'uiSrc/utils'
 import { OAuthSocialAction } from 'uiSrc/slices/interfaces/cloud'
 import { DatabaseListColumn } from 'uiSrc/constants'
-import { GetHashFieldsResponse } from 'apiSrc/modules/browser/hash/dto'
-import { GetSetMembersResponse } from 'apiSrc/modules/browser/set/dto'
+
+import { Tag } from './tag'
 import {
+  GetHashFieldsResponse,
+  GetSetMembersResponse,
   GetRejsonRlResponseDto,
   SafeRejsonRlDataDto,
-} from 'apiSrc/modules/browser/rejson-rl/dto'
-import {
   GetListElementsDto,
   GetListElementsResponse,
-} from 'apiSrc/modules/browser/list/dto'
-import { Database as DatabaseInstanceResponse } from 'apiSrc/modules/database/models/database'
-import { SearchZSetMembersResponse } from 'apiSrc/modules/browser/z-set/dto'
-import { SentinelMaster } from 'apiSrc/modules/redis-sentinel/models/sentinel-master'
-import { CreateSentinelDatabaseDto } from 'apiSrc/modules/redis-sentinel/dto/create.sentinel.database.dto'
-import { CreateSentinelDatabaseResponse } from 'apiSrc/modules/redis-sentinel/dto/create.sentinel.database.response'
-import { RedisNodeInfoResponse } from 'apiSrc/modules/database/dto/redis-info.dto'
-import { Tag } from './tag'
+  Database as DatabaseInstanceResponse,
+  Environment,
+  RedisConnectionFamily,
+  SearchZSetMembersResponse,
+  SentinelMaster,
+  CreateSentinelDatabaseDto,
+  CreateSentinelDatabaseResponse,
+  RedisNodeInfoResponse,
+} from 'apiClient'
 
 export interface Instance extends Partial<DatabaseInstanceResponse> {
   host: string
@@ -57,6 +58,8 @@ export interface Instance extends Partial<DatabaseInstanceResponse> {
   visible?: boolean
   loading?: boolean
   isFreeDb?: boolean
+  environment: Environment
+  connectionFamily?: RedisConnectionFamily
   tags?: Tag[]
 }
 
@@ -179,6 +182,7 @@ export enum RedisDefaultModules {
   FTL = 'ftl',
   RedisGears = 'redisgears',
   RedisGears2 = 'redisgears_2',
+  VectorSet = 'vectorset',
 }
 
 export enum RedisCustomModulesName {
@@ -212,10 +216,11 @@ export const DATABASE_LIST_MODULES_TEXT = Object.freeze({
   [RedisDefaultModules.TimeSeries]: 'Time Series',
   [RedisCustomModulesName.Proto]: 'redis-protobuf',
   [RedisCustomModulesName.IpTables]: 'RedisPushIpTables',
-  [RedisDefaultModules.Search]: 'Redis Query Engine',
-  [RedisDefaultModules.SearchLight]: 'Redis Query Engine',
-  [RedisDefaultModules.FT]: 'Redis Query Engine',
-  [RedisDefaultModules.FTL]: 'Redis Query Engine',
+  [RedisDefaultModules.Search]: 'Redis Search',
+  [RedisDefaultModules.SearchLight]: 'Redis Search',
+  [RedisDefaultModules.FT]: 'Redis Search',
+  [RedisDefaultModules.FTL]: 'Redis Search',
+  [RedisDefaultModules.VectorSet]: 'Vector Set',
 })
 
 export enum AddRedisClusterDatabaseOptions {
@@ -242,7 +247,7 @@ export const DATABASE_LIST_OPTIONS_TEXT = Object.freeze({
 })
 
 export enum PersistencePolicy {
-  'none' = 'none',
+  none = 'none',
   'aof-every-1-second' = 'Append-only file (AOF) every 1 second',
   'aof-every-write' = 'Append-only file (AOF) every write',
   'snapshot-every-1-hour' = 'Redis database backup (RDB) every 1 hour',
@@ -319,6 +324,7 @@ export interface DatabaseConfigInfo {
   networkInKbps?: Nullable<number>
   networkOutKbps?: Nullable<number>
   cpuUsagePercentage?: Nullable<number>
+  maxCpuUsagePercentage?: Nullable<number>
   serverName?: Nullable<string>
   cloudDetails?: {
     cloudId: number
@@ -349,6 +355,14 @@ export interface InitialStateInstances {
     data: Nullable<ImportDatabasesData>
   }
   shownColumns: DatabaseListColumn[]
+  dangerousCommands: string[]
+}
+
+// Fields on the edit-database form that can be deep-linked to via the
+// `focusField` query param (see `Pages.homeEditInstance`). Feature-agnostic —
+// each field's component reacts only to its own key, so intents never collide.
+export enum EditDatabaseField {
+  Environment = 'environment',
 }
 
 export interface ErrorImportResult {
@@ -475,8 +489,7 @@ export interface ModifiedSentinelMaster extends CreateSentinelDatabaseDto {
 }
 
 export interface ModifiedGetListElementsResponse
-  extends GetListElementsDto,
-    GetListElementsResponse {
+  extends GetListElementsDto, GetListElementsResponse {
   elements: { index: number; element: RedisResponseBuffer }[]
   key?: RedisString
   searchedIndex: Nullable<number>
@@ -499,6 +512,7 @@ export enum EditorType {
 
 export interface InitialStateRejson {
   loading: boolean
+  downloading: boolean
   error: Nullable<string>
   data: GetRejsonRlResponse
   editorType: EditorType

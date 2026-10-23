@@ -58,10 +58,22 @@ export class GetUserAgreementsResponse {
   })
   version: string;
 
+  @ApiPropertyOptional({
+    description: 'Did the user accept the EULA agreement.',
+    type: Boolean,
+  })
   eula?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Did the user accept the analytics agreement.',
+    type: Boolean,
+  })
   analytics?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Did the user accept the notifications agreement.',
+    type: Boolean,
+  })
   notifications?: boolean;
 
   @Exclude()
@@ -79,6 +91,15 @@ export class GetAppSettingsResponse {
   theme: string = null;
 
   @ApiProperty({
+    description: 'Applied application language.',
+    type: String,
+    example: 'en',
+  })
+  @Expose()
+  @Default(null)
+  language: string | null = null;
+
+  @ApiProperty({
     description: 'Applied application date format',
     type: String,
     example: 'yyyy-mm-dd',
@@ -90,6 +111,7 @@ export class GetAppSettingsResponse {
   @ApiProperty({
     description: 'Applied application timezone',
     enum: TimezoneOption,
+    enumName: 'TimezoneOption',
     example: 'local',
   })
   @Expose()
@@ -115,7 +137,8 @@ export class GetAppSettingsResponse {
   batchSize: number = WORKBENCH_CONFIG.countBatch;
 
   @ApiProperty({
-    description: 'Flag indicating that terms and conditions are accepted via environment variable',
+    description:
+      'Flag indicating that terms and conditions are accepted via environment variable',
     type: Boolean,
     example: false,
   })
@@ -147,6 +170,15 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsString()
   theme?: string;
+
+  @ApiPropertyOptional({
+    description: 'Application language.',
+    type: String,
+    example: 'en',
+  })
+  @IsOptional()
+  @IsString()
+  language?: string;
 
   @ApiPropertyOptional({
     description: 'Application date format.',
@@ -187,10 +219,14 @@ export class UpdateSettingsDto {
   batchSize?: number;
 
   @ApiPropertyOptional({
-    description: 'Agreements',
+    description:
+      'Agreements. On first setup all keys from the agreements spec must be provided: eula, analytics, notifications, encryption.',
     type: Map,
     example: {
       eula: true,
+      analytics: false,
+      notifications: false,
+      encryption: false,
     },
   })
   @IsOptional()

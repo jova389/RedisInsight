@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import cx from 'classnames'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import {
@@ -11,11 +11,17 @@ import {
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from 'uiSrc/components/base/forms/buttons'
 import { PlayFilledIcon } from 'uiSrc/components/base/icons'
 import { Text } from 'uiSrc/components/base/text'
-import { RiPopover } from 'uiSrc/components/base'
+import { RiPopover, RiTooltip } from 'uiSrc/components/base'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import { Environment } from 'apiClient'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -25,12 +31,15 @@ export interface Props {
 
 const LoadSampleData = (props: Props) => {
   const { anchorClassName, onSuccess } = props
+  const { t } = useTranslation()
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
 
-  const { id } = useSelector(connectedInstanceSelector)
-  const { loading } = useSelector(bulkActionsSelector)
+  const { id } = useAppSelector(connectedInstanceSelector)
+  const { loading } = useAppSelector(bulkActionsSelector)
+  const { environment } = useDatabaseEnvironment()
+  const isProduction = environment === Environment.Production
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleSampleData = () => {
     setIsConfirmationOpen(false)
@@ -55,29 +64,38 @@ const LoadSampleData = (props: Props) => {
       panelPaddingSize="none"
       anchorClassName={cx(styles.buttonWrapper, anchorClassName)}
       button={
-        <PrimaryButton
-          onClick={() => setIsConfirmationOpen(true)}
-          className={styles.loadDataBtn}
-          loading={loading}
-          disabled={loading}
-          data-testid="load-sample-data-btn"
+        <RiTooltip
+          content={
+            isProduction
+              ? t('browser.loadSampleData.productionTooltip')
+              : undefined
+          }
+          data-testid="load-sample-data-btn-tooltip"
         >
-          Load sample data
-        </PrimaryButton>
+          <SecondaryButton
+            filled
+            onClick={() => setIsConfirmationOpen(true)}
+            className={styles.loadDataBtn}
+            loading={loading}
+            disabled={loading || isProduction}
+            data-testid="load-sample-data-btn"
+          >
+            {t('browser.loadSampleData.button')}
+          </SecondaryButton>
+        </RiTooltip>
       }
     >
-      <Row gap="m" responsive={false} style={{ padding: 8 }}>
+      <Row gap="m" responsive={false} style={{ padding: 15 }}>
         <FlexItem>
-          <RiIcon type="ToastDangerIcon" className={styles.popoverIcon} />
+          <RiIcon size="m" type="ToastDangerIcon" color="attention500" />
         </FlexItem>
         <FlexItem>
-          <Text>Execute commands in bulk</Text>
-          <Spacer size="s" />
-          <Text color="subdued" size="s">
-            All commands from the file will be automatically executed against
-            your database. Avoid executing them in production databases.
+          <Text variant="semiBold">
+            {t('browser.loadSampleData.confirm.title')}
           </Text>
-          <Spacer size="s" />
+          <Spacer size="m" />
+          <Text size="s">{t('browser.loadSampleData.confirm.message')}</Text>
+          <Spacer size="l" />
           <Row justify="end">
             <FlexItem>
               <PrimaryButton
@@ -88,7 +106,7 @@ const LoadSampleData = (props: Props) => {
                 onClick={handleSampleData}
                 data-testid="load-sample-data-btn-confirm"
               >
-                Execute
+                {t('browser.loadSampleData.confirm.execute')}
               </PrimaryButton>
             </FlexItem>
           </Row>

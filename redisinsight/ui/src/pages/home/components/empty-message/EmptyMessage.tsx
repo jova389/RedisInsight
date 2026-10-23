@@ -8,59 +8,65 @@ import { EXTERNAL_LINKS, UTM_CAMPAINGS } from 'uiSrc/constants/links'
 import { getUtmExternalLink } from 'uiSrc/utils/links'
 import { TelemetryEvent, sendEventTelemetry } from 'uiSrc/telemetry'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
-import { Text } from 'uiSrc/components/base/text'
 import { Link } from 'uiSrc/components/base/link/Link'
-import { RiImage } from 'uiSrc/components/base/display'
-import styles from './styles.module.scss'
+import { Col } from 'uiSrc/components/base/layout/flex'
+import { Spacer } from 'uiSrc/components/base/layout'
+import { Title } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
+import * as S from './EmptyMessage.styles'
 
 export interface Props {
   onAddInstanceClick: () => void
 }
 
-const EmptyMessage = ({ onAddInstanceClick }: Props) => (
-  <div
-    className={styles.noResultsContainer}
-    data-testid="empty-database-instance-list"
-  >
-    <RiImage src={CakeIcon} className={styles.icon} alt="empty" />
-    <Text className={styles.text}>No databases yet, let&apos;s add one!</Text>
-    <PrimaryButton
-      size="m"
-      onClick={() => {
-        sendEventTelemetry({
-          event: TelemetryEvent.CONFIG_DATABASES_CLICKED,
-          eventData: {
-            source: OAuthSocialSource.EmptyDatabasesList,
-          },
-        })
-        onAddInstanceClick?.()
-      }}
-      data-testid="empty-rdi-instance-button"
-    >
-      + Add Redis database
-    </PrimaryButton>
-    <OAuthSsoHandlerDialog>
-      {(ssoCloudHandlerClick) => (
-        <Link
-          data-testid="empty-database-cloud-button"
-          target="_blank"
-          className={styles.link}
-          href={getUtmExternalLink(EXTERNAL_LINKS.tryFree, {
-            campaign: UTM_CAMPAINGS[OAuthSocialSource.EmptyDatabasesList],
-            medium: 'main',
-          })}
-          onClick={(e) => {
-            ssoCloudHandlerClick(e, {
-              action: OAuthSocialAction.Create,
-              source: OAuthSocialSource.EmptyDatabasesList,
+const EmptyMessage = ({ onAddInstanceClick }: Props) => {
+  const { t } = useTranslation()
+
+  return (
+    <S.Container contentCentered data-testid="empty-database-instance-list">
+      <S.Icon src={CakeIcon} alt="empty" />
+      <Title size="M">{t('home.databaseList.empty.title')}</Title>
+      <Spacer size="m" />
+      <Col gap="m" grow={false} align="center">
+        <PrimaryButton
+          size="m"
+          onClick={() => {
+            sendEventTelemetry({
+              event: TelemetryEvent.CONFIG_DATABASES_CLICKED,
+              eventData: {
+                source: OAuthSocialSource.EmptyDatabasesList,
+              },
             })
+            onAddInstanceClick?.()
           }}
+          data-testid="empty-rdi-instance-button"
         >
-          Create a free trial Cloud database
-        </Link>
-      )}
-    </OAuthSsoHandlerDialog>
-  </div>
-)
+          {'+ '}
+          {t('home.databaseList.empty.button.addDatabase')}
+        </PrimaryButton>
+        <OAuthSsoHandlerDialog>
+          {(ssoCloudHandlerClick) => (
+            <Link
+              data-testid="empty-database-cloud-button"
+              target="_blank"
+              href={getUtmExternalLink(EXTERNAL_LINKS.tryFree, {
+                campaign: UTM_CAMPAINGS[OAuthSocialSource.EmptyDatabasesList],
+                medium: 'main',
+              })}
+              onClick={(e) => {
+                ssoCloudHandlerClick(e as any, {
+                  action: OAuthSocialAction.Create,
+                  source: OAuthSocialSource.EmptyDatabasesList,
+                })
+              }}
+            >
+              {t('home.databaseList.empty.link.createCloudDb')}
+            </Link>
+          )}
+        </OAuthSsoHandlerDialog>
+      </Col>
+    </S.Container>
+  )
+}
 
 export default EmptyMessage

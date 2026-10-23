@@ -1,0 +1,62 @@
+import React from 'react'
+
+import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
+import {
+  bufferToString,
+  createTooltipContent,
+  formattingBuffer,
+} from 'uiSrc/utils'
+import { decompressingBuffer } from 'uiSrc/utils/decompressors'
+import { FormattedValue } from 'uiSrc/pages/browser/modules/key-details/shared'
+import { Row } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
+import { ElementNameCellProps } from '../../VectorSetElementList.types'
+
+export const ElementNameCell = ({
+  element,
+  compressor,
+  viewFormat,
+}: ElementNameCellProps) => {
+  const { t } = useTranslation()
+  const memberBuffer = element.name as RedisResponseBuffer
+  const { value: decompressedItem } = decompressingBuffer(
+    memberBuffer,
+    compressor,
+  )
+
+  const { value, isValid } = formattingBuffer(
+    decompressedItem as RedisResponseBuffer,
+    viewFormat,
+    { expanded: false },
+  )
+
+  const tooltipContent = createTooltipContent(
+    value,
+    decompressedItem as RedisResponseBuffer,
+    viewFormat,
+  )
+
+  // Test ids must not depend on the view format: rich formats (Markdown,
+  // JSON) return JSX from formattingBuffer, not a string.
+  const testIdSuffix = bufferToString(
+    decompressedItem as RedisResponseBuffer,
+  ).substring(0, 200)
+
+  return (
+    <Row data-testid={`vector-set-element-value-${testIdSuffix}`}>
+      <FormattedValue
+        value={value}
+        expanded={false}
+        title={
+          isValid
+            ? t('browser.vectorSet.list.elementColumn')
+            : t('browser.keyDetails.failedConvertFormatter', {
+                format: viewFormat,
+              })
+        }
+        tooltipContent={tooltipContent}
+        position="bottom"
+      />
+    </Row>
+  )
+}

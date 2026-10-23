@@ -13,6 +13,7 @@ import { catchAclError } from 'src/utils';
 import ERROR_MESSAGES from 'src/constants/error-messages';
 import {
   DeleteKeysResponse,
+  GetArrayKeyInfoResponse,
   GetKeyInfoResponse,
   GetKeysDto,
   GetKeysInfoDto,
@@ -22,6 +23,7 @@ import {
   RenameKeyResponse,
   UpdateKeyTtlDto,
 } from 'src/modules/browser/keys/dto';
+import { RedisDataType } from 'src/modules/browser/keys/dto/key.dto';
 import { BrowserToolKeysCommands } from 'src/modules/browser/constants/browser-tool-commands';
 import { ClientMetadata } from 'src/common/models';
 import { Scanner } from 'src/modules/browser/keys/scanner/scanner';
@@ -141,7 +143,7 @@ export class KeysService {
     clientMetadata: ClientMetadata,
     key: RedisString,
     includeSize: boolean = false,
-  ): Promise<GetKeyInfoResponse> {
+  ): Promise<GetKeyInfoResponse | GetArrayKeyInfoResponse> {
     try {
       this.logger.debug('Getting key info.', clientMetadata);
       const client =
@@ -179,6 +181,14 @@ export class KeysService {
         result,
       );
 
+      // Array keys carry u64 `length` / `count` as decimal strings — they
+      // have a dedicated response class so the wire format and the
+      // generated client both preserve precision. Split the
+      // plainToInstance call so each branch is monomorphic and
+      // class-transformer keeps the array-only string fields.
+      if (type === RedisDataType.Array) {
+        return plainToInstance(GetArrayKeyInfoResponse, result);
+      }
       return plainToInstance(GetKeyInfoResponse, result);
     } catch (error) {
       this.logger.error('Failed to get key info.', error, clientMetadata);

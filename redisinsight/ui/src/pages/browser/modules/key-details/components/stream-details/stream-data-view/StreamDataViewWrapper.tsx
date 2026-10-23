@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { last, mergeWith, toNumber } from 'lodash'
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
 
@@ -17,11 +17,7 @@ import {
 } from 'uiSrc/slices/browser/stream'
 import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
 import PopoverDelete from 'uiSrc/pages/browser/components/popover-delete/PopoverDelete'
-import {
-  KeyTypes,
-  TableCellTextAlignment,
-  TEXT_FAILED_CONVENT_FORMATTER,
-} from 'uiSrc/constants'
+import { KeyTypes, TableCellTextAlignment } from 'uiSrc/constants'
 import {
   getBasedOnViewTypeEvent,
   sendEventTelemetry,
@@ -38,7 +34,8 @@ import { decompressingBuffer } from 'uiSrc/utils/decompressors'
 import { FormattedValue } from 'uiSrc/pages/browser/modules/key-details/shared'
 import { FormatedDate } from 'uiSrc/components'
 import { Text } from 'uiSrc/components/base/text'
-import { StreamEntryDto } from 'apiSrc/modules/browser/stream/dto'
+import { useTranslation } from 'uiSrc/i18n'
+import { StreamEntryDto } from 'apiClient'
 import StreamDataView from './StreamDataView'
 import styles from './StreamDataView/styles.module.scss'
 import {
@@ -55,19 +52,20 @@ export interface Props {
 }
 
 const StreamDataViewWrapper = (props: Props) => {
+  const { t } = useTranslation()
   const {
     entries: loadedEntries = [],
     keyName: key,
     keyNameString: keyString,
     lastRefreshTime,
-  } = useSelector(streamDataSelector)
-  const { id: instanceId, compressor = null } = useSelector(
+  } = useAppSelector(streamDataSelector)
+  const { id: instanceId, compressor = null } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { viewType: browserViewType } = useSelector(keysSelector)
-  const { viewFormat: viewFormatProp } = useSelector(selectedKeySelector)
+  const { viewType: browserViewType } = useAppSelector(keysSelector)
+  const { viewFormat: viewFormatProp } = useAppSelector(selectedKeySelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   // for Manager columns
   // const [uniqFields, setUniqFields] = useState({})
@@ -153,15 +151,19 @@ const StreamDataViewWrapper = (props: Props) => {
                       }}
                       data-testid={`stream-field-name-${field}`}
                     >
-                      <FormattedValue
-                        value={formattedValue}
-                        title={
-                          isValid
-                            ? 'Field'
-                            : TEXT_FAILED_CONVENT_FORMATTER(viewFormatProp)
-                        }
-                        tooltipContent={tooltipContent}
-                      />
+                      <Text variant="semiBold" color="primary">
+                        <FormattedValue
+                          value={formattedValue}
+                          title={
+                            isValid
+                              ? 'Field'
+                              : t('browser.keyDetails.failedConvertFormatter', {
+                                  format: viewFormatProp,
+                                })
+                          }
+                          tooltipContent={tooltipContent}
+                        />
+                      </Text>
                     </div>
                   ) : (
                     <div>&nbsp;</div>
@@ -180,7 +182,7 @@ const StreamDataViewWrapper = (props: Props) => {
     const headerRow = {
       id: {
         id: 'id',
-        label: 'Entry ID',
+        label: t('browser.stream.column.entryId'),
         sortable: true,
       },
       ...columnsNames,
@@ -282,9 +284,9 @@ const StreamDataViewWrapper = (props: Props) => {
 
       return (
         <Text
-          size="s"
           style={{ maxWidth: '100%', minHeight: '36px' }}
           component="div"
+          color="secondary"
         >
           <div
             style={{ display: 'flex', whiteSpace: 'break-spaces' }}
@@ -296,7 +298,9 @@ const StreamDataViewWrapper = (props: Props) => {
               title={
                 isValid
                   ? 'Value'
-                  : TEXT_FAILED_CONVENT_FORMATTER(viewFormatProp)
+                  : t('browser.keyDetails.failedConvertFormatter', {
+                      format: viewFormatProp,
+                    })
               }
               tooltipContent={tooltipContent}
               expanded={expanded}
@@ -311,7 +315,7 @@ const StreamDataViewWrapper = (props: Props) => {
 
   const idColumn: ITableColumn = {
     id: 'id',
-    label: 'Entry ID',
+    label: t('browser.stream.column.entryId'),
     maxWidth: minColumnWidth,
     minWidth: minColumnWidth,
     isSortable: true,
@@ -325,8 +329,8 @@ const StreamDataViewWrapper = (props: Props) => {
         <div style={{ minHeight: '38px' }}>
           {id.length < MAX_VISIBLE_LENGTH_STREAM_TIMESTAMP && (
             <Text
-              color="subdued"
               size="s"
+              color="secondary"
               style={{ maxWidth: '100%' }}
               component="div"
             >
@@ -343,7 +347,12 @@ const StreamDataViewWrapper = (props: Props) => {
               </div>
             </Text>
           )}
-          <Text size="s" style={{ maxWidth: '100%' }} className="truncateText">
+          <Text
+            component="div"
+            size="s"
+            style={{ maxWidth: '100%' }}
+            className="truncateText"
+          >
             <div
               className="streamItemId truncateText"
               data-testid={`stream-entry-${id}`}
@@ -386,14 +395,12 @@ const StreamDataViewWrapper = (props: Props) => {
   }
 
   return (
-    <>
-      <StreamDataView
-        data={entries}
-        columns={columns}
-        onClosePopover={closePopover}
-        {...props}
-      />
-    </>
+    <StreamDataView
+      data={entries}
+      columns={columns}
+      onClosePopover={closePopover}
+      {...props}
+    />
   )
 }
 

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   mockCommonClientMetadata,
+  mockCredentialProvider,
   mockDatabase,
   mockDatabaseAnalytics,
   mockDatabaseRepository,
@@ -29,12 +30,11 @@ import {
 } from 'src/__mocks__/redis-client';
 import { RedisClient } from 'src/modules/redis/client';
 import { ConnectionType } from 'src/modules/database/entities/database.entity';
-import {
-  RedisConnectionTimeoutException,
-} from 'src/modules/redis/exceptions/connection';
+import { RedisConnectionTimeoutException } from 'src/modules/redis/exceptions/connection';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseConnectionEvent } from 'src/modules/database/constants/events';
 import { InternalServerErrorException } from '@nestjs/common';
+import { CredentialStrategyProvider } from 'src/modules/database/credentials/credential-strategy.provider';
 
 describe('DatabaseClientFactory', () => {
   let service: DatabaseClientFactory;
@@ -80,6 +80,10 @@ describe('DatabaseClientFactory', () => {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
+        {
+          provide: CredentialStrategyProvider,
+          useFactory: mockCredentialProvider,
+        },
       ],
     }).compile();
 
@@ -122,7 +126,8 @@ describe('DatabaseClientFactory', () => {
     it('should only instantiate a single client per unique client metadata', async () => {
       const mockClientMetadata2: ClientMetadata = {
         sessionMetadata: {
-          userId: '4',
+          userId: 'user-4',
+          accountId: 'acc-4',
           sessionId: uuidv4(),
         },
         databaseId: uuidv4(),
@@ -164,7 +169,8 @@ describe('DatabaseClientFactory', () => {
     it('should reject multiple failed calls with the same error instance', async () => {
       const mockCommonClientMetadata2: ClientMetadata = {
         sessionMetadata: {
-          userId: '4',
+          userId: 'user-4',
+          accountId: 'acc-4',
           sessionId: uuidv4(),
         },
         databaseId: uuidv4(),

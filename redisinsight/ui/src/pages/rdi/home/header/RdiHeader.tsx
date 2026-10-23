@@ -1,10 +1,15 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
-import { instancesSelector } from 'uiSrc/slices/rdi/instances'
+import { instancesSelector, setShownColumns } from 'uiSrc/slices/rdi/instances'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
+import { getRdiColumnFieldNameMap, RdiListColumn } from 'uiSrc/constants'
+import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
+import ColumnsConfigPopover from 'uiSrc/components/columns-config/ColumnsConfigPopover'
+import { PlusIcon } from 'uiSrc/components/base/icons'
+import { useTranslation } from 'uiSrc/i18n'
 import SearchRdiList from '../search/SearchRdiList'
 
 export interface Props {
@@ -12,7 +17,24 @@ export interface Props {
 }
 
 const RdiHeader = ({ onRdiInstanceClick }: Props) => {
-  const { data: instances } = useSelector(instancesSelector)
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
+  const { data: instances, shownColumns } = useAppSelector(instancesSelector)
+
+  if (instances.length === 0) {
+    return null
+  }
+
+  const handleColumnsChange = (
+    next: RdiListColumn[],
+    diff: { shown: RdiListColumn[]; hidden: RdiListColumn[] },
+  ) => {
+    dispatch(setShownColumns(next))
+    sendEventTelemetry({
+      event: TelemetryEvent.RDI_INSTANCE_LIST_COLUMNS_CLICKED,
+      eventData: diff,
+    })
+  }
 
   return (
     <div className="containerDl">
@@ -21,14 +43,20 @@ const RdiHeader = ({ onRdiInstanceClick }: Props) => {
           <PrimaryButton
             onClick={onRdiInstanceClick}
             data-testid="rdi-instance"
+            icon={PlusIcon}
           >
-            <span>+ Endpoint</span>
+            {t('rdi.home.header.addButton')}
           </PrimaryButton>
         </FlexItem>
         {instances.length > 0 && (
-          <FlexItem className="searchContainer">
+          <Row justify="end" align="center" gap="l">
+            <ColumnsConfigPopover
+              columnsMap={getRdiColumnFieldNameMap(t)}
+              shownColumns={shownColumns}
+              onChange={handleColumnsChange}
+            />
             <SearchRdiList />
-          </FlexItem>
+          </Row>
         )}
       </Row>
       <Spacer className="spacerDl" />

@@ -8,7 +8,7 @@ import {
   GetAgreementsSpecResponse,
   GetAppSettingsResponse,
   UpdateSettingsDto,
-} from 'apiSrc/modules/settings/dto/settings.dto'
+} from 'apiClient'
 
 import { AppDispatch, RootState } from '../store'
 import { StateUserSettings } from '../interfaces/user'
@@ -204,12 +204,7 @@ export function updateUserConfigSettingsAction(
 }
 
 type ToggleAnalyticsReasonType =
-  | 'none'
-  | 'oauth-agreement'
-  | 'google'
-  | 'github'
-  | 'sso'
-  | 'user'
+  'none' | 'oauth-agreement' | 'google' | 'github' | 'sso' | 'user'
 
 export function enableUserAnalyticsAction(
   reason: ToggleAnalyticsReasonType = 'none',

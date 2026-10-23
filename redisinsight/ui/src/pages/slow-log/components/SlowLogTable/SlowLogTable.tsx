@@ -1,102 +1,91 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useParams } from 'react-router-dom'
-import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
-import VirtualTable from 'uiSrc/components/virtual-table/VirtualTable'
-import {
-  DURATION_UNITS,
-  DurationUnits,
-  SortOrder,
-  TableCellAlignment,
-  TableCellTextAlignment,
-} from 'uiSrc/constants'
+import { useTranslation } from 'uiSrc/i18n'
+import { DurationUnits, SortOrder } from 'uiSrc/constants'
 import { convertNumberByUnits } from 'uiSrc/pages/slow-log/utils'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { numberWithSpaces } from 'uiSrc/utils/numbers'
 import { Text } from 'uiSrc/components/base/text'
+import {
+  Table,
+  ColumnDef,
+  SortingState,
+} from 'uiSrc/components/base/layout/table'
 
 import { FormatedDate, RiTooltip } from 'uiSrc/components'
-import styles from '../styles.module.scss'
+
+import { SlowLog } from 'apiClient'
+import { StyledTableWrapper } from './SlowLogTable.styles'
 
 export const DATE_FORMAT = 'HH:mm:ss d LLL yyyy'
 
 export interface Props {
-  items: any
+  items: SlowLog[]
   loading: boolean
   durationUnit: DurationUnits
 }
 
-const sortByTimeStamp = (items = [], order: SortOrder) =>
-  [...items].sort((a: any, b: any) =>
-    order === SortOrder.DESC ? b.time - a.time : a.time - b.time,
-  )
-
 const SlowLogTable = (props: Props) => {
-  const { items = [], loading = false, durationUnit } = props
-  const [table, setTable] = useState<any>([])
-  const [sortedColumnName, setSortedColumnName] = useState('time')
-  const [sortedColumnOrder, setSortedColumnOrder] = useState(SortOrder.DESC)
+  const { items = [], durationUnit } = props
 
+  const { t } = useTranslation()
   const { instanceId } = useParams<{ instanceId: string }>()
-  const sortedColumn = {
-    column: sortedColumnName,
-    order: sortedColumnOrder,
-  }
 
-  useEffect(() => {
-    setTable(sortByTimeStamp(items, sortedColumnOrder))
-  }, [items, sortedColumnOrder])
+  const durationUnitLabel =
+    durationUnit === DurationUnits.milliSeconds
+      ? t('analytics.units.msec')
+      : t('analytics.units.microseconds')
 
-  const columns: ITableColumn[] = [
+  const columns: ColumnDef<SlowLog>[] = [
     {
       id: 'time',
-      label: 'Timestamp',
-      absoluteWidth: 190,
-      minWidth: 190,
-      isSortable: true,
-      render: (timestamp) => (
-        <Text
-          size="s"
-          color="subdued"
-          data-testid="timestamp-value"
-          className={styles.timestampCell}
-        >
-          <FormatedDate date={timestamp * 1000} />
-        </Text>
-      ),
+      header: t('analytics.slowLog.table.timestamp'),
+      accessorKey: 'time',
+      size: 200,
+      cell: ({ getValue }) => {
+        const date = (getValue() as number) * 1000
+
+        return <FormatedDate date={date} />
+      },
     },
     {
       id: 'durationUs',
-      label: `Duration, ${DURATION_UNITS.find(({ value }) => value === durationUnit)?.inputDisplay}`,
-      minWidth: 110,
-      absoluteWidth: 'auto',
-      textAlignment: TableCellTextAlignment.Right,
-      alignment: TableCellAlignment.Right,
-      render: (duration) => (
-        <Text size="s" color="subdued" data-testid="duration-value">
-          {numberWithSpaces(convertNumberByUnits(duration, durationUnit))}
-        </Text>
-      ),
+      header: t('analytics.slowLog.table.duration', {
+        unit: durationUnitLabel,
+      }),
+      accessorKey: 'durationUs',
+      size: 150,
+      cell: ({ getValue }) => {
+        const duration = getValue() as number
+
+        return (
+          <Text size="s" data-testid="duration-value">
+            {numberWithSpaces(convertNumberByUnits(duration, durationUnit))}
+          </Text>
+        )
+      },
     },
     {
       id: 'args',
-      label: 'Command',
-      render: (command) => (
-        <RiTooltip
-          position="bottom"
-          content={command}
-          anchorClassName={styles.commandTooltip}
-        >
-          <span className={styles.commandText} data-testid="command-value">
-            {command}
-          </span>
-        </RiTooltip>
-      ),
+      header: t('analytics.slowLog.table.command'),
+      accessorKey: 'args',
+      size: 850,
+      cell: ({ getValue }) => {
+        const command = getValue() as string
+
+        return (
+          <RiTooltip position="bottom" content={command}>
+            <span data-testid="command-value">{command}</span>
+          </RiTooltip>
+        )
+      },
     },
   ]
 
-  const onChangeSorting = (column: any, order: SortOrder) => {
-    setSortedColumnName(column)
-    setSortedColumnOrder(order)
+  const handleSortingChange = (state: SortingState) => {
+    const { desc } = state[0] || { desc: true }
+    const order = desc ? SortOrder.DESC : SortOrder.ASC
+
     sendEventTelemetry({
       event: TelemetryEvent.SLOWLOG_SORTED,
       eventData: {
@@ -107,17 +96,16 @@ const SlowLogTable = (props: Props) => {
   }
 
   return (
-    <div className={styles.tableWrapper} data-testid="slowlog-table">
-      <VirtualTable
-        selectable={false}
-        loading={loading}
-        items={table}
+    <StyledTableWrapper data-testid="slowlog-table">
+      <Table
         columns={columns}
-        sortedColumn={sortedColumn}
-        onChangeSorting={onChangeSorting}
-        hideFooter
+        data={items}
+        enableColumnResizing
+        onSortingChange={handleSortingChange}
+        maxHeight="60vh"
+        stripedRows
       />
-    </div>
+    </StyledTableWrapper>
   )
 }
 

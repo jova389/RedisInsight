@@ -1,8 +1,8 @@
-import { rest, RestHandler } from 'msw'
+import { http, HttpHandler, HttpResponse } from 'msw'
 import { ApiEndpoints } from 'uiSrc/constants'
 import { getMswURL } from 'uiSrc/utils/test-utils'
 import { getUrl } from 'uiSrc/utils'
-import { DatabaseRecommendationsResponse as RecommendationResponse } from 'apiSrc/modules/database-recommendation/dto/database-recommendations.response'
+import { DatabaseRecommendationsResponse as RecommendationResponse } from 'apiClient'
 import { INSTANCE_ID_MOCK } from '../instances/instancesHandlers'
 
 export const RECOMMENDATIONS_DATA_MOCK = {
@@ -13,16 +13,19 @@ export const RECOMMENDATIONS_DATA_MOCK = {
   totalUnread: 1,
 }
 
-const handlers: RestHandler[] = [
+const handlers: HttpHandler[] = [
   // fetchRecommendationsAction
-  rest.get<RecommendationResponse>(
+  http.get<any, RecommendationResponse>(
     getMswURL(getUrl(INSTANCE_ID_MOCK, ApiEndpoints.RECOMMENDATIONS)),
-    async (req, res, ctx) =>
-      res(ctx.status(200), ctx.json(RECOMMENDATIONS_DATA_MOCK)),
+    async () => {
+      return HttpResponse.json(RECOMMENDATIONS_DATA_MOCK, { status: 200 })
+    },
   ),
-  rest.delete(
+  http.delete(
     getMswURL(getUrl(INSTANCE_ID_MOCK, ApiEndpoints.RECOMMENDATIONS)),
-    async (req, res, ctx) => res(ctx.status(200)),
+    async () => {
+      return HttpResponse.text('', { status: 200 })
+    },
   ),
 ]
 

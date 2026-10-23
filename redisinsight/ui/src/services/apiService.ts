@@ -6,7 +6,10 @@ import axios, {
 import { isNumber } from 'lodash'
 import { sessionStorageService } from 'uiSrc/services'
 import { BrowserStorageItem, CustomErrorCodes } from 'uiSrc/constants'
-import { CLOUD_AUTH_API_ENDPOINTS, CustomHeaders } from 'uiSrc/constants/api'
+import ApiEndpoints, {
+  CLOUD_AUTH_API_ENDPOINTS,
+  CustomHeaders,
+} from 'uiSrc/constants/api'
 import { store } from 'uiSrc/slices/store'
 import { logoutUserAction } from 'uiSrc/slices/oauth/cloud'
 import { setConnectivityError } from 'uiSrc/slices/app/connectivity'
@@ -64,8 +67,15 @@ export const requestInterceptor = (config: InternalAxiosRequestConfig) => {
 
 export const cloudAuthInterceptor = (error: AxiosError) => {
   const { response, config } = error
+  // only the /cloud/me flow opens the MFA dialog, so keep the session for an
+  // mfa-required 401 there; elsewhere it has no handler and should log out
+  const isMfaChallengeOnLogin =
+    config?.url === ApiEndpoints.CLOUD_ME &&
+    (response?.data as { errorCode?: number })?.errorCode ===
+      CustomErrorCodes.CloudApiMfaRequired
   if (
     response?.status === 401 &&
+    !isMfaChallengeOnLogin &&
     config?.url &&
     CLOUD_AUTH_API_ENDPOINTS.includes(config.url as any)
   ) {
@@ -78,16 +88,20 @@ export const cloudAuthInterceptor = (error: AxiosError) => {
 export const hostedAuthInterceptor = (error: AxiosError) => {
   const { response } = error
   if (response?.status === 401 && hostedApiBaseUrl) {
+    const noPermission =
+      (response?.data as any)?.message === 'Insufficient permissions'
     // provide the current path to redirect back to the same location after login
-    window.location.href = `${riConfig.app.unauthenticatedRedirect}${window.location.pathname}`
+    window.location.href = noPermission
+      ? riConfig.app.returnUrlBase!
+      : `${riConfig.app.unauthenticatedRedirect}${window.location.pathname}`
   }
   return Promise.reject(error)
 }
 
 export const isConnectivityError = (
   status?: number,
-  data?: { code?: string; error?: string }
-): boolean  => {
+  data?: { code?: string; error?: string },
+): boolean => {
   if (!status || !data) {
     return false
   }
@@ -96,7 +110,10 @@ export const isConnectivityError = (
     case 424:
       return !!data.error?.startsWith?.('RedisConnection')
     case 503:
-      return data.code === 'serviceUnavailable' || data.error === 'Service Unavailable'
+      return (
+        data.code === 'serviceUnavailable' ||
+        data.error === 'Service Unavailable'
+      )
     default:
       return false
   }
@@ -115,7 +132,10 @@ export const connectivityErrorsInterceptor = (error: AxiosError) => {
   if (isConnectivityError(response?.status, responseData)) {
     let message
 
-    if (responseData?.errorCode === CustomErrorCodes.RedisConnectionDefaultUserDisabled) {
+    if (
+      responseData?.errorCode ===
+      CustomErrorCodes.RedisConnectionDefaultUserDisabled
+    ) {
       message = responseData?.message
     }
 
@@ -127,7 +147,9 @@ export const connectivityErrorsInterceptor = (error: AxiosError) => {
     )
 
     if (isConnectedToDatabase && isErrorTargetsConnectedDatabase) {
-      store?.dispatch<any>(setConnectivityError(message || ApiErrors.ConnectionLost))
+      store?.dispatch<any>(
+        setConnectivityError(message || ApiErrors.ConnectionLost),
+      )
     }
   }
 

@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { AxiosError } from 'axios'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import {
@@ -25,6 +26,7 @@ import { contentSelector } from 'uiSrc/slices/content/create-redis-buttons'
 import DatabasePanelDialog from 'uiSrc/pages/home/components/database-panel-dialog'
 import { Page, PageBody } from 'uiSrc/components/base/layout/page'
 import { FlexItem } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
 
 import './styles.scss'
 import styles from './styles.module.scss'
@@ -37,16 +39,17 @@ interface IState {
 const DEFAULT_STATE = { loading: true, error: '', data: null }
 
 const EditConnection = () => {
+  const { t } = useTranslation()
   const history = useHistory()
-  const dispatch = useDispatch()
-  const { server } = useSelector(appInfoSelector)
-  const { data: createDbContent } = useSelector(contentSelector)
+  const dispatch = useAppDispatch()
+  const { server } = useAppSelector(appInfoSelector)
+  const { data: createDbContent } = useAppSelector(contentSelector)
   const [state, setState] = useState<IState>(DEFAULT_STATE)
   const { theme } = useContext(ThemeContext)
 
   let isApiSubscribed = false
 
-  setTitle('Redis Stack')
+  setTitle(t('redisStack.title'))
 
   useEffect(() => {
     getInstanceInfo()
@@ -68,11 +71,11 @@ const EditConnection = () => {
         setState({ ...state, loading: false, data })
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
+      const errorMessage = getApiErrorMessage(error as AxiosError)
       if (isApiSubscribed) {
         setState({ ...state, loading: false, error: errorMessage })
       }
-      dispatch(addErrorNotification(error))
+      dispatch(addErrorNotification(error as AxiosError))
     }
   }
   const onInstanceChanged = () => {
@@ -113,7 +116,7 @@ const EditConnection = () => {
     <PagePlaceholder />
   ) : (
     <>
-      <PageHeader title="Redis Stack" />
+      <PageHeader title={t('redisStack.title')} />
       <div />
       <Page className="homePage redisStackConnection">
         <PageBody component="div" className={styles.container}>

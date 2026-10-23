@@ -1,16 +1,20 @@
 import React from 'react'
-import { NodePublicState } from 'react-vtree/dist/es/Tree'
 import { instance, mock } from 'ts-mockito'
 import { cloneDeep } from 'lodash'
+import reactRouterDom from 'react-router-dom'
+import { faker } from '@faker-js/faker'
 import { cleanup, mockedStore, render, screen } from 'uiSrc/utils/test-utils'
 import { stringToBuffer } from 'uiSrc/utils'
 import { KeyTypes, BrowserColumns } from 'uiSrc/constants'
-import Node from './Node'
-import { TreeData } from '../../interfaces'
+import Node, { NodeProps } from './Node'
+import { TreeData } from '../../VirtualTree.types'
 import { mockVirtualTreeResult } from '../../VirtualTree.spec'
 
+const mockPush = jest.fn()
+const mockInstanceId = faker.string.uuid()
+
 const mockDataFullName = 'test'
-const mockedProps = mock<NodePublicState<TreeData>>()
+const mockedProps = mock<NodeProps>()
 const mockedPropsData = mock<TreeData>()
 
 const mockedData: TreeData = {
@@ -30,6 +34,11 @@ const mockedDataWithMetadata = {
   size: 123,
 }
 
+jest.mock('uiSrc/telemetry', () => ({
+  ...jest.requireActual('uiSrc/telemetry'),
+  sendEventTelemetry: jest.fn(),
+}))
+
 jest.mock('uiSrc/services', () => ({
   ...jest.requireActual('uiSrc/services'),
   useDisposableWebworker: () => ({
@@ -38,18 +47,40 @@ jest.mock('uiSrc/services', () => ({
   }),
 }))
 
+jest.mock('uiSrc/components/hooks/useDatabaseEnvironment', () => ({
+  useDatabaseEnvironment: () => ({
+    environment: 'unspecified',
+    isDangerousCommand: () => false,
+  }),
+}))
+
 let store: typeof mockedStore
 beforeEach(() => {
   cleanup()
   store = cloneDeep(mockedStore)
   store.clearActions()
+  const state = store.getState()
+  state.connections.instances.connectedInstance.id = mockInstanceId
+  reactRouterDom.useHistory = jest.fn().mockReturnValue({ push: mockPush })
 })
+
+afterEach(() => {
+  jest.clearAllMocks()
+})
+
+const renderNode = (
+  props: Partial<NodeProps> = {},
+  options?: { store?: any },
+) => {
+  const mergedProps = { ...instance(mockedProps), ...props }
+  return render(<Node {...mergedProps} />, {
+    store: options?.store ?? store,
+  })
+}
 
 describe('Node', () => {
   it('should render', () => {
-    expect(
-      render(<Node {...instance(mockedProps)} data={mockedData} />),
-    ).toBeTruthy()
+    expect(renderNode({ data: mockedData })).toBeTruthy()
   })
 
   it('should render arrow and folder icons for Node properly', () => {
@@ -59,9 +90,7 @@ describe('Node', () => {
       fullName: mockDataFullName,
     }
 
-    const { container } = render(
-      <Node {...instance(mockedProps)} data={mockData} />,
-    )
+    const { container } = renderNode({ data: mockData })
 
     expect(
       container.querySelector(
@@ -88,14 +117,7 @@ describe('Node', () => {
       getMetadata: mockGetMetadata,
     }
 
-    render(
-      <Node
-        {...instance(mockedProps)}
-        setOpen={mockSetOpen}
-        isOpen={false}
-        data={mockData}
-      />,
-    )
+    renderNode({ setOpen: mockSetOpen, isOpen: false, data: mockData })
 
     screen.getByTestId(`node-item_${mockDataFullName}`).click()
 
@@ -118,14 +140,7 @@ describe('Node', () => {
       getMetadata: mockGetMetadata,
     }
 
-    render(
-      <Node
-        {...instance(mockedProps)}
-        setOpen={mockSetOpen}
-        isOpen={false}
-        data={mockData}
-      />,
-    )
+    renderNode({ setOpen: mockSetOpen, isOpen: false, data: mockData })
 
     screen.getByTestId(`node-item_${mockDataFullName}`).click()
 
@@ -136,9 +151,7 @@ describe('Node', () => {
   })
 
   it('name, ttl and size should be rendered', () => {
-    const { getByTestId } = render(
-      <Node {...instance(mockedProps)} data={mockedDataWithMetadata} />,
-    )
+    const { getByTestId } = renderNode({ data: mockedDataWithMetadata })
 
     expect(getByTestId(`node-item_${mockDataFullName}`)).toBeInTheDocument()
     expect(
@@ -162,14 +175,7 @@ describe('Node', () => {
       updateStatusOpen: mockUpdateStatusOpen,
     }
 
-    render(
-      <Node
-        {...instance(mockedProps)}
-        isOpen={false}
-        setOpen={mockSetOpen}
-        data={mockData}
-      />,
-    )
+    renderNode({ isOpen: false, setOpen: mockSetOpen, data: mockData })
 
     screen.getByTestId(`node-item_${mockDataFullName}`).click()
 
@@ -179,6 +185,209 @@ describe('Node', () => {
       !mockIsOpen,
     )
     expect(mockSetOpen).toBeCalledWith(!mockIsOpen)
+  })
+
+  describe('Folder delete', () => {
+    it('should render folder delete button for non-leaf nodes', () => {
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        delimiters: [':'],
+        onDeleteFolder: jest.fn(),
+      }
+
+      renderNode({ data: mockData })
+
+      expect(screen.getByTestId('delete-folder-btn-folder')).toBeInTheDocument()
+    })
+
+    it('should call onDeleteFolder with correct params when folder delete button is clicked', () => {
+      const mockOnDeleteFolder = jest.fn()
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'user:session',
+        keyCount: 42,
+        delimiters: [':'],
+        onDeleteFolder: mockOnDeleteFolder,
+      }
+
+      renderNode({ data: mockData })
+
+      screen.getByTestId('delete-folder-btn-user:session').click()
+
+      expect(mockOnDeleteFolder).toHaveBeenCalledWith(
+        'user:session:*',
+        'user:session',
+        42,
+      )
+    })
+
+    it('should disable folder delete when folder has unprintable characters', () => {
+      const mockOnDeleteFolder = jest.fn()
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder\uFFFD',
+        nameString: 'folder\uFFFD',
+        keyCount: 100,
+        delimiters: [':'],
+        onDeleteFolder: mockOnDeleteFolder,
+      }
+
+      renderNode({ data: mockData })
+
+      const deleteBtn = screen.getByTestId('delete-folder-btn-folder\uFFFD')
+      expect(deleteBtn).toBeDisabled()
+    })
+
+    it('should disable folder delete when multiple delimiters are configured', () => {
+      const mockOnDeleteFolder = jest.fn()
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        delimiters: [':', '-'],
+        onDeleteFolder: mockOnDeleteFolder,
+      }
+
+      renderNode({ data: mockData })
+
+      const deleteBtn = screen.getByTestId('delete-folder-btn-folder')
+      expect(deleteBtn).toBeDisabled()
+    })
+
+    it('should stop propagation when folder delete button is clicked', () => {
+      const mockOnDeleteFolder = jest.fn()
+      const mockUpdateStatusOpen = jest.fn()
+      const mockSetOpen = jest.fn()
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        delimiters: [':'],
+        onDeleteFolder: mockOnDeleteFolder,
+        updateStatusOpen: mockUpdateStatusOpen,
+      }
+
+      renderNode({ setOpen: mockSetOpen, isOpen: false, data: mockData })
+
+      screen.getByTestId('delete-folder-btn-folder').click()
+
+      expect(mockOnDeleteFolder).toHaveBeenCalled()
+      expect(mockSetOpen).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('showFolderMetadata', () => {
+    it('should hide folder actions when showFolderMetadata is false', () => {
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        keyApproximate: 50,
+        delimiters: [':'],
+        onDeleteFolder: jest.fn(),
+        showFolderMetadata: false,
+      }
+
+      renderNode({ data: mockData })
+
+      expect(screen.queryByTestId('percentage_folder')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('count_folder')).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId('delete-folder-btn-folder'),
+      ).not.toBeInTheDocument()
+    })
+
+    it('should show folder actions when showFolderMetadata is true', () => {
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        keyApproximate: 50,
+        delimiters: [':'],
+        onDeleteFolder: jest.fn(),
+        showFolderMetadata: true,
+      }
+
+      renderNode({ data: mockData })
+
+      expect(screen.getByTestId('percentage_folder')).toBeInTheDocument()
+      expect(screen.getByTestId('count_folder')).toBeInTheDocument()
+      expect(screen.getByTestId('delete-folder-btn-folder')).toBeInTheDocument()
+    })
+  })
+
+  describe('showDeleteAction', () => {
+    it('should hide leaf DeleteKeyPopover when showDeleteAction is false', () => {
+      const mockData: TreeData = {
+        ...mockedDataWithMetadata,
+        onDelete: jest.fn(),
+        onDeleteClicked: jest.fn(),
+        showDeleteAction: false,
+      }
+
+      renderNode({ data: mockData })
+
+      expect(
+        screen.queryByTestId(`delete-key-btn-${mockDataFullName}`),
+      ).not.toBeInTheDocument()
+    })
+
+    it('should show leaf DeleteKeyPopover when showDeleteAction is true', () => {
+      const mockData: TreeData = {
+        ...mockedDataWithMetadata,
+        onDelete: jest.fn(),
+        onDeleteClicked: jest.fn(),
+        showDeleteAction: true,
+      }
+
+      renderNode({ data: mockData })
+
+      expect(
+        screen.getByTestId(`delete-key-btn-${mockDataFullName}`),
+      ).toBeInTheDocument()
+    })
+
+    it('should show leaf DeleteKeyPopover by default when showDeleteAction is not set', () => {
+      const mockData: TreeData = {
+        ...mockedDataWithMetadata,
+        onDelete: jest.fn(),
+        onDeleteClicked: jest.fn(),
+      }
+
+      renderNode({ data: mockData })
+
+      expect(
+        screen.getByTestId(`delete-key-btn-${mockDataFullName}`),
+      ).toBeInTheDocument()
+    })
+
+    it('should still show folder metadata when showDeleteAction is false and showFolderMetadata is true', () => {
+      const mockData: TreeData = {
+        ...mockedData,
+        isLeaf: false,
+        fullName: 'folder',
+        keyCount: 100,
+        keyApproximate: 50,
+        delimiters: [':'],
+        onDeleteFolder: jest.fn(),
+        showFolderMetadata: true,
+        showDeleteAction: false,
+      }
+
+      renderNode({ data: mockData })
+
+      expect(screen.getByTestId('percentage_folder')).toBeInTheDocument()
+      expect(screen.getByTestId('count_folder')).toBeInTheDocument()
+    })
   })
 
   describe('Node metadata and column visibility', () => {
@@ -194,7 +403,7 @@ describe('Node', () => {
         updateStatusOpen: mockUpdateStatusOpen,
       }
 
-      render(<Node {...instance(mockedProps)} data={mockData} />)
+      renderNode({ data: mockData })
 
       screen.getByTestId(`node-item_${mockDataFullName}`).click()
 
@@ -218,7 +427,7 @@ describe('Node', () => {
         updateStatusOpen: mockUpdateStatusOpen,
       }
 
-      render(<Node {...instance(mockedProps)} data={mockData} />)
+      renderNode({ data: mockData })
 
       screen.getByTestId(`node-item_${mockDataFullName}`).click()
 
@@ -230,14 +439,14 @@ describe('Node', () => {
     })
 
     it('should render TTL and Size when metadata exists', () => {
-      render(<Node {...instance(mockedProps)} data={mockedDataWithMetadata} />)
+      renderNode({ data: mockedDataWithMetadata })
 
       expect(screen.getByTestId(`ttl-${mockDataFullName}`)).toBeInTheDocument()
       expect(screen.getByTestId(`size-${mockDataFullName}`)).toBeInTheDocument()
     })
 
     it('should not render TTL and Size when metadata does not exist', () => {
-      render(<Node {...instance(mockedProps)} data={mockedData} />)
+      renderNode({ data: mockedData })
 
       expect(
         screen.queryByTestId(`ttl-${mockDataFullName}`),
@@ -260,18 +469,28 @@ describe('Node', () => {
           getMetadata: mockGetMetadata,
         }
 
-        const store = {
-          getState: () => initialState,
-          subscribe: jest.fn(),
+        const connectionState = {
+          connections: {
+            instances: { connectedInstance: { id: mockInstanceId } },
+          },
+        }
+        // Hold the snapshot in a closure variable so `getState` returns a
+        // stable reference between renders. react-redux 9's
+        // `useSyncExternalStore` treats a fresh object as "state changed"
+        // and re-subscribes, which loops without this.
+        let stateSnapshot = { ...initialState, ...connectionState }
+        const customStore = {
+          getState: () => stateSnapshot,
+          subscribe: jest.fn(() => () => {}),
           dispatch: jest.fn(),
         }
 
-        const { rerender } = render(
-          <Node {...instance(mockedProps)} data={mockData} />,
-          { store },
+        const { rerender } = renderNode(
+          { data: mockData },
+          { store: customStore },
         )
 
-        store.getState = () => updatedState
+        stateSnapshot = { ...updatedState, ...connectionState }
 
         rerender(<Node {...instance(mockedProps)} data={mockData} />)
 
@@ -295,23 +514,29 @@ describe('Node', () => {
         onDeleteClicked: jest.fn(),
       }
 
-      const store = {
-        getState: () => ({
-          app: {
-            context: {
-              dbConfig: {
-                shownColumns: columns,
-              },
+      // Snapshot held in a closure so `getState` returns the same reference
+      // across react-redux 9's `useSyncExternalStore` calls.
+      const stateSnapshot = {
+        app: {
+          context: {
+            dbConfig: {
+              shownColumns: columns,
             },
           },
-        }),
-        subscribe: jest.fn(),
+        },
+        connections: {
+          instances: { connectedInstance: { id: mockInstanceId } },
+        },
+      }
+      const customStore = {
+        getState: () => stateSnapshot,
+        subscribe: jest.fn(() => () => {}),
         dispatch: jest.fn(),
       }
 
-      const { container } = render(
-        <Node {...instance(mockedProps)} data={mockData} />,
-        { store },
+      const { container } = renderNode(
+        { data: mockData },
+        { store: customStore },
       )
 
       expect(

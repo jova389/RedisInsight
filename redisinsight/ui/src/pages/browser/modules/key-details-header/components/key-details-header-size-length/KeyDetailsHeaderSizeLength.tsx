@@ -1,5 +1,5 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import {
   LENGTH_NAMING_BY_TYPE,
@@ -15,6 +15,7 @@ import { FlexItem } from 'uiSrc/components/base/layout/flex'
 import { Text } from 'uiSrc/components/base/text'
 import { RiTooltip } from 'uiSrc/components'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -22,8 +23,9 @@ export interface Props {
 }
 
 const KeyDetailsHeaderSizeLength = ({ width }: Props) => {
-  const { type, size, length } =
-    useSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  const { type, size, length, quantType, vectorDim, count } =
+    useAppSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  const { t } = useTranslation()
 
   const isSizeTooLarge = size === -1
 
@@ -32,24 +34,24 @@ const KeyDetailsHeaderSizeLength = ({ width }: Props) => {
       {size && (
         <FlexItem>
           <Text
-            color="subdued"
             size="s"
             className={styles.subtitleText}
             data-testid="key-size-text"
           >
             <RiTooltip
-              title="Key Size"
+              title={t('browser.keyDetails.size.tooltipTitle')}
               position="left"
               content={
                 <>
                   {isSizeTooLarge
-                    ? 'The key size is too large to run the MEMORY USAGE command, as it may lead to performance issues.'
+                    ? t('browser.keyDetails.size.tooLarge')
                     : formatBytes(size, 3)}
                 </>
               }
             >
               <>
-                {width > MIDDLE_SCREEN_RESOLUTION && 'Key Size: '}
+                {width > MIDDLE_SCREEN_RESOLUTION &&
+                  t('browser.keyDetails.size.label')}
                 {formatBytes(size, 0)}
                 {isSizeTooLarge && (
                   <>
@@ -70,16 +72,59 @@ const KeyDetailsHeaderSizeLength = ({ width }: Props) => {
       )}
       <FlexItem>
         <Text
-          color="subdued"
           size="s"
           className={styles.subtitleText}
           data-testid="key-length-text"
         >
-          {LENGTH_NAMING_BY_TYPE[type] ?? 'Length'}
+          {t(
+            LENGTH_NAMING_BY_TYPE[type] ?? 'browser.keyDetails.length.default',
+          )}
           {': '}
           {length ?? '-'}
         </Text>
       </FlexItem>
+      {quantType && (
+        <FlexItem>
+          <Text
+            size="s"
+            className={styles.subtitleText}
+            data-testid="key-quant-type-text"
+          >
+            {width > MIDDLE_SCREEN_RESOLUTION
+              ? t('browser.keyDetails.quantType.full')
+              : t('browser.keyDetails.quantType.short')}
+            {quantType}
+          </Text>
+        </FlexItem>
+      )}
+      {vectorDim !== undefined && (
+        <FlexItem>
+          <Text
+            size="s"
+            className={styles.subtitleText}
+            data-testid="key-vector-dim-text"
+          >
+            {width > MIDDLE_SCREEN_RESOLUTION
+              ? t('browser.keyDetails.vectorDim.full')
+              : t('browser.keyDetails.vectorDim.short')}
+            {vectorDim}
+          </Text>
+        </FlexItem>
+      )}
+      {count !== undefined && (
+        <FlexItem>
+          <Text
+            size="s"
+            className={styles.subtitleText}
+            data-testid="key-count-text"
+          >
+            {width > MIDDLE_SCREEN_RESOLUTION
+              ? t('browser.keyDetails.count.full')
+              : t('browser.keyDetails.count.short')}
+            {count}
+          </Text>
+        </FlexItem>
+      )}
     </>
   )
 }

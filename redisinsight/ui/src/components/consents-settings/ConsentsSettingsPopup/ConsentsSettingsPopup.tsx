@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
+import { useTranslation } from 'uiSrc/i18n'
 
 import { BuildType } from 'uiSrc/constants/env'
 import { appInfoSelector } from 'uiSrc/slices/app/info'
@@ -15,8 +16,9 @@ import { Modal } from 'uiSrc/components/base/display'
 import styles from '../styles.module.scss'
 
 const ConsentsSettingsPopup = () => {
+  const { t } = useTranslation()
   const history = useHistory()
-  const { server } = useSelector(appInfoSelector)
+  const { server } = useAppSelector(appInfoSelector)
 
   const handleSubmitted = () => {
     if (
@@ -44,8 +46,8 @@ const ConsentsSettingsPopup = () => {
       title={
         <Row justify="between">
           <FlexItem>
-            <Title size="L" className={styles.consentsPopupTitle}>
-              EULA and Privacy Settings
+            <Title size="XL" variant="semiBold" color="primary">
+              {t('consentsSettingsPopup.title')}
             </Title>
           </FlexItem>
           <FlexItem>

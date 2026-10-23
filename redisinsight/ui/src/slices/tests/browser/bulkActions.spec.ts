@@ -1,6 +1,11 @@
 import { cloneDeep } from 'lodash'
 import { AxiosError } from 'axios'
-import { BulkActionsStatus, BulkActionsType } from 'uiSrc/constants'
+import {
+  BulkActionConfirmation,
+  BulkActionsStatus,
+  BulkActionsType,
+  KeyTypes,
+} from 'uiSrc/constants'
 import reducer, {
   bulkActionsSelector,
   initialState,
@@ -11,11 +16,16 @@ import reducer, {
   setBulkActionType,
   setDeleteOverview,
   bulkActionsDeleteOverviewSelector,
+  bulkActionsDeleteSelector,
   disconnectBulkDeleteAction,
   bulkDeleteSuccess,
   setBulkDeleteStartAgain,
   setBulkUploadStartAgain,
   setBulkDeleteLoading,
+  setBulkDeleteConfirmedThrough,
+  setBulkDeleteFilter,
+  setBulkDeleteSearch,
+  setBulkDeleteKeyCount,
   bulkUpload,
   bulkUploadSuccess,
   bulkUploadFailed,
@@ -54,7 +64,7 @@ describe('bulkActions slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)
@@ -261,6 +271,144 @@ describe('bulkActions slice', () => {
           browser: { bulkActions: nextState },
         })
         expect(bulkActionsSelector(rootState)).toEqual(state)
+      })
+    })
+
+    describe('setBulkDeleteConfirmedThrough', () => {
+      it('should set confirmedThrough', () => {
+        const state = {
+          ...initialState.bulkDelete,
+          confirmedThrough: BulkActionConfirmation.TypeToConfirm,
+        }
+
+        const nextState = reducer(
+          initialState,
+          setBulkDeleteConfirmedThrough(BulkActionConfirmation.TypeToConfirm),
+        )
+
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState)).toEqual(state)
+      })
+
+      it('should reset confirmedThrough to null', () => {
+        const currentState = {
+          ...initialState,
+          bulkDelete: {
+            ...initialState.bulkDelete,
+            confirmedThrough: BulkActionConfirmation.TypeToConfirm,
+          },
+        }
+
+        const nextState = reducer(
+          currentState,
+          setBulkDeleteConfirmedThrough(null),
+        )
+
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState).confirmedThrough).toBeNull()
+      })
+    })
+
+    describe('setBulkDeleteFilter', () => {
+      it('should properly set filter', () => {
+        // Arrange
+        const state = {
+          ...initialState.bulkDelete,
+          filter: KeyTypes.Hash,
+        }
+
+        // Act
+        const nextState = reducer(
+          initialState,
+          setBulkDeleteFilter(KeyTypes.Hash),
+        )
+
+        // Assert
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState)).toEqual(state)
+      })
+
+      it('should properly set filter to null', () => {
+        // Arrange
+        const currentState = {
+          ...initialState,
+          bulkDelete: {
+            ...initialState.bulkDelete,
+            filter: KeyTypes.Hash,
+          },
+        }
+
+        // Act
+        const nextState = reducer(currentState, setBulkDeleteFilter(null))
+
+        // Assert
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState).filter).toBeNull()
+      })
+    })
+
+    describe('setBulkDeleteSearch', () => {
+      it('should properly set search pattern', () => {
+        // Arrange
+        const searchPattern = 'user:session:*'
+
+        // Act
+        const nextState = reducer(
+          initialState,
+          setBulkDeleteSearch(searchPattern),
+        )
+
+        // Assert
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState).search).toEqual(
+          searchPattern,
+        )
+      })
+    })
+
+    describe('setBulkDeleteKeyCount', () => {
+      it('should properly set key count', () => {
+        // Arrange
+        const keyCount = 42
+
+        // Act
+        const nextState = reducer(initialState, setBulkDeleteKeyCount(keyCount))
+
+        // Assert
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState).keyCount).toEqual(keyCount)
+      })
+
+      it('should properly set key count to null', () => {
+        // Arrange
+        const currentState = {
+          ...initialState,
+          bulkDelete: {
+            ...initialState.bulkDelete,
+            keyCount: 100,
+          },
+        }
+
+        // Act
+        const nextState = reducer(currentState, setBulkDeleteKeyCount(null))
+
+        // Assert
+        const rootState = Object.assign(initialStateDefault, {
+          browser: { bulkActions: nextState },
+        })
+        expect(bulkActionsDeleteSelector(rootState).keyCount).toBeNull()
       })
     })
 

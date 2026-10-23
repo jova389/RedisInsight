@@ -27,6 +27,8 @@ export default {
   UNDEFINED_INSTANCE_ID: 'Undefined redis database instance id.',
   NO_CONNECTION_TO_REDIS_DB: 'No connection to the Redis Database.',
   WRONG_DATABASE_TYPE: 'Wrong database type.',
+  HOST_PORT_NOT_EDITABLE_FOR_MANAGED_DATABASE:
+    'Host and port cannot be changed for a database managed by a cloud provider.',
   CONNECTION_TIMEOUT:
     'The connection has timed out, please check the connection details.',
   DB_CONNECTION_TIMEOUT:
@@ -44,7 +46,8 @@ export default {
     `Could not connect to ${url}, please check the CA or Client certificate.`,
   INCORRECT_CREDENTIALS: (url) =>
     `Could not connect to ${url}, please check the Username or Password.`,
-  DATABASE_DEFAULT_USER_DISABLED: 'Database does not have default user enabled.',
+  DATABASE_DEFAULT_USER_DISABLED:
+    'Database does not have default user enabled.',
   DATABASE_MANAGEMENT_IS_DISABLED:
     'Database connection management is disabled.',
   CA_CERT_EXIST: 'This ca certificate name is already in use.',
@@ -77,6 +80,11 @@ export default {
   DATABASE_ALREADY_EXISTS: 'The database already exists.',
 
   INCORRECT_CLUSTER_CURSOR_FORMAT: 'Incorrect cluster cursor format.',
+  ARRAY_RANGE_TOO_LARGE: (max: number) =>
+    `Requested range exceeds the maximum of ${numberWithSpaces(max)} elements per call. Narrow the range and try again.`,
+  ARRAY_MATCH_VALUE_REQUIRED: 'value is required for MATCH operation.',
+  ARRAY_IS_FULL:
+    'The array has reached the maximum index (2^64-2), so there is no position left to append to.',
   REMOVING_MULTIPLE_ELEMENTS_NOT_SUPPORT: () =>
     'Removing multiple elements is available for Redis databases v. 6.2 or later.',
   SCAN_PER_KEY_TYPE_NOT_SUPPORT: () =>
@@ -102,6 +110,8 @@ export default {
     `Node ${node} not exist in OSS Cluster.`,
   REDIS_MODULE_IS_REQUIRED: (module: string) =>
     `Required ${module} module is not loaded.`,
+  UNABLE_TO_LIST_VECTOR_SET_ELEMENTS: (commands: string[]) =>
+    `Unable to list vector set elements. The following commands failed: ${commands.join(', ')}.`,
   APP_SETTINGS_NOT_FOUND: () => 'Could not find application settings.',
   SERVER_INFO_NOT_FOUND: () => 'Could not find server info.',
   INCREASE_MINIMUM_LIMIT: (count?: number) =>
@@ -124,6 +134,11 @@ export default {
     'Unable to get required data from the user profile.',
   CLOUD_OAUTH_UNKNOWN_AUTHORIZATION_REQUEST: 'Unknown authorization request.',
   CLOUD_OAUTH_UNEXPECTED_ERROR: 'Unexpected error.',
+  CLOUD_MFA_REQUIRED:
+    'Multi-factor authentication is required to complete sign in.',
+  CLOUD_MFA_INVALID_CODE: 'Invalid or expired code. Please try again.',
+  CLOUD_MFA_QUOTA_EXCEEDED:
+    'Too many authentication attempts. Wait a few minutes and sign in again.',
 
   CLOUD_JOB_UNEXPECTED_ERROR: 'Unexpected error occurred',
   CLOUD_JOB_ABORTED: 'Cloud job aborted',
@@ -140,9 +155,11 @@ export default {
   CLOUD_TASK_NOT_FOUND: 'Cloud task was not found',
   CLOUD_DATABASE_IN_FAILED_STATE: 'Cloud database is in the failed state',
   CLOUD_DATABASE_IN_UNEXPECTED_STATE: 'Cloud database is in unexpected state',
-  CLOUD_DATABASE_ALREADY_EXISTS_FREE: 'Free trial database already exists',
+  CLOUD_DATABASE_ALREADY_EXISTS_FREE: 'Free database already exists',
   CLOUD_DATABASE_IMPORT_FORBIDDEN:
     'Adding your Redis Cloud database to Redis Insight is disabled due to a setting restricting database connection management.',
+  CLOUD_DATABASE_ENDPOINT_INVALID:
+    'Database endpoint is unavailable. It may still be provisioning or has been disabled.',
   CLOUD_PLAN_NOT_FOUND_FREE: 'Unable to find free cloud plan',
   CLOUD_SUBSCRIPTION_ALREADY_EXISTS_FREE: 'Free subscription already exists',
   COMMON_DEFAULT_IMPORT_ERROR: 'Unable to import default data',
@@ -159,8 +176,22 @@ export default {
     'Encountered a timeout error while attempting to retrieve data',
   RDI_VALIDATION_ERROR: 'Validation error',
   INVALID_RDI_INSTANCE_ID: 'Invalid rdi instance id.',
-  UNSAFE_BIG_JSON_LENGTH: 'This JSON is too large. Try opening it with Redis Insight Desktop.',
+  UNSAFE_BIG_JSON_LENGTH:
+    'This JSON is too large. Try opening it with Redis Insight Desktop.',
 
   // database settings
   DATABASE_SETTINGS_NOT_FOUND: 'Could not find settings for this database',
+
+  // Azure autodiscovery
+  AZURE_DATABASE_NOT_FOUND: 'Database not found',
+  AZURE_FAILED_TO_GET_CONNECTION_DETAILS: 'Failed to get connection details',
+  AZURE_ENTRA_ID_AUTH_FAILED:
+    'Failed to authenticate with Entra ID. Please make sure your user has the correct permissions (Data Owner, Data Contributor, or Data Reader role).',
+  AZURE_ACCESS_KEY_AUTH_FAILED:
+    'Failed to authenticate with Access Key. The key may have been regenerated or access keys may be disabled for this database.',
+  AZURE_UNEXPECTED_ERROR: 'An unexpected error occurred',
+  AZURE_TLS_CERTIFICATE_ERROR:
+    'Could not establish a secure connection. The server certificate could not be verified.',
+  AZURE_ENTRA_ID_TOKEN_EXPIRED:
+    'Azure Entra ID token expired. Sign in to Azure again to continue.',
 };

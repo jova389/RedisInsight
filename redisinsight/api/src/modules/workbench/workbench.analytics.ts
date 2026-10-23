@@ -6,11 +6,20 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CommandsService } from 'src/modules/commands/commands.service';
 import { CommandTelemetryBaseService } from 'src/modules/analytics/command.telemetry.base.service';
 import { SessionMetadata } from 'src/common/models';
+import { Environment } from 'src/modules/database/entities/database.entity';
+import { CommandExecutionType } from './models/command-execution';
 
 export interface IExecResult {
   response: any;
   status: CommandExecutionStatus;
   error?: RedisError | ReplyError | Error;
+}
+
+export interface WorkbenchCommandEventData {
+  command?: string;
+  rawMode?: boolean;
+  environment?: Environment;
+  isDangerous?: 'true' | 'false';
 }
 
 @Injectable()
@@ -22,24 +31,26 @@ export class WorkbenchAnalytics extends CommandTelemetryBaseService {
     super(eventEmitter, commandsService);
   }
 
-  sendIndexInfoEvent(
+  async sendIndexInfoEvent(
     sessionMetadata: SessionMetadata,
     databaseId: string,
-    additionalData: object,
-  ): void {
+    commandExecutionType: CommandExecutionType,
+    additionalData: object | null,
+  ): Promise<void> {
     if (!additionalData) {
       return;
     }
 
     try {
-      this.sendEvent(
-        sessionMetadata,
-        TelemetryEvents.WorkbenchIndexInfoSubmitted,
-        {
-          databaseId,
-          ...additionalData,
-        },
-      );
+      const event =
+        commandExecutionType === CommandExecutionType.Search
+          ? TelemetryEvents.SearchIndexInfoSubmitted
+          : TelemetryEvents.WorkbenchIndexInfoSubmitted;
+
+      this.sendEvent(sessionMetadata, event, {
+        databaseId,
+        ...additionalData,
+      });
     } catch (e) {
       // ignore error
     }
@@ -48,8 +59,9 @@ export class WorkbenchAnalytics extends CommandTelemetryBaseService {
   public async sendCommandExecutedEvents(
     sessionMetadata: SessionMetadata,
     databaseId: string,
+    commandExecutionType: CommandExecutionType,
     results: IExecResult[],
-    additionalData: object = {},
+    additionalData: WorkbenchCommandEventData = {},
   ): Promise<void> {
     try {
       await Promise.all(
@@ -57,6 +69,7 @@ export class WorkbenchAnalytics extends CommandTelemetryBaseService {
           this.sendCommandExecutedEvent(
             sessionMetadata,
             databaseId,
+            commandExecutionType,
             result,
             additionalData,
           ),
@@ -70,27 +83,33 @@ export class WorkbenchAnalytics extends CommandTelemetryBaseService {
   public async sendCommandExecutedEvent(
     sessionMetadata: SessionMetadata,
     databaseId: string,
+    commandExecutionType: CommandExecutionType,
     result: IExecResult,
-    additionalData: object = {},
+    additionalData: WorkbenchCommandEventData = {},
   ): Promise<void> {
     const { status } = result;
     try {
+      const { command } = additionalData;
       if (status === CommandExecutionStatus.Success) {
-        this.sendEvent(
-          sessionMetadata,
-          TelemetryEvents.WorkbenchCommandExecuted,
-          {
-            databaseId,
-            ...(await this.getCommandAdditionalInfo(additionalData['command'])),
-            ...additionalData,
-          },
-        );
-      }
-      if (status === CommandExecutionStatus.Fail) {
-        this.sendCommandErrorEvent(sessionMetadata, databaseId, result.error, {
-          ...(await this.getCommandAdditionalInfo(additionalData['command'])),
+        const event =
+          commandExecutionType === CommandExecutionType.Search
+            ? TelemetryEvents.SearchCommandExecuted
+            : TelemetryEvents.WorkbenchCommandExecuted;
+
+        this.sendEvent(sessionMetadata, event, {
+          databaseId,
+          ...(await this.getCommandAdditionalInfo(command)),
           ...additionalData,
         });
+      }
+      if (status === CommandExecutionStatus.Fail) {
+        await this.sendCommandErrorEvent(
+          sessionMetadata,
+          databaseId,
+          result.error,
+          commandExecutionType,
+          additionalData,
+        );
       }
     } catch (e) {
       // continue regardless of error
@@ -108,34 +127,36 @@ export class WorkbenchAnalytics extends CommandTelemetryBaseService {
     });
   }
 
-  private sendCommandErrorEvent(
+  private async sendCommandErrorEvent(
     sessionMetadata: SessionMetadata,
     databaseId: string,
     error: any,
-    additionalData: object = {},
-  ): void {
+    commandExecutionType: CommandExecutionType,
+    additionalData: WorkbenchCommandEventData = {},
+  ): Promise<void> {
     try {
+      const event =
+        commandExecutionType === CommandExecutionType.Search
+          ? TelemetryEvents.SearchCommandErrorReceived
+          : TelemetryEvents.WorkbenchCommandErrorReceived;
+
+      const { command } = additionalData;
+      const commandInfo = await this.getCommandAdditionalInfo(command);
+
       if (error instanceof HttpException) {
-        this.sendFailedEvent(
-          sessionMetadata,
-          TelemetryEvents.WorkbenchCommandErrorReceived,
-          error,
-          {
-            databaseId,
-            ...additionalData,
-          },
-        );
+        this.sendFailedEvent(sessionMetadata, event, error, {
+          databaseId,
+          ...commandInfo,
+          ...additionalData,
+        });
       } else {
-        this.sendEvent(
-          sessionMetadata,
-          TelemetryEvents.WorkbenchCommandErrorReceived,
-          {
-            databaseId,
-            error: error.name,
-            command: error?.command?.name,
-            ...additionalData,
-          },
-        );
+        this.sendEvent(sessionMetadata, event, {
+          databaseId,
+          error: error.name,
+          command: error?.command?.name,
+          ...commandInfo,
+          ...additionalData,
+        });
       }
     } catch (e) {
       // continue regardless of error

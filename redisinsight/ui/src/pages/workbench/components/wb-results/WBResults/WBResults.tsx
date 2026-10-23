@@ -1,6 +1,7 @@
 import React from 'react'
 import cx from 'classnames'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { CodeButtonParams } from 'uiSrc/constants'
 import { ProfileQueryType } from 'uiSrc/pages/workbench/constants'
 import { generateProfileQueryForCommand } from 'uiSrc/pages/workbench/utils/profile'
@@ -16,6 +17,7 @@ import WbNoResultsMessage from '../../wb-no-results-message'
 
 import styles from './styles.module.scss'
 
+/** @deprecated Use QueryResultsProps from 'uiSrc/components/query/query-results' instead. */
 export interface Props {
   isResultsLoaded: boolean
   items: CommandExecutionUI[]
@@ -38,7 +40,10 @@ export interface Props {
     executeParams?: CodeButtonParams,
   ) => void
 }
+
+/** @deprecated Use QueryResults from 'uiSrc/components/query/query-results' instead. */
 const WBResults = (props: Props) => {
+  const { t } = useTranslation()
   const {
     isResultsLoaded,
     items = [],
@@ -76,10 +81,7 @@ const WBResults = (props: Props) => {
   return (
     <div className={styles.wrapper}>
       {!isResultsLoaded && (
-        <ProgressBarLoader
-          color="primary"
-          data-testid="progress-wb-history"
-        />
+        <ProgressBarLoader color="primary" data-testid="progress-wb-history" />
       )}
       {!!items?.length && (
         <div className={styles.header}>
@@ -91,7 +93,7 @@ const WBResults = (props: Props) => {
             disabled={clearing || processing}
             data-testid="clear-history-btn"
           >
-            Clear Results
+            {t('workbench.results.clear')}
           </EmptyButton>
         </div>
       )}

@@ -1,14 +1,12 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
-import {
-  theme as redisUiOldTheme,
-  themeLight,
-  themeDark,
-} from '@redis-ui/styles'
+import { CommonStyles, themesDefault } from '@redis-ui/styles'
+import 'modern-normalize/modern-normalize.css'
 import '@redis-ui/styles/normalized-styles.css'
 import '@redis-ui/styles/fonts.css'
 
-import { ipcThemeChange } from 'uiSrc/electron/utils'
+import { ipcThemeChange } from 'uiSrc/electron/utils/ipcThemeChange'
+import { GlobalStyles } from 'uiSrc/styles/globalStyles'
 import {
   BrowserStorageItem,
   Theme,
@@ -22,7 +20,17 @@ interface Props {
   children: React.ReactNode
 }
 
+const { light: themeLight, dark: themeDark } = themesDefault
 const THEME_NAMES = THEMES.map(({ value }) => value)
+
+const getQueryTheme = () => {
+  const queryThemeParam = new URLSearchParams(window.location.search)
+    .get('theme')
+    ?.toUpperCase()
+    .split('-')[0]
+
+  return THEMES.find(({ value }) => value === queryThemeParam)?.value
+}
 
 export const defaultState = {
   theme: DEFAULT_THEME || Theme.System,
@@ -33,20 +41,30 @@ export const defaultState = {
   },
 }
 
+export const isValidTheme = (theme: unknown): theme is Theme => {
+  return typeof theme === 'string' && THEME_NAMES.includes(theme as Theme)
+}
+
 export const ThemeContext = React.createContext(defaultState)
 
 export class ThemeProvider extends React.Component<Props> {
   constructor(props: any) {
     super(props)
 
+    const queryTheme = getQueryTheme()
     const storedThemeValue = localStorageService.get(BrowserStorageItem.theme)
-    const theme =
-      !storedThemeValue || !THEME_NAMES.includes(storedThemeValue)
-        ? defaultState.theme
-        : storedThemeValue
+
+    let theme = defaultState.theme
+
+    if (queryTheme) {
+      theme = queryTheme
+    } else if (storedThemeValue && isValidTheme(storedThemeValue)) {
+      theme = storedThemeValue
+    }
+
     const usingSystemTheme = theme === Theme.System
 
-    themeService.applyTheme(theme)
+    themeService.applyTheme(theme as Theme)
 
     this.state = {
       theme: theme === Theme.System ? this.getSystemTheme() : theme,
@@ -80,12 +98,7 @@ export class ThemeProvider extends React.Component<Props> {
   render() {
     const { children } = this.props
     const { theme, usingSystemTheme }: any = this.state
-    const uiTheme =
-      theme === Theme.Dark
-        ? themeDark
-        : theme === Theme.Light
-          ? themeLight
-          : redisUiOldTheme
+    const uiTheme = theme === Theme.Dark ? themeDark : themeLight
     return (
       <ThemeContext.Provider
         value={{
@@ -94,10 +107,18 @@ export class ThemeProvider extends React.Component<Props> {
           changeTheme: this.changeTheme,
         }}
       >
-        <StyledThemeProvider theme={uiTheme}>{children}</StyledThemeProvider>
+        <StyledThemeProvider theme={uiTheme}>
+          <CommonStyles />
+          <GlobalStyles />
+          {children}
+        </StyledThemeProvider>
       </ThemeContext.Provider>
     )
   }
+}
+
+export const useThemeContext = () => {
+  return useContext(ThemeContext)
 }
 
 export default ThemeProvider

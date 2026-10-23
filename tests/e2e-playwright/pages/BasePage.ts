@@ -1,0 +1,245 @@
+import { Page, Locator, expect } from '@playwright/test';
+
+/**
+ * Base Page Object class with common functionality
+ * All page objects should extend this class
+ *
+ * Navigation is UI-based for cross-platform compatibility (browser + Electron)
+ */
+export abstract class BasePage {
+  // Bounded wait for the databases list to render at least one row. Kept short
+  // so an empty/stale list falls through to a reload instead of blocking for
+  // the full test timeout.
+  private static readonly DATABASE_LIST_TIMEOUT_MS = 10_000;
+
+  readonly page: Page;
+
+  // Common UI elements
+  readonly loadingSpinner: Locator;
+  readonly toastSuccess: Locator;
+  readonly toastError: Locator;
+  readonly toastContainer: Locator;
+
+  // Navigation elements
+  readonly redisLogo: Locator;
+  readonly homeTabs: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+
+    // Navigation locators
+    this.redisLogo = page.getByTestId('redis-logo-link');
+    this.homeTabs = page.getByTestId('home-tabs');
+
+    // Common locators
+    this.loadingSpinner = page.locator('[data-testid="loading-spinner"], .loading-spinner');
+    this.toastSuccess = page.locator('.toast-success, [data-testid="toast-success"]');
+    this.toastError = page.locator('.toast-error, [data-testid="toast-error"]');
+    this.toastContainer = page.locator('.Toastify, [data-testid="toast-container"]');
+  }
+
+  // ===========================================
+  // Navigation Methods (UI-based, works on all platforms)
+  // ===========================================
+
+  /**
+   * Navigate to the home page (databases list)
+   * Click the Redis logo - works on both browser and Electron
+   */
+  async gotoHome(): Promise<void> {
+    await this.redisLogo.click();
+    await this.homeTabs.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  /**
+   * Navigate to a specific database instance (opens Browser page by default)
+   * Waits for database to be connected (navigation tabs visible)
+   * @param databaseId - ID of the database to connect to
+   */
+  async gotoDatabase(databaseId: string): Promise<void> {
+    await this.gotoHome();
+
+    const dbRow = this.page.getByTestId(`instance-name-${databaseId}`);
+
+    await this.paginateToRow(dbRow);
+
+    // The database may have been created via API after the home page
+    // fetched its list. Clicking the logo while already on "/" doesn't
+    // trigger a data re-fetch, so the list can be stale. Reload once
+    // to get a fresh list and retry pagination.
+    if (!(await dbRow.isVisible())) {
+      await this.page.reload();
+      await this.paginateToRow(dbRow);
+    }
+
+    await dbRow.click();
+    await this.page.getByRole('tab', { name: 'Browse' }).waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Wait for the database list to load, then paginate through all pages
+   * starting from page 1 until {@link row} is visible or no more pages remain.
+   */
+  private async paginateToRow(row: Locator): Promise<void> {
+    const firstPage = this.page.getByRole('button', { name: 'first page' });
+    const nextPage = this.page.getByRole('button', { name: 'next page' });
+
+    // Empty list (e.g. a DB was just created via API and the cached home list
+    // is stale) — bail out so gotoDatabase() can reload and retry instead of
+    // blocking here for the full test timeout.
+    if (!(await this.waitForDatabaseList())) return;
+
+    // Always start from page 1 so we scan every page. Bail if page 1 doesn't
+    // render so gotoDatabase() can reload and retry.
+    if ((await firstPage.isVisible()) && (await firstPage.isEnabled())) {
+      await firstPage.click();
+      if (!(await this.waitForDatabaseList())) return;
+    }
+
+    while (!(await row.isVisible())) {
+      if (!(await nextPage.isVisible()) || !(await nextPage.isEnabled())) break;
+      await nextPage.click();
+      // Stop paginating if the next page fails to render rows, rather than
+      // blindly advancing past a page that may hold the target row.
+      if (!(await this.waitForDatabaseList())) break;
+    }
+  }
+
+  /**
+   * Wait (briefly) for the databases list to render at least one row.
+   * Returns false instead of throwing when the list is empty, so callers can
+   * reload a stale list rather than blocking for the whole test timeout.
+   */
+  private async waitForDatabaseList(): Promise<boolean> {
+    try {
+      await this.page
+        .getByTestId(/^instance-name-/)
+        .first()
+        .waitFor({
+          state: 'visible',
+          timeout: BasePage.DATABASE_LIST_TIMEOUT_MS,
+        });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Navigate to this page's URL
+   * Must be implemented by each page
+   * @param options - Optional navigation options (e.g., databaseId)
+   */
+  abstract goto(...args: unknown[]): Promise<void>;
+
+  /**
+   * Wait for page to be fully loaded
+   * Override in child classes for page-specific loading indicators
+   */
+  async waitForLoad(): Promise<void> {
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.waitForSpinnerToDisappear();
+  }
+
+  /**
+   * Wait for loading spinner to disappear
+   */
+  async waitForSpinnerToDisappear(timeout = 30000): Promise<void> {
+    try {
+      await this.loadingSpinner.waitFor({ state: 'hidden', timeout });
+    } catch {
+      // Spinner might not appear at all, which is fine
+    }
+  }
+
+  /**
+   * Wait for a success toast to appear
+   */
+  async waitForSuccessToast(timeout = 10000): Promise<void> {
+    await expect(this.toastSuccess).toBeVisible({ timeout });
+  }
+
+  /**
+   * Wait for an error toast to appear
+   */
+  async waitForErrorToast(timeout = 10000): Promise<void> {
+    await expect(this.toastError).toBeVisible({ timeout });
+  }
+
+  /**
+   * Dismiss all toasts
+   */
+  async dismissToasts(): Promise<void> {
+    const closeButtons = this.toastContainer.locator('button[aria-label="close"], .Toastify__close-button');
+    const count = await closeButtons.count();
+    for (let i = 0; i < count; i++) {
+      await closeButtons
+        .nth(i)
+        .click()
+        .catch(() => {});
+    }
+  }
+
+  /**
+   * Take a screenshot for debugging
+   */
+  async screenshot(name: string): Promise<void> {
+    await this.page.screenshot({ path: `test-results/screenshots/${name}.png`, fullPage: true });
+  }
+
+  /**
+   * Get current page URL
+   */
+  getUrl(): string {
+    return this.page.url();
+  }
+
+  /**
+   * Check if element is visible
+   */
+  async isVisible(locator: Locator, timeout = 5000): Promise<boolean> {
+    try {
+      await expect(locator).toBeVisible({ timeout });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait for URL to contain specific path
+   */
+  async waitForUrl(urlPattern: string | RegExp, timeout = 10000): Promise<void> {
+    await this.page.waitForURL(urlPattern, { timeout });
+  }
+
+  /**
+   * Reload the page and wait for load
+   */
+  async reload(): Promise<void> {
+    await this.page.reload();
+    await this.waitForLoad();
+  }
+
+  /**
+   * Press keyboard shortcut
+   */
+  async pressKey(key: string): Promise<void> {
+    await this.page.keyboard.press(key);
+  }
+
+  /**
+   * Fill input with clear first
+   */
+  async fillInput(locator: Locator, value: string): Promise<void> {
+    await locator.clear();
+    await locator.fill(value);
+  }
+
+  /**
+   * Click and wait for navigation
+   */
+  async clickAndWaitForNavigation(locator: Locator): Promise<void> {
+    await Promise.all([this.page.waitForURL(/.*/, { waitUntil: 'domcontentloaded' }), locator.click()]);
+  }
+}

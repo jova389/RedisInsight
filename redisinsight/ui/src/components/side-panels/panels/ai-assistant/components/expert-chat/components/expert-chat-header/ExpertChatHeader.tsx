@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import cx from 'classnames'
 
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import {
@@ -18,7 +18,7 @@ import {
   setExplorePanelIsPageOpen,
 } from 'uiSrc/slices/panels/sidePanels'
 import { RestartChat } from 'uiSrc/components/side-panels/panels/ai-assistant/components/shared'
-
+import { Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { EmptyButton, PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import { EraserIcon, LightBulbIcon } from 'uiSrc/components/base/icons'
@@ -37,7 +37,7 @@ const ExpertChatHeader = (props: Props) => {
     props
   const [isTutorialsPopoverOpen, setIsTutorialsPopoverOpen] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const history = useHistory()
 
   const handleOpenTutorials = () => {
@@ -102,18 +102,20 @@ const ExpertChatHeader = (props: Props) => {
             }
           >
             <>
-              <Text>
+              <Text size="m" color="primary">
                 Open relevant tutorials to learn more about search and query.
               </Text>
-              <Spacer size="s" />
-              <PrimaryButton
-                size="s"
-                onClick={handleOpenTutorials}
-                className={styles.openTutorialsBtn}
-                data-testid="ai-expert-open-tutorials"
-              >
-                Open tutorials
-              </PrimaryButton>
+              <Spacer size="l" />
+              <Row justify="end">
+                <PrimaryButton
+                  size="s"
+                  onClick={handleOpenTutorials}
+                  className={styles.openTutorialsBtn}
+                  data-testid="ai-expert-open-tutorials"
+                >
+                  Open tutorials
+                </PrimaryButton>
+              </Row>
             </>
           </RiPopover>
         </RiTooltip>

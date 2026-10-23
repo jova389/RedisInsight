@@ -1,0 +1,594 @@
+import { request, APIRequestContext } from '@playwright/test';
+import { AddDatabaseConfig, DatabaseInstance, IndexSchemaField } from 'e2eSrc/types';
+import { TEST_DB_PREFIX } from 'e2eSrc/test-data/databases';
+import { retry } from './retry';
+
+/**
+ * API Helper for database operations
+ * Used for test setup/teardown to avoid slow UI interactions
+ */
+export class ApiHelper {
+  private context: APIRequestContext | null = null;
+  private readonly apiUrl: string;
+  private readonly windowId?: string;
+
+  constructor(options: { apiUrl: string; windowId?: string }) {
+    this.apiUrl = options.apiUrl;
+    this.windowId = options.windowId;
+  }
+
+  private async getContext(): Promise<APIRequestContext> {
+    if (!this.context) {
+      this.context = await request.newContext({
+        baseURL: this.apiUrl,
+        // Ignore HTTPS certificate errors for self-signed certificates (used in Electron tests)
+        ignoreHTTPSErrors: true,
+        // Include X-Window-Id header for Electron app authentication
+        extraHTTPHeaders: this.windowId ? { 'X-Window-Id': this.windowId } : undefined,
+      });
+    }
+    return this.context;
+  }
+
+  /**
+   * Create a database via API.
+   *
+   * Retried because creation makes the app open a Redis connection to validate the
+   * target, so a transient connection fault fails the whole call. The app reports
+   * such a fault as `404 Cannot POST /api/databases`, which is indistinguishable
+   * from a genuinely missing route, so the status cannot be used to decide whether
+   * retrying is worthwhile.
+   *
+   * This covers brief faults only. A sustained one needs its own cause found: the
+   * long stalls once seen in the Docker job came from the app being unable to
+   * resolve the hostnames the cluster advertises, fixed in the compose file rather
+   * than by waiting longer here.
+   */
+  async createDatabase(config: AddDatabaseConfig): Promise<DatabaseInstance> {
+    let attempts = 0;
+
+    return retry(
+      async () => {
+        attempts += 1;
+
+        // A create can succeed on the server and still fail the client, e.g. a
+        // reset connection while reading the response. Retrying blindly would add
+        // a second database, and duplicate names are allowed, so adopt the one a
+        // previous attempt left behind instead. Matched on the connection details
+        // too, so a same-named database pointing elsewhere is never adopted.
+        if (attempts > 1) {
+          const existing = (await this.getDatabases()).find(
+            (database) =>
+              database.name === config.name && database.host === config.host && database.port === config.port,
+          );
+          if (existing) return existing;
+        }
+
+        return this.postDatabase(config);
+      },
+      {
+        maxAttempts: 4,
+        delayMs: 2000,
+        backoffFactor: 2,
+        errorMessage: 'Gave up creating database',
+      },
+    );
+  }
+
+  private async postDatabase(config: AddDatabaseConfig): Promise<DatabaseInstance> {
+    const ctx = await this.getContext();
+    const response = await ctx.post('/api/databases', {
+      data: {
+        name: config.name,
+        host: config.host,
+        port: config.port,
+        username: config.username || null,
+        password: config.password || null,
+        db: config.db ?? 0,
+        ...(config.environment ? { environment: config.environment } : {}),
+        ...(config.cloudDetails ? { cloudDetails: config.cloudDetails } : {}),
+      },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create database: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete a database by ID
+   */
+  async deleteDatabase(id: string): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.delete(`/api/databases/${id}`);
+
+    if (!response.ok() && response.status() !== 404) {
+      const body = await response.text();
+      throw new Error(`Failed to delete database: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Update a database via API (PATCH)
+   */
+  async updateDatabase(id: string, data: Record<string, unknown>): Promise<DatabaseInstance> {
+    const ctx = await this.getContext();
+    const response = await ctx.patch(`/api/databases/${id}`, { data });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to update database: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get all databases
+   */
+  async getDatabases(): Promise<DatabaseInstance[]> {
+    const ctx = await this.getContext();
+    const response = await ctx.get('/api/databases');
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to get databases: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get a database by ID
+   */
+  async getDatabase(id: string): Promise<DatabaseInstance | null> {
+    const ctx = await this.getContext();
+    const response = await ctx.get(`/api/databases/${id}`);
+
+    if (response.status() === 404) {
+      return null;
+    }
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to get database: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete databases matching a name pattern
+   * Useful for cleanup of test databases
+   */
+  async deleteDatabasesByPattern(pattern: RegExp): Promise<number> {
+    const databases = await this.getDatabases();
+    const matching = databases.filter((db) => pattern.test(db.name));
+
+    for (const db of matching) {
+      await this.deleteDatabase(db.id);
+    }
+
+    return matching.length;
+  }
+
+  /**
+   * Delete all test databases (names starting with TEST_DB_PREFIX)
+   */
+  async deleteTestDatabases(): Promise<number> {
+    return this.deleteDatabasesByPattern(new RegExp(`^${TEST_DB_PREFIX}`));
+  }
+
+  /**
+   * Create a String key via API
+   * Value can be a string or a Buffer-like object { type: 'Buffer', data: number[] } for binary data
+   */
+  async createStringKey(
+    databaseId: string,
+    keyName: string,
+    value: string | { type: 'Buffer'; data: number[] },
+  ): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/string`, {
+      data: { keyName, value },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create string key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a Hash key via API
+   */
+  async createHashKey(databaseId: string, keyName: string, fields: { field: string; value: string }[]): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/hash`, {
+      data: { keyName, fields },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create hash key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a List key via API
+   * Uses the POST /list endpoint with elements array
+   */
+  async createListKey(databaseId: string, keyName: string, elements: string[]): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/list`, {
+      data: { keyName, elements, destination: 'TAIL' },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create list key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a Set key via API
+   */
+  async createSetKey(databaseId: string, keyName: string, members: string[]): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/set`, {
+      data: { keyName, members },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create set key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a Sorted Set (ZSet) key via API
+   * Uses the POST /zSet endpoint with members array containing {name, score}
+   */
+  async createZSetKey(
+    databaseId: string,
+    keyName: string,
+    members: { member: string; score: string }[],
+  ): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/zSet`, {
+      data: { keyName, members: members.map((m) => ({ name: m.member, score: parseFloat(m.score) })) },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create zset key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a Stream key via API
+   * Uses the POST /streams endpoint with entries array containing {id, fields}
+   * Fields should be {name, value} pairs
+   */
+  async createStreamKey(
+    databaseId: string,
+    keyName: string,
+    fields: { field: string; value: string }[],
+    entryId: string = '*',
+  ): Promise<void> {
+    const ctx = await this.getContext();
+    // Convert field/value to name/value format expected by API
+    const formattedFields = fields.map((f) => ({ name: f.field, value: f.value }));
+    const response = await ctx.post(`/api/databases/${databaseId}/streams`, {
+      data: { keyName, entries: [{ id: entryId, fields: formattedFields }] },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create stream key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Create a JSON key via API
+   */
+  async createJsonKey(databaseId: string, keyName: string, value: string): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/rejson-rl`, {
+      data: { keyName, data: value },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create json key: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Delete keys matching a pattern in a database
+   * Uses SCAN + DEL to avoid blocking
+   */
+  async deleteKeysByPattern(databaseId: string, pattern: string): Promise<number> {
+    const ctx = await this.getContext();
+
+    const scanResponse = await ctx.post(`/api/databases/${databaseId}/keys`, {
+      data: { cursor: '0', count: 10000, match: pattern },
+    });
+
+    if (!scanResponse.ok()) {
+      return 0;
+    }
+
+    // The endpoint returns an array (one entry per cluster node).
+    const scanPages: { cursor: number; keys?: { name: string }[] }[] = await scanResponse.json();
+    const keys = scanPages[0]?.keys || [];
+
+    if (keys.length === 0) {
+      return 0;
+    }
+
+    const keyNames = keys.map((k) => k.name);
+    const deleteResponse = await ctx.delete(`/api/databases/${databaseId}/keys`, {
+      data: { keyNames },
+    });
+
+    return deleteResponse.ok() ? keyNames.length : 0;
+  }
+
+  /**
+   * Get current app settings
+   */
+  async getSettings(): Promise<{
+    agreements: {
+      eula: boolean;
+      analytics: boolean;
+      encryption: boolean;
+      notifications: boolean;
+      version: string;
+    } | null;
+  }> {
+    const ctx = await this.getContext();
+    const response = await ctx.get('/api/settings');
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to get settings: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Reset agreements to trigger EULA popup
+   */
+  async resetAgreements(): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.delete('/api/settings/agreements');
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to reset agreements: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Accept EULA and set agreements via API
+   */
+  async acceptEula(options?: { analytics?: boolean; encryption?: boolean; notifications?: boolean }): Promise<void> {
+    const ctx = await this.getContext();
+    const response = await ctx.patch('/api/settings', {
+      data: {
+        agreements: {
+          eula: true,
+          analytics: options?.analytics ?? false,
+          encryption: options?.encryption ?? true,
+          notifications: options?.notifications ?? false,
+        },
+      },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to accept EULA: ${response.status()} - ${body}`);
+    }
+  }
+
+  /**
+   * Ensure EULA is accepted (check first, accept if needed)
+   */
+  async ensureEulaAccepted(): Promise<void> {
+    const settings = await this.getSettings();
+    if (!settings.agreements || !settings.agreements.eula) {
+      await this.acceptEula();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Vector Search — Index management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Create a RediSearch index via the CLI endpoint.
+   *
+   * Builds an `FT.CREATE` command from the provided arguments and sends it
+   * through the same send-command helper used for ad-hoc Redis commands.
+   */
+  async createIndex(
+    databaseId: string,
+    indexName: string,
+    prefix: string,
+    schema: IndexSchemaField[],
+    keyType: 'hash' | 'json' = 'hash',
+  ): Promise<void> {
+    const schemaArgs = schema.flatMap((f) => [`"${f.name}"`, f.type.toUpperCase()]);
+    const command = [
+      'FT.CREATE',
+      `"${indexName}"`,
+      'ON',
+      keyType.toUpperCase(),
+      'PREFIX',
+      '1',
+      `"${prefix}"`,
+      'SCHEMA',
+      ...schemaArgs,
+    ].join(' ');
+
+    await this.sendCommand(databaseId, command);
+  }
+
+  /**
+   * Delete a single RediSearch index.
+   * Silently ignores 404 (index already gone).
+   */
+  async deleteIndex(databaseId: string, indexName: string): Promise<void> {
+    await this.sendCommand(databaseId, `FT.DROPINDEX ${indexName}`).catch(() => {});
+  }
+
+  /**
+   * Delete RediSearch indexes in the database.
+   * When called without a filter, deletes all indexes.
+   * Pass a filter predicate to delete only matching indexes.
+   */
+  async deleteAllIndexes(databaseId: string, filter?: (name: string) => boolean): Promise<void> {
+    const indexes = await this.getIndexes(databaseId);
+    const toDelete = filter ? indexes.filter(filter) : indexes;
+
+    for (const name of toDelete) {
+      await this.deleteIndex(databaseId, name);
+    }
+  }
+
+  /**
+   * List all RediSearch indexes in the database.
+   */
+  async getIndexes(databaseId: string): Promise<string[]> {
+    const response = await this.sendCommand(databaseId, 'FT._LIST');
+
+    if (Array.isArray(response)) {
+      return response.map(String).filter(Boolean);
+    }
+
+    return [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Vector Search — Saved queries
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Create a saved query via API.
+   * Returns the created query object (including `id`).
+   */
+  async createSavedQuery(
+    databaseId: string,
+    indexName: string,
+    name: string,
+    query: string,
+  ): Promise<{ id: string; name: string; query: string }> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/query-library`, {
+      data: { indexName, name, query },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create saved query: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete all saved queries for a given index.
+   */
+  async deleteAllSavedQueries(databaseId: string, indexName: string): Promise<void> {
+    const ctx = await this.getContext();
+    const listResponse = await ctx.get(`/api/databases/${databaseId}/query-library?indexName=${indexName}`);
+
+    if (!listResponse.ok()) return;
+
+    const queries: { id: string }[] = await listResponse.json();
+    for (const q of queries) {
+      await ctx.delete(`/api/databases/${databaseId}/query-library/${q.id}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Vector Search — Command history
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Delete all search-type command execution history entries for a database.
+   */
+  async deleteCommandExecutions(databaseId: string): Promise<void> {
+    const ctx = await this.getContext();
+    const listResponse = await ctx.get(`/api/databases/${databaseId}/workbench/command-executions?type=SEARCH`);
+
+    if (!listResponse.ok()) return;
+
+    const executions: { id: string }[] = await listResponse.json();
+    if (executions.length === 0) return;
+
+    for (const e of executions) {
+      await ctx.delete(`/api/databases/${databaseId}/workbench/command-executions/${e.id}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Database Analysis
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generate a database analysis report via the API.
+   * Returns the full analysis response (progress, totalKeys, totalMemory, etc.).
+   */
+  async createDatabaseAnalysis(databaseId: string, delimiter = ':'): Promise<Record<string, unknown>> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/analysis`, {
+      data: { delimiter },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Failed to create database analysis: ${response.status()} - ${body}`);
+    }
+
+    return response.json();
+  }
+
+  // ---------------------------------------------------------------------------
+  // General — Send arbitrary Redis command
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Send a Redis command via the Workbench command-executions endpoint.
+   * Returns the `response` field from the first result entry.
+   */
+  async sendCommand(databaseId: string, command: string): Promise<unknown> {
+    const ctx = await this.getContext();
+    const response = await ctx.post(`/api/databases/${databaseId}/workbench/command-executions`, {
+      data: { commands: [command] },
+    });
+
+    if (!response.ok()) {
+      const body = await response.text();
+      throw new Error(`Command "${command}" failed: ${response.status()} - ${body}`);
+    }
+
+    const executions = await response.json();
+    return executions?.[0]?.result?.[0]?.response;
+  }
+
+  /**
+   * Cleanup resources
+   */
+  async dispose(): Promise<void> {
+    if (this.context) {
+      await this.context.dispose();
+      this.context = null;
+    }
+  }
+}

@@ -22,6 +22,7 @@ import { DatabaseImportModule } from 'src/modules/database-import/database-impor
 import { SingleUserAuthMiddleware } from 'src/common/middlewares/single-user-auth.middleware';
 import { CustomTutorialModule } from 'src/modules/custom-tutorial/custom-tutorial.module';
 import { CloudModule } from 'src/modules/cloud/cloud.module';
+import { AzureModule } from 'src/modules/azure/azure.module';
 import { RdiModule } from 'src/modules/rdi/rdi.module';
 import { AiChatModule } from 'src/modules/ai/chat/ai-chat.module';
 import { AiQueryModule } from 'src/modules/ai/query/ai-query.module';
@@ -42,6 +43,8 @@ import {
   redisConnectionControllers,
 } from './middleware/redis-connection';
 import { DatabaseSettingsModule } from './modules/database-settings/database-settings.module';
+import { CredentialsModule } from './modules/database/credentials/credentials.module';
+import { QueryLibraryModule } from './modules/query-library/query-library.module';
 
 const SERVER_CONFIG = config.get('server') as Config['server'];
 const PATH_CONFIG = config.get('dir_path') as Config['dir_path'];
@@ -66,10 +69,12 @@ const STATICS_CONFIG = config.get('statics') as Config['statics'];
     NotificationModule.register(),
     BulkActionsModule,
     ClusterMonitorModule,
-    CustomTutorialModule.register(),
+    // Custom tutorials are deprecated (RED-194229).
+    ...(SERVER_CONFIG.customTutorials ? [CustomTutorialModule.register()] : []),
     DatabaseAnalysisModule,
     DatabaseImportModule,
     CloudModule.register(),
+    AzureModule,
     AiChatModule,
     AiQueryModule.register(),
     RdiModule.register(),
@@ -79,6 +84,8 @@ const STATICS_CONFIG = config.get('statics') as Config['statics'];
     }),
     InitModule.register([AnalyticsModule]),
     DatabaseSettingsModule.register(),
+    CredentialsModule.register(),
+    QueryLibraryModule.register(),
   ],
   controllers: [],
   providers: [],

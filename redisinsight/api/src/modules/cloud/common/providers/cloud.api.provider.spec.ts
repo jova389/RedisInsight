@@ -13,8 +13,11 @@ import { CloudSessionService } from 'src/modules/cloud/session/cloud-session.ser
 import { CloudUserApiProvider } from 'src/modules/cloud/user/providers/cloud-user.api.provider';
 import {
   CloudApiForbiddenException,
+  CloudApiMfaQuotaExceededException,
+  CloudApiMfaRequiredException,
   CloudApiUnauthorizedException,
 } from 'src/modules/cloud/common/exceptions';
+import { CloudAuthIdpType } from 'src/modules/cloud/auth/models';
 import { CloudApiProvider } from './cloud.api.provider';
 
 const generateUtmBodyTests = [
@@ -55,6 +58,10 @@ const getHeadersTests = [
     expected: { ...mockDefaultCloudApiHeaders },
   },
   {
+    input: null,
+    expected: { ...mockDefaultCloudApiHeaders },
+  },
+  {
     input: {},
     expected: { ...mockDefaultCloudApiHeaders },
   },
@@ -72,6 +79,39 @@ const getHeadersTests = [
   {
     input: { csrf: 'csrf-token' },
     expected: { ...mockDefaultCloudApiHeaders, 'x-csrf-token': 'csrf-token' },
+  },
+  {
+    input: { idToken: 'id-token-value' },
+    expected: {
+      ...mockDefaultCloudApiHeaders,
+    },
+  },
+  {
+    input: { idToken: 'id-token-value', idpType: CloudAuthIdpType.Google },
+    expected: {
+      ...mockDefaultCloudApiHeaders,
+    },
+  },
+  {
+    input: { idToken: 'id-token-value', idpType: CloudAuthIdpType.Sso },
+    expected: {
+      ...mockDefaultCloudApiHeaders,
+      'Sm-Id-Token': 'id-token-value',
+    },
+  },
+  {
+    input: {
+      accessToken: 'jwt-token',
+      idToken: 'id-token-value',
+      csrf: 'csrf-token',
+      idpType: CloudAuthIdpType.Sso,
+    },
+    expected: {
+      ...mockDefaultCloudApiHeaders,
+      authorization: 'Bearer jwt-token',
+      'x-csrf-token': 'csrf-token',
+      'Sm-Id-Token': 'id-token-value',
+    },
   },
 ];
 
@@ -129,6 +169,24 @@ describe('CloudApiProvider', () => {
       await expect(
         service.callWithAuthRetry(mockSessionMetadata.sessionId, mockedFn),
       ).rejects.toBeInstanceOf(CloudApiForbiddenException);
+      expect(sessionService.invalidateApiSession).toHaveBeenCalledTimes(0);
+    });
+    // no retry on MFA errors: a retry re-fires /login and burns the server-side MFA attempt quota,
+    // and the session must be kept so the pending login can be completed with a TOTP code
+    it('should not retry and keep session on CloudApiMfaRequiredException', async () => {
+      mockedFn.mockRejectedValueOnce(new CloudApiMfaRequiredException());
+      await expect(
+        service.callWithAuthRetry(mockSessionMetadata.sessionId, mockedFn),
+      ).rejects.toBeInstanceOf(CloudApiMfaRequiredException);
+      expect(mockedFn).toHaveBeenCalledTimes(1);
+      expect(sessionService.invalidateApiSession).toHaveBeenCalledTimes(0);
+    });
+    it('should not retry and keep session on CloudApiMfaQuotaExceededException', async () => {
+      mockedFn.mockRejectedValueOnce(new CloudApiMfaQuotaExceededException());
+      await expect(
+        service.callWithAuthRetry(mockSessionMetadata.sessionId, mockedFn),
+      ).rejects.toBeInstanceOf(CloudApiMfaQuotaExceededException);
+      expect(mockedFn).toHaveBeenCalledTimes(1);
       expect(sessionService.invalidateApiSession).toHaveBeenCalledTimes(0);
     });
     it('should throw CloudApiForbiddenException error from 2nd attempt (by default)', async () => {

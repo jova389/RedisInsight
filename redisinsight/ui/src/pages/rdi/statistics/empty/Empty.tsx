@@ -3,6 +3,7 @@ import { useHistory } from 'react-router-dom'
 
 import EmptyPipelineIcon from 'uiSrc/assets/img/rdi/empty_pipeline.svg'
 import { Pages } from 'uiSrc/constants'
+import { useTranslation } from 'uiSrc/i18n'
 import { Text } from 'uiSrc/components/base/text'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
@@ -17,25 +18,31 @@ interface Props {
 
 const Empty = ({ rdiInstanceId }: Props) => {
   const history = useHistory()
+  const { t } = useTranslation()
 
   return (
     <Panel>
-      <div className={styles.emptyPipelineContainer} data-testid="empty-pipeline">
+      <div
+        className={styles.emptyPipelineContainer}
+        data-testid="empty-pipeline"
+      >
         <RiImage src={EmptyPipelineIcon} alt="empty" $size="s" />
         <Spacer size="xl" />
-        <Text>No pipeline deployed yet</Text>
+        <Text>{t('rdi.statistics.empty.title')}</Text>
         <Text className={styles.subTitle}>
-          Create your first pipeline to get started!
+          {t('rdi.statistics.empty.description')}
         </Text>
         <Spacer size="l" />
         <PrimaryButton
           data-testid="add-pipeline-btn"
           size="s"
           onClick={() => {
-            history.push(Pages.rdiPipelineConfig(rdiInstanceId))
+            history.push(Pages.rdiPipeline(rdiInstanceId), {
+              skipLastPageRestore: true,
+            })
           }}
         >
-          Add Pipeline
+          {t('rdi.statistics.empty.addButton')}
         </PrimaryButton>
       </div>
     </Panel>

@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { AxiosError } from 'axios'
 import { isString, uniqBy } from 'lodash'
 import { apiService, resourcesService } from 'uiSrc/services'
 import { ApiEndpoints, ICommand, ICommands } from 'uiSrc/constants'
@@ -8,7 +9,7 @@ import {
   checkDeprecatedCommandGroup,
 } from 'uiSrc/utils'
 import { getConfig } from 'uiSrc/config'
-import { GetServerInfoResponse } from 'apiSrc/modules/server/dto/server.dto'
+import { GetServerInfoResponse } from 'apiClient'
 
 import { AppDispatch, RootState } from '../store'
 import { StateAppRedisCommands } from '../interfaces'
@@ -108,7 +109,7 @@ export function fetchRedisCommandsInfo(
         }
       }
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error)
+      const errorMessage = getApiErrorMessage(error as AxiosError)
       dispatch(getRedisCommandsFailure(errorMessage))
       onFailAction?.()
     }

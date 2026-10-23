@@ -14,7 +14,10 @@ import reducer, {
   getFeatureFlagsSuccess,
   getFeatureFlagsFailure,
   fetchFeatureFlags,
+  isAzureEntraIdEnabledSelector,
+  isArrayEnabledSelector,
 } from 'uiSrc/slices/app/features'
+import { FeatureFlags } from 'uiSrc/constants'
 import {
   cleanup,
   initialStateDefault,
@@ -554,6 +557,95 @@ describe('slices', () => {
       const expectedActions = [getFeatureFlags(), getFeatureFlagsFailure()]
 
       expect(store.getActions()).toEqual(expectedActions)
+    })
+  })
+
+  describe('isAzureEntraIdEnabledSelector', () => {
+    const createRootState = (features: Record<string, { flag: boolean }>) => ({
+      ...initialStateDefault,
+      app: {
+        features: {
+          ...initialState,
+          featureFlags: {
+            ...initialState.featureFlags,
+            features,
+          },
+        },
+      },
+    })
+
+    it('should return true when both azureEntraId and envDependent flags are enabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.azureEntraId]: { flag: true },
+        [FeatureFlags.envDependent]: { flag: true },
+      })
+
+      expect(isAzureEntraIdEnabledSelector(rootState)).toBe(true)
+    })
+
+    it('should return false when azureEntraId is disabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.azureEntraId]: { flag: false },
+        [FeatureFlags.envDependent]: { flag: true },
+      })
+
+      expect(isAzureEntraIdEnabledSelector(rootState)).toBe(false)
+    })
+
+    it('should return false when envDependent is disabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.azureEntraId]: { flag: true },
+        [FeatureFlags.envDependent]: { flag: false },
+      })
+
+      expect(isAzureEntraIdEnabledSelector(rootState)).toBe(false)
+    })
+
+    it('should return false when both flags are disabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.azureEntraId]: { flag: false },
+        [FeatureFlags.envDependent]: { flag: false },
+      })
+
+      expect(isAzureEntraIdEnabledSelector(rootState)).toBe(false)
+    })
+  })
+
+  describe('isArrayEnabledSelector', () => {
+    const createRootState = (features: Record<string, { flag: boolean }>) => ({
+      ...initialStateDefault,
+      app: {
+        ...initialStateDefault.app,
+        features: {
+          ...initialState,
+          featureFlags: {
+            ...initialState.featureFlags,
+            features,
+          },
+        },
+      },
+    })
+
+    it('should return true when array flag is enabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.array]: { flag: true },
+      })
+
+      expect(isArrayEnabledSelector(rootState)).toBe(true)
+    })
+
+    it('should return false when array flag is disabled', () => {
+      const rootState = createRootState({
+        [FeatureFlags.array]: { flag: false },
+      })
+
+      expect(isArrayEnabledSelector(rootState)).toBe(false)
+    })
+
+    it('should return false when array flag is missing', () => {
+      const rootState = createRootState({})
+
+      expect(isArrayEnabledSelector(rootState)).toBe(false)
     })
   })
 })

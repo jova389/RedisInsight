@@ -1,4 +1,4 @@
-import { format } from 'winston';
+import { format, Logform } from 'winston';
 import { isArray, isObject, isPlainObject, omit } from 'lodash';
 import { inspect } from 'util';
 import config, { Config } from 'src/utils/config';
@@ -14,14 +14,13 @@ type SanitizedError = {
   type: string;
   message: string;
   stack?: string;
-  cause?: ReturnType<typeof sanitizeError>;
+  cause?: unknown;
 };
 
-export const getOriginalErrorCause = (cause: unknown): Error | undefined => {
-  if (cause instanceof Error) {
-    return getOriginalErrorCause((cause as any).cause) || cause;
+export const getOriginalErrorCause = (cause: unknown): unknown => {
+  if (cause) {
+    return getOriginalErrorCause(cause['cause']) || cause;
   }
-  return undefined;
 };
 
 export const sanitizeError = (
@@ -30,11 +29,17 @@ export const sanitizeError = (
 ): SanitizedError | undefined => {
   if (!error) return undefined;
 
+  let cause = getOriginalErrorCause(error['cause']);
+
+  if (cause instanceof Error) {
+    cause = sanitizeError(cause, opts);
+  }
+
   return {
     type: error.constructor?.name ?? 'UnknownError',
     message: String(error.message ?? 'Unknown error'),
     stack: opts.omitSensitiveData ? undefined : error.stack,
-    cause: sanitizeError(getOriginalErrorCause((error as any).cause), opts),
+    cause,
   };
 };
 
@@ -63,11 +68,15 @@ export const sanitizeErrors = <T>(
   return clone;
 };
 
-export const prepareLogsData = format((info, opts: SanitizeOptions = {}) => {
-  return sanitizeErrors(info, opts);
-});
+// logform types format options as `unknown`, and is installed twice, so the
+// formats below need narrowing and an explicit type.
+export const prepareLogsData: Logform.FormatWrap = format(
+  (info, opts?: unknown) => {
+    return sanitizeErrors(info, (opts as SanitizeOptions) ?? {});
+  },
+);
 
-export const prettyFileFormat = format.printf((info) => {
+export const prettyFileFormat: Logform.Format = format.printf((info) => {
   const separator = ' | ';
   const timestamp = new Date().toLocaleString();
   const { level, context, message } = info;
@@ -86,7 +95,11 @@ export const prettyFileFormat = format.printf((info) => {
 });
 
 const MAX_DEPTH = 10;
-export const logDataToPlain = (value: any, seen = new WeakSet(), depth = 0): any => {
+export const logDataToPlain = (
+  value: any,
+  seen = new WeakSet(),
+  depth = 0,
+): any => {
   if (depth > MAX_DEPTH) return '[MaxDepthExceeded]';
 
   if (value === null || typeof value !== 'object' || value instanceof Error) {

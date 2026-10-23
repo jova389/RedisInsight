@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, within } from 'uiSrc/utils/test-utils'
+import { render, screen, within, toggleAccordion } from 'uiSrc/utils/test-utils'
 import { ImportDatabasesData } from 'uiSrc/slices/interfaces'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import ResultsLog from './ResultsLog'
@@ -27,10 +27,10 @@ describe('ResultsLog', () => {
 
     expect(screen.getByTestId('success-results-closed')).toBeInTheDocument()
     expect(screen.getByTestId('partial-results-closed')).toBeInTheDocument()
-    expect(screen.getByTestId('failed-results-closed')).toBeInTheDocument()
+    expect(screen.getByTestId('fail-results-closed')).toBeInTheDocument()
   })
 
-  it('should open and collapse other groups', () => {
+  it('should open and collapse other groups', async () => {
     const mockedData: ImportDatabasesData = {
       total: 3,
       fail: [{ index: 0, status: 'fail', errors: [mockedError] }],
@@ -39,28 +39,22 @@ describe('ResultsLog', () => {
     }
     render(<ResultsLog data={mockedData} />)
 
-    fireEvent.click(
-      within(screen.getByTestId('success-results-closed')).getByRole('button'),
-    )
+    await toggleAccordion('success-results-closed')
     expect(screen.getByTestId('success-results-open')).toBeInTheDocument()
 
     expect(screen.getByTestId('partial-results-closed')).toBeInTheDocument()
-    expect(screen.getByTestId('failed-results-closed')).toBeInTheDocument()
+    expect(screen.getByTestId('fail-results-closed')).toBeInTheDocument()
 
-    fireEvent.click(
-      within(screen.getByTestId('failed-results-closed')).getByRole('button'),
-    )
-    expect(screen.getByTestId('failed-results-open')).toBeInTheDocument()
+    await toggleAccordion('fail-results-closed')
+    expect(screen.getByTestId('fail-results-open')).toBeInTheDocument()
 
     expect(screen.getByTestId('partial-results-closed')).toBeInTheDocument()
     expect(screen.getByTestId('success-results-closed')).toBeInTheDocument()
 
-    fireEvent.click(
-      within(screen.getByTestId('partial-results-closed')).getByRole('button'),
-    )
+    await toggleAccordion('partial-results-closed')
     expect(screen.getByTestId('partial-results-open')).toBeInTheDocument()
 
-    expect(screen.getByTestId('failed-results-closed')).toBeInTheDocument()
+    expect(screen.getByTestId('fail-results-closed')).toBeInTheDocument()
     expect(screen.getByTestId('success-results-closed')).toBeInTheDocument()
   })
 
@@ -87,13 +81,13 @@ describe('ResultsLog', () => {
       ),
     ).toHaveTextContent('1')
     expect(
-      within(screen.getByTestId('failed-results-closed')).getByTestId(
+      within(screen.getByTestId('fail-results-closed')).getByTestId(
         'number-of-dbs',
       ),
     ).toHaveTextContent('1')
   })
 
-  it('should call proper telemetry event after click', () => {
+  it('should call proper telemetry event after click', async () => {
     const sendEventTelemetryMock = jest.fn()
     ;(sendEventTelemetry as jest.Mock).mockImplementation(
       () => sendEventTelemetryMock,
@@ -107,11 +101,9 @@ describe('ResultsLog', () => {
     }
     render(<ResultsLog data={mockedData} />)
 
-    fireEvent.click(
-      within(screen.getByTestId('success-results-closed')).getByRole('button'),
-    )
+    await toggleAccordion('success-results-closed')
 
-    expect(sendEventTelemetry).toBeCalledWith({
+    expect(sendEventTelemetry).toHaveBeenCalledWith({
       event: TelemetryEvent.CONFIG_DATABASES_REDIS_IMPORT_LOG_VIEWED,
       eventData: {
         length: 1,
@@ -120,10 +112,8 @@ describe('ResultsLog', () => {
     })
     ;(sendEventTelemetry as jest.Mock).mockRestore()
 
-    fireEvent.click(
-      within(screen.getByTestId('success-results-open')).getByRole('button'),
-    )
+    await toggleAccordion('success-results-open')
 
-    expect(sendEventTelemetry).not.toBeCalled()
+    expect(sendEventTelemetry).not.toHaveBeenCalled()
   })
 })

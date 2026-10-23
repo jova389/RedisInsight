@@ -10,6 +10,9 @@ export class CloudSession {
   refreshToken?: string;
 
   @Expose()
+  idToken?: string;
+
+  @Expose()
   idpType?: CloudAuthIdpType;
 
   @Expose()
@@ -17,6 +20,11 @@ export class CloudSession {
 
   @Expose()
   apiSessionId?: string;
+
+  // session id set by an mfa-challenged login; the mfa_code re-login must
+  // reuse it so the cloud api can correlate the pending challenge
+  @Expose()
+  mfaApiSessionId?: string;
 
   @Expose()
   user?: CloudUser;

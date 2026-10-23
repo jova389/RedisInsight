@@ -20,6 +20,7 @@ const endpoint = () => request(server).patch('/settings');
 const responseSchema = Joi.object()
   .keys({
     theme: Joi.string().allow(null).required(),
+    language: Joi.string().allow(null),
     scanThreshold: Joi.number().required(),
     batchSize: Joi.number().required(),
     dateFormat: Joi.string().allow(null),
@@ -123,7 +124,7 @@ describe('PATCH /settings', () => {
         data: { scanThreshold: null, theme: null, batchSize: null },
         responseSchema,
         checkFn: ({ body }) => {
-          const { agreements, ...defaultSettings } =
+          const { agreements: _agreements, ...defaultSettings } =
             constants.APP_DEFAULT_SETTINGS;
 
           expect(body).to.include(defaultSettings);
@@ -159,7 +160,7 @@ describe('PATCH /settings', () => {
         data: { agreements: allAcceptedAgreements },
         responseSchema,
         checkFn: ({ body }) => {
-          const { agreements, ...defaultSettings } =
+          const { agreements: _agreements, ...defaultSettings } =
             constants.APP_DEFAULT_SETTINGS;
 
           expect(body).to.include(defaultSettings);
@@ -175,7 +176,7 @@ describe('PATCH /settings', () => {
         data: { agreements: { analytics: false } },
         responseSchema,
         checkFn: ({ body }) => {
-          const { agreements, ...defaultSettings } =
+          const { agreements: _agreements, ...defaultSettings } =
             constants.APP_DEFAULT_SETTINGS;
 
           expect(body).to.include(defaultSettings);

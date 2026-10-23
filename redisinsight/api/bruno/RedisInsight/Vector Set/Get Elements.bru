@@ -1,0 +1,68 @@
+meta {
+  name: Get Elements
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{API_URL}}/databases/{{DB_INSTANCE_ID}}/vector-set/get-elements
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "keyName": "compass",
+    "start": "-",
+    "end": "+",
+    "count": 15
+  }
+}
+
+docs {
+  # Get Vector Set Elements
+
+  Returns elements from a Vector Set in **lexicographical order** (alphabetical byte-by-byte comparison).
+
+  ## Request Parameters
+
+  | Parameter | Description |
+  |-----------|-------------|
+  | `keyName` | The Vector Set key name |
+  | `start` | Starting point for the range (use `-` for beginning) |
+  | `end` | Ending point for the range (use `+` for end) |
+  | `count` | Maximum number of elements to return |
+
+  ## Range Syntax
+
+  | Symbol | Meaning |
+  |--------|---------|
+  | `-` | Minimum (start from beginning) |
+  | `+` | Maximum (end at last element) |
+  | `[elem` | Inclusive (include this element) |
+  | `(elem` | Exclusive (start after this element) |
+
+  ## Important: Lexicographical Ordering
+
+  Elements are sorted as **strings**, not by any natural meaning. For the `compass` example above, the eight compass directions come back in this order:
+
+  ```
+  east → north → northeast → northwest → south → southeast → southwest → west
+  ```
+
+  Two things to notice:
+
+  - `north` sorts **before** `northeast` even though `northeast` looks "longer" — when one string is a prefix of another, the shorter one wins lexicographically.
+  - `southeast` sorts **before** `southwest` because `'e'` (0x65) < `'w'` (0x77) at the 6th character.
+
+  ## Response
+
+  - `total`: Total number of elements in the Vector Set
+  - `nextCursor`: Use this as `start` in the next request to paginate (if more elements exist)
+  - `isPaginationSupported`: Whether the server supports ordered cursor pagination
+  - `elementNames`: Array of element name strings. Use the `/get-details` endpoint to retrieve the full embedding and attributes for a specific element.
+}
+
+settings {
+  encodeUrl: true
+}

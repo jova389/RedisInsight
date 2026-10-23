@@ -117,7 +117,7 @@ describe('POST /databases/test', () => {
         it('Should throw an error if db index specified', async () => {
           await validateApiCall({
             endpoint,
-            statusCode: 400,
+            statusCode: 424,
             data: {
               name: dbName,
               host: constants.TEST_REDIS_HOST,
@@ -188,7 +188,7 @@ describe('POST /databases/test', () => {
       it('Should throw an error without CA cert when cert validation enabled', async () => {
         await validateApiCall({
           endpoint,
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -197,17 +197,17 @@ describe('POST /databases/test', () => {
             verifyServerCert: true,
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
       });
       it('Should throw an error with invalid CA cert', async () => {
         await validateApiCall({
           endpoint,
-          statusCode: 400,
+          statusCode: 424,
           data: {
             name: dbName,
             host: constants.TEST_REDIS_HOST,
@@ -220,21 +220,16 @@ describe('POST /databases/test', () => {
             },
           },
           responseBody: {
-            statusCode: 400,
-            // todo: verify error handling because right now messages are different
-            // message: 'Could not connect to',
-            error: 'Bad Request',
+            statusCode: 424,
+            message:
+              'Could not connect to redis:6379, please check the CA or Client certificate.',
+            error: 'RedisConnectionIncorrectCertificateException',
           },
         });
       });
     });
     describe('TLS AUTH', function () {
       requirements('rte.tls', 'rte.tlsAuth');
-
-      let existingCACertId,
-        existingClientCertId,
-        existingCACertName,
-        existingClientCertName;
 
       after(localDb.initAgreements);
 
@@ -281,11 +276,6 @@ describe('POST /databases/test', () => {
     requirements('rte.type=STANDALONE', 'rte.ssh');
     describe('TLS AUTH', function () {
       requirements('rte.tls', 'rte.tlsAuth');
-
-      let existingCACertId,
-        existingClientCertId,
-        existingCACertName,
-        existingClientCertName;
 
       after(localDb.initAgreements);
 

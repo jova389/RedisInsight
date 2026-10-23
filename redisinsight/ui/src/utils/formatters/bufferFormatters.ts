@@ -111,7 +111,7 @@ const ASCIIToBuffer = (strInit: string) => {
     .replace(/\\n/g, '\n')
     .replace(/\\r/g, '\r')
 
-  for (let i = 0; i < str.length; ) {
+  for (let i = 0; i < str.length;) {
     if (str.substring(i, i + 2) === '\\x') {
       result += str.substring(i + 2, i + 4)
       i += 4
@@ -121,6 +121,41 @@ const ASCIIToBuffer = (strInit: string) => {
   }
 
   return anyToBuffer(Array.from(Buffer.from(result, 'hex')))
+}
+
+const MIN_VECTOR_BYTES = 8 // at least 2 float32 values
+
+/**
+ * Returns true when the buffer holds non-text (binary) data.
+ * Uses a UTF-8 round-trip: encode → decode; if the bytes differ the
+ * original payload is not valid UTF-8 text.
+ */
+const isBinaryData = (buf: RedisResponseBuffer): boolean => {
+  const utf8 = decoder.decode(new Uint8Array(buf.data))
+  const roundTrip = encoder.encode(utf8)
+  if (roundTrip.length !== buf.data.length) return true
+  for (let i = 0; i < roundTrip.length; i++) {
+    if (roundTrip[i] !== buf.data[i]) return true
+  }
+  return false
+}
+
+/**
+ * Heuristic: returns true when the buffer is likely a binary-encoded
+ * float32 vector (e.g. embeddings stored via Redis HSET as raw bytes).
+ */
+const isBinaryVector = (buf: RedisResponseBuffer): boolean => {
+  const len = buf.data.length
+  if (len < MIN_VECTOR_BYTES || len % 4 !== 0) return false
+  if (!isBinaryData(buf)) return false
+
+  const bytes = new Uint8Array(buf.data)
+  const view = new DataView(bytes.buffer)
+  for (let i = 0; i < view.byteLength; i += 4) {
+    const f = view.getFloat32(i, true)
+    if (!Number.isFinite(f)) return false
+  }
+  return true
 }
 
 const bufferToFloat32Array = (data: Uint8Array) => {
@@ -244,6 +279,8 @@ export {
   bufferToJava,
   bufferToFloat32Array,
   bufferToFloat64Array,
+  isBinaryData,
+  isBinaryVector,
 }
 
 window.ri = {

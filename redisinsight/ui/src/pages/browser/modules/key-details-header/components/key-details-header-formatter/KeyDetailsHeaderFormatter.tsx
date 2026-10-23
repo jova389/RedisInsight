@@ -1,15 +1,12 @@
-import React, { useContext, useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useEffect, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 
 import {
   KeyTypes,
   KeyValueFormat,
   MIDDLE_SCREEN_RESOLUTION,
-  TEXT_DISABLED_STRING_FORMATTING,
-  Theme,
 } from 'uiSrc/constants'
-import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import {
   keysSelector,
   selectedKeyDataSelector,
@@ -25,6 +22,7 @@ import { stringDataSelector } from 'uiSrc/slices/browser/string'
 import { isFullStringLoaded } from 'uiSrc/utils'
 import { RiTooltip } from 'uiSrc/components'
 import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 import {
   Container,
   ControlsIcon,
@@ -38,19 +36,19 @@ export interface Props {
 }
 const KeyDetailsHeaderFormatter = (props: Props) => {
   const { width } = props
+  const { t } = useTranslation()
 
   const { instanceId = '' } = useParams<{ instanceId: string }>()
-  const { theme } = useContext(ThemeContext)
-  const { viewType } = useSelector(keysSelector)
-  const { viewFormat } = useSelector(selectedKeySelector)
-  const { type: keyType, length } = useSelector(selectedKeyDataSelector) ?? {}
-  const { value: keyValue } = useSelector(stringDataSelector)
+  const { viewType } = useAppSelector(keysSelector)
+  const { viewFormat } = useAppSelector(selectedKeySelector)
+  const { type: keyType, length } =
+    useAppSelector(selectedKeyDataSelector) ?? {}
+  const { value: keyValue } = useAppSelector(stringDataSelector)
 
   const [isSelectOpen, setIsSelectOpen] = useState<boolean>(false)
-  const [typeSelected, setTypeSelected] = useState<KeyValueFormat>(viewFormat)
   const [options, setOptions] = useState<any[]>([])
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const isStringFormattingEnabled =
     keyType === KeyTypes.String
@@ -67,22 +65,19 @@ const KeyDetailsHeaderFormatter = (props: Props) => {
             data-test-subj={`format-option-${value}`}
             content={
               !isStringFormattingEnabled
-                ? TEXT_DISABLED_STRING_FORMATTING
-                : typeSelected
+                ? t('browser.keyDetails.stringFormattingDisabled')
+                : viewFormat
             }
             position="top"
             anchorClassName="flex-row"
           >
             <>
               {width >= MIDDLE_SCREEN_RESOLUTION ? (
-                <OptionText color="subdued">{text}</OptionText>
+                <OptionText>{t(text)}</OptionText>
               ) : (
                 <ControlsIcon
-                  type={
-                    theme === Theme.Dark
-                      ? 'FormattersDarkIcon'
-                      : 'FormattersLightIcon'
-                  }
+                  size="m"
+                  type="FormatterIcon"
                   data-testid={`key-value-formatter-option-selected-${value}`}
                 />
               )}
@@ -95,14 +90,14 @@ const KeyDetailsHeaderFormatter = (props: Props) => {
             size="s"
             data-test-subj={`format-option-${value}`}
           >
-            {text}
+            {t(text)}
           </Text>
         ),
       }),
     )
 
     setOptions(newOptions)
-  }, [viewFormat, keyType, width, isStringFormattingEnabled])
+  }, [viewFormat, keyType, width, isStringFormattingEnabled, t])
 
   const onChangeType = (value: KeyValueFormat) => {
     sendEventTelemetry({
@@ -119,7 +114,6 @@ const KeyDetailsHeaderFormatter = (props: Props) => {
       },
     })
 
-    setTypeSelected(value)
     setIsSelectOpen(false)
     dispatch(setViewFormat(value))
   }
@@ -142,7 +136,7 @@ const KeyDetailsHeaderFormatter = (props: Props) => {
             }
             return option.inputDisplay as JSX.Element
           }}
-          value={typeSelected}
+          value={viewFormat}
           onChange={(value: any) => onChangeType(value)}
           data-testid="select-format-key-value"
         />

@@ -1,12 +1,7 @@
 import React from 'react'
 import { cloneDeep } from 'lodash'
-import {
-  act,
-  cleanup,
-  fireEvent,
-  mockedStore,
-  render,
-} from 'uiSrc/utils/test-utils'
+import { Environment } from 'apiClient'
+import { cleanup, mockedStore, render, userEvent } from 'uiSrc/utils/test-utils'
 import {
   getRedisModulesSummary,
   sendEventTelemetry,
@@ -15,6 +10,7 @@ import {
 import {
   freeInstancesSelector,
   setDefaultInstance,
+  setDefaultInstanceSuccess,
 } from 'uiSrc/slices/instances/instances'
 import { OAuthSocialSource } from 'uiSrc/slices/interfaces'
 import { setCapability } from 'uiSrc/slices/app/context'
@@ -33,14 +29,19 @@ jest.mock('uiSrc/slices/oauth/cloud', () => ({
   }),
 }))
 
-jest.mock('uiSrc/slices/instances/instances', () => ({
-  ...jest.requireActual('uiSrc/slices/instances/instances'),
-  freeInstancesSelector: jest.fn().mockReturnValue([
-    {
-      id: 'instanceId',
-    },
-  ]),
-}))
+jest.mock('uiSrc/slices/instances/instances', () => {
+  // eslint-disable-next-line global-require
+  const { Environment: MockEnvironment } = require('apiClient')
+  return {
+    ...jest.requireActual('uiSrc/slices/instances/instances'),
+    freeInstancesSelector: jest.fn().mockReturnValue([
+      {
+        id: 'instanceId',
+        environment: MockEnvironment.Production,
+      },
+    ]),
+  }
+})
 
 let store: typeof mockedStore
 beforeEach(() => {
@@ -63,10 +64,8 @@ describe('OAuthConnectFreeDb', () => {
 
     const { queryByTestId } = render(<OAuthConnectFreeDb id="providedId" />)
 
-    await act(() =>
-      fireEvent.click(
-        queryByTestId('connect-free-db-btn') as HTMLButtonElement,
-      ),
+    await userEvent.click(
+      queryByTestId('connect-free-db-btn') as HTMLButtonElement,
     )
 
     expect(sendEventTelemetry).toHaveBeenCalledWith({
@@ -75,6 +74,7 @@ describe('OAuthConnectFreeDb', () => {
         databaseId: 'providedId',
         provider: undefined,
         source: OAuthSocialSource.ListOfDatabases,
+        environment: Environment.Production,
         ...getRedisModulesSummary(),
         ...MOCK_ADDITIONAL_INFO,
       },
@@ -86,6 +86,7 @@ describe('OAuthConnectFreeDb', () => {
         tutorialPopoverShown: false,
       }),
       setDefaultInstance(),
+      setDefaultInstanceSuccess(),
     ]
     expect(store.getActions()).toEqual(expectedActions)
   })

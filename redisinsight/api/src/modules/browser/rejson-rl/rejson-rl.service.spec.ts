@@ -404,6 +404,52 @@ describe('JsonService', () => {
           data: JSON.stringify(testData),
         });
       });
+      it('should handle json with "constructor" key when forceRetrieve is true', async () => {
+        const testData = {
+          constructor: 'example value',
+          nested: { constructor: 123 },
+        };
+
+        when(client.sendCommand)
+          .calledWith(
+            [BrowserToolRejsonRlCommands.JsonGet, testKey, testPath],
+            { replyEncoding: 'utf8' },
+          )
+          .mockReturnValue(JSON.stringify([testData]));
+
+        const result = await service.getJson(mockBrowserClientMetadata, {
+          keyName: testKey,
+          path: testPath,
+          forceRetrieve: true,
+        });
+
+        expect(result).toEqual({
+          downloaded: true,
+          path: testPath,
+          data: JSON.stringify(testData),
+        });
+      });
+      it('should handle json with "__proto__" key when forceRetrieve is true', async () => {
+        const rawJson = '{"__proto__":"proto_value","normal":"data"}';
+
+        when(client.sendCommand)
+          .calledWith(
+            [BrowserToolRejsonRlCommands.JsonGet, testKey, testPath],
+            { replyEncoding: 'utf8' },
+          )
+          .mockReturnValue(`[${rawJson}]`);
+
+        const result = await service.getJson(mockBrowserClientMetadata, {
+          keyName: testKey,
+          path: testPath,
+          forceRetrieve: true,
+        });
+
+        expect(result.downloaded).toBe(true);
+        expect(result.path).toBe(testPath);
+        expect(result.data).toContain('__proto__');
+        expect(result.data).toContain('proto_value');
+      });
     });
     describe('user has no PERM for JSON.DEBUG', () => {
       beforeEach(() => {
@@ -619,10 +665,14 @@ describe('JsonService', () => {
           )
           .mockReturnValue([5001]);
 
-        await expect(service.getJson(mockBrowserClientMetadata, {
-          keyName: testKey,
-          path: testPath,
-        })).rejects.toThrow(new BadRequestException(ERROR_MESSAGES.UNSAFE_BIG_JSON_LENGTH));
+        await expect(
+          service.getJson(mockBrowserClientMetadata, {
+            keyName: testKey,
+            path: testPath,
+          }),
+        ).rejects.toThrow(
+          new BadRequestException(ERROR_MESSAGES.UNSAFE_BIG_JSON_LENGTH),
+        );
       });
       it('should return array with scalar values in a custom path', async () => {
         const path = '$["customPath"]';
@@ -821,10 +871,14 @@ describe('JsonService', () => {
           )
           .mockReturnValue([10_000]);
 
-        await expect(service.getJson(mockBrowserClientMetadata, {
-          keyName: testKey,
-          path: testPath,
-        })).rejects.toThrow(new BadRequestException(ERROR_MESSAGES.UNSAFE_BIG_JSON_LENGTH));
+        await expect(
+          service.getJson(mockBrowserClientMetadata, {
+            keyName: testKey,
+            path: testPath,
+          }),
+        ).rejects.toThrow(
+          new BadRequestException(ERROR_MESSAGES.UNSAFE_BIG_JSON_LENGTH),
+        );
       });
       it('should return object with scalar values as strings in a custom path', async () => {
         const path = '$["customPath"]';
@@ -1302,6 +1356,70 @@ describe('JsonService', () => {
         testKey,
         testPath,
       ]);
+    });
+  });
+
+  describe('downloadJsonValue', () => {
+    beforeEach(() => {
+      databaseService.get.mockResolvedValue(mockDatabaseWithModules);
+      when(client.sendCommand)
+        .calledWith([BrowserToolKeysCommands.Exists, testKey])
+        .mockResolvedValue(1);
+    });
+
+    it('should return a stream with the json value', async () => {
+      when(client.sendCommand)
+        .calledWith([BrowserToolRejsonRlCommands.JsonGet, testKey, testPath], {
+          replyEncoding: 'utf8',
+        })
+        .mockResolvedValue(JSON.stringify([{ some: 'object' }]));
+
+      const { stream } = await service.downloadJsonValue(
+        mockBrowserClientMetadata,
+        { keyName: testKey, path: testPath },
+      );
+
+      const chunks: string[] = [];
+      // eslint-disable-next-line no-restricted-syntax
+      for await (const chunk of stream) {
+        chunks.push(chunk.toString());
+      }
+
+      // The raw JSON.GET result is streamed as-is (no re-formatting).
+      expect(chunks.join('')).toEqual(JSON.stringify({ some: 'object' }));
+    });
+
+    it('should throw NotFound error when no key found in the database', async () => {
+      when(client.sendCommand)
+        .calledWith([BrowserToolKeysCommands.Exists, testKey])
+        .mockResolvedValue(0);
+
+      await expect(
+        service.downloadJsonValue(mockBrowserClientMetadata, {
+          keyName: testKey,
+          path: testPath,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('should throw BadRequest error when module not loaded', async () => {
+      const replyError: ReplyError = {
+        name: 'ReplyError',
+        message: `unknown command ${BrowserToolRejsonRlCommands.JsonGet}`,
+        command: BrowserToolRejsonRlCommands.JsonGet,
+      };
+      when(client.sendCommand)
+        .calledWith([BrowserToolRejsonRlCommands.JsonGet, testKey, testPath], {
+          replyEncoding: 'utf8',
+        })
+        .mockRejectedValue(replyError);
+
+      await expect(
+        service.downloadJsonValue(mockBrowserClientMetadata, {
+          keyName: testKey,
+          path: testPath,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

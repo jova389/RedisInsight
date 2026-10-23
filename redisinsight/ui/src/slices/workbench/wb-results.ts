@@ -6,7 +6,6 @@ import {
   ApiEndpoints,
   BrowserStorageItem,
   CodeButtonParams,
-  EMPTY_COMMAND,
 } from 'uiSrc/constants'
 import { addErrorNotification } from 'uiSrc/slices/app/notifications'
 import { CliOutputFormatterType } from 'uiSrc/constants/cliOutput'
@@ -39,8 +38,9 @@ import {
   findCommand,
   getLocalWbHistory,
   removeCommand,
+  wbHistoryStorage,
 } from 'uiSrc/services/workbenchStorage'
-import { CreateCommandExecutionsDto } from 'apiSrc/modules/workbench/dto/create-command-executions.dto'
+import { CreateCommandExecutionsDto } from 'apiClient'
 
 import { AppDispatch, RootState } from '../store'
 import {
@@ -48,6 +48,7 @@ import {
   ConnectionType,
   StateWorkbenchResults,
 } from '../interfaces'
+import { mapCommandExecutionToUI } from 'uiSrc/services/commands-history/utils/command-execution.mapper'
 
 export const initialState: StateWorkbenchResults = {
   isLoaded: false,
@@ -80,11 +81,7 @@ const workbenchResultsSlice = createSlice({
       state,
       { payload }: { payload: CommandExecution[] },
     ) => {
-      state.items = payload.map((item) => ({
-        ...item,
-        command: item.command || EMPTY_COMMAND,
-        emptyCommand: !item.command,
-      }))
+      state.items = payload.map(mapCommandExecutionToUI)
       state.loading = false
       state.isLoaded = true
     },
@@ -317,7 +314,10 @@ export function fetchWBHistoryAction(
         state.app.features.featureFlags.features.envDependent?.flag
       if (envDependentFlag === false) {
         // Fetch commands from local storage
-        const commandsHistory = await getLocalWbHistory(instanceId)
+        const commandsHistory = await getLocalWbHistory(
+          wbHistoryStorage,
+          instanceId,
+        )
         if (Array.isArray(commandsHistory)) {
           dispatch(loadWBHistorySuccess(reverse(commandsHistory)))
         } else {
@@ -400,7 +400,7 @@ export function sendWBCommandAction({
         const envDependentFlag =
           state.app.features.featureFlags.features.envDependent?.flag
         if (envDependentFlag === false) {
-          await addCommands(reverse(data))
+          await addCommands(wbHistoryStorage, reverse(data))
         }
         onSuccessAction?.(multiCommands)
       }
@@ -479,7 +479,7 @@ export function sendWBCommandClusterAction({
         const envDependentFlag =
           state.app.features.featureFlags.features.envDependent?.flag
         if (envDependentFlag === false) {
-          await addCommands(reverse(data))
+          await addCommands(wbHistoryStorage, reverse(data))
         }
         onSuccessAction?.(multiCommands)
       }
@@ -513,7 +513,7 @@ export function fetchWBCommandAction(
       const envDependentFlag =
         state.app.features.featureFlags.features.envDependent?.flag
       if (envDependentFlag === false) {
-        const command = await findCommand(commandId)
+        const command = await findCommand(wbHistoryStorage, commandId)
 
         dispatch(fetchWBCommandSuccess(command as CommandExecution))
 
@@ -554,7 +554,7 @@ export function deleteWBCommandAction(
       const envDependentFlag =
         state.app.features.featureFlags.features.envDependent?.flag
       if (envDependentFlag === false) {
-        await removeCommand(id, commandId)
+        await removeCommand(wbHistoryStorage, id, commandId)
 
         dispatch(deleteWBCommandSuccess(commandId))
         onSuccessAction?.()
@@ -595,7 +595,7 @@ export function clearWbResultsAction(
       const envDependentFlag =
         state.app.features.featureFlags.features.envDependent?.flag
       if (envDependentFlag === false) {
-        await clearCommands(id)
+        await clearCommands(wbHistoryStorage, id)
         dispatch(clearWbResultsSuccess())
         onSuccessAction?.()
         return

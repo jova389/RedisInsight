@@ -1,18 +1,8 @@
 name: Install all libraries action
 description: Install all libraries and dependencies
 inputs:
-  skip-electron-deps:
-    description: Skip install electron dependencies
-    default: '0'
-    required: false
-
-  skip-backend-deps:
-    description: Skip install backend dependencies
-    default: '0'
-    required: false
-
-  skip-postinstall:
-    description: Skip postinstall
+  skip-system-deps:
+    description: Skip install system dependencies (libsecret, rpm, etc.)
     default: '0'
     required: false
 
@@ -24,46 +14,57 @@ inputs:
     description: SQLite3 binary host mirror
     required: false
 
-#TODO: check !contains
+  cache-node-modules:
+    description: Cache node_modules between runs ('1' enabled, '0' disabled). Disable for jobs that build the application to avoid stale nested deps surviving lockfile changes.
+    default: '1'
+    required: false
 
 runs:
   using: 'composite'
   steps:
-    # OS libraries
     - name: Setup Node
-      uses: actions/setup-node@v4.0.4
+      uses: actions/setup-node@v7.0.0
       with:
-        node-version: '22.12.0'
-        # disable cache for windows
-        # https://github.com/actions/setup-node/issues/975
-        cache: ${{ runner.os != 'Windows' && 'yarn' || '' }}
-        cache-dependency-path: ${{ runner.os != 'Windows' && '**/yarn.lock' || '' }}
+        node-version-file: '.nvmrc'
+
+    - name: Cache node_modules
+      id: cache-node-modules
+      if: inputs.cache-node-modules != '0'
+      uses: actions/cache@v5
+      with:
+        path: |
+          node_modules
+          redisinsight/node_modules
+          redisinsight/api/node_modules
+        # Hash both package.json and package-lock.json for every workspace so a
+        # change to either invalidates the cache. Hashing only package-lock.json
+        # would let package.json edits without `npm ci` cache-hit, which would
+        # skip `npm ci` and hide the resulting package.json / lockfile mismatch.
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'package-lock.json', 'redisinsight/package.json', 'redisinsight/package-lock.json', 'redisinsight/api/package.json', 'redisinsight/api/package-lock.json') }}
+        restore-keys: |
+          node-modules-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Setup Python
-      # if: ${{ contains(inputs.skip-electron-deps, '1') }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.11'
 
     - name: Install linux libraries
-      if: ${{ runner.os == 'Linux' }}
-      # if: ${{ runner.os == 'Linux' && !contains(inputs.skip-electron-deps, '1') }}
+      if: ${{ runner.os == 'Linux' && inputs.skip-system-deps != '1' }}
       shell: bash
       run: |
         sudo apt-get update -qy
         sudo apt-get install -qy libsecret-1-dev rpm
 
     - name: Install macos libraries
-      if: ${{ runner.os == 'macOS' }}
-      # if: ${{ runner.os == 'macOS' && !contains(inputs.skip-electron-deps, '1') }}
+      if: ${{ runner.os == 'macOS' && inputs.skip-system-deps != '1' }}
       shell: bash
       run: |
         brew install libsecret
 
-    # TODO: matrix?
-    # Javascript dependencies
+    # Javascript dependencies (skip if cache was restored)
     - name: Install dependencies for redisinsight package.js
-      # if: ${{ contains(inputs.skip-electron-deps, '1') }}
+      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       uses: ./.github/actions/install-deps
       with:
         dir-path: './redisinsight'
@@ -71,15 +72,27 @@ runs:
         sqlite3-host-mirror: ${{ inputs.sqlite3-host-mirror }}
 
     - name: Install dependencies for BE package.js
-      # if: ${{ !contains(inputs.skip-backend-deps, '1') }}
+      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       uses: ./.github/actions/install-deps
       with:
         dir-path: './redisinsight/api'
 
     - name: Install dependencies for root package.js
-      # if: ${{ contains(inputs.skip-electron-deps, '1') }}
+      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       uses: ./.github/actions/install-deps
       with:
         dir-path: './'
         keytar-host-mirror: ${{ inputs.keytar-host-mirror }}
         sqlite3-host-mirror: ${{ inputs.sqlite3-host-mirror }}
+
+    # The OpenAPI client (`redisinsight/api-client/`) is gitignored and produced
+    # by the `postinstall` hook in `redisinsight/api`. When the node_modules
+    # cache is restored, postinstall is skipped, so the directory ends up
+    # missing and the UI workspace fails to resolve `from 'apiClient'`.
+    # Generate it here when it isn't present.
+    - name: Generate OpenAPI client (if missing)
+      shell: bash
+      run: |
+        if [ ! -f redisinsight/api-client/index.ts ]; then
+          npm run generate:api-client --prefix redisinsight/api
+        fi

@@ -1,4 +1,5 @@
 import { AxiosError } from 'axios'
+import { RootState } from 'uiSrc/slices/store'
 import { cloneDeep } from 'lodash'
 import { apiService } from 'uiSrc/services'
 import {
@@ -8,7 +9,7 @@ import {
   mockStore,
 } from 'uiSrc/utils/test-utils'
 import successMessages from 'uiSrc/components/notifications/success-messages'
-import { GetRejsonRlResponseDto } from 'apiSrc/modules/browser/rejson-rl/dto'
+import { GetRejsonRlResponseDto } from 'apiClient'
 import reducer, {
   initialState,
   loadRejsonBranch,
@@ -26,6 +27,10 @@ import reducer, {
   rejsonSelector,
   fetchReJSON,
   fetchVisualisationResults,
+  fetchDownloadJsonValue,
+  downloadReJSON,
+  downloadReJSONSuccess,
+  downloadReJSONFailure,
   setReJSONDataAction,
   appendReJSONArrayItemAction,
   removeReJSONKeyAction,
@@ -34,6 +39,7 @@ import reducer, {
 import {
   addErrorNotification,
   addMessageNotification,
+  IAddInstanceErrorPayload,
 } from '../../app/notifications'
 import { refreshKeyInfo } from '../../browser/keys'
 import { EditorType } from 'uiSrc/slices/interfaces'
@@ -83,7 +89,7 @@ describe('rejson slice', () => {
       const nextState = initialState
 
       // Act
-      const result = reducer(undefined, {})
+      const result = reducer(undefined, { type: '' })
 
       // Assert
       expect(result).toEqual(nextState)
@@ -102,11 +108,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, loadRejsonBranch())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -129,11 +133,9 @@ describe('rejson slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -152,11 +154,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, loadRejsonBranchSuccess(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -176,11 +176,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, loadRejsonBranchFailure(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -198,11 +196,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, appendReJSONArrayItem())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -219,11 +215,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, appendReJSONArrayItemSuccess())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -246,11 +240,9 @@ describe('rejson slice', () => {
       )
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -268,11 +260,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, setReJSONData())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -289,11 +279,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, setReJSONDataSuccess())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -313,11 +301,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, setReJSONDataFailure(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -335,11 +321,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, removeRejsonKey())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -356,11 +340,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, removeRejsonKeySuccess())
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -380,11 +362,9 @@ describe('rejson slice', () => {
       const nextState = reducer(initialState, removeRejsonKeyFailure(data))
 
       // Assert
-      const rootState = {
+      const rootState: RootState = {
         ...initialStateDefault,
-        browser: {
-          rejson: nextState,
-        },
+        browser: { ...initialStateDefault.browser, rejson: nextState },
       }
       expect(rejsonSelector(rootState)).toEqual(state)
     })
@@ -752,6 +732,41 @@ describe('rejson slice', () => {
 
         // Assert
         expect(result).toEqual(expectedResult)
+      })
+    })
+
+    describe('fetchDownloadJsonValue', () => {
+      it('dispatches success actions and calls onSuccessAction', async () => {
+        const key = stringToBuffer('key')
+        const headers = {}
+        const responsePayload = { data: 'json-data', status: 200, headers }
+        apiService.post = jest.fn().mockResolvedValue(responsePayload)
+        const onSuccess = jest.fn()
+
+        await store.dispatch<any>(fetchDownloadJsonValue(key, '$', onSuccess))
+
+        expect(store.getActions()).toEqual([
+          downloadReJSON(),
+          downloadReJSONSuccess(),
+        ])
+        expect(onSuccess).toHaveBeenCalledWith('json-data', headers)
+      })
+
+      it('dispatches failure actions on error', async () => {
+        const key = stringToBuffer('key')
+        const errorMessage = 'Something went wrong'
+        const responsePayload = {
+          response: { status: 500, data: { message: errorMessage } },
+        }
+        apiService.post = jest.fn().mockRejectedValueOnce(responsePayload)
+
+        await store.dispatch<any>(fetchDownloadJsonValue(key))
+
+        expect(store.getActions()).toEqual([
+          downloadReJSON(),
+          downloadReJSONFailure(errorMessage),
+          addErrorNotification(responsePayload as IAddInstanceErrorPayload),
+        ])
       })
     })
   })

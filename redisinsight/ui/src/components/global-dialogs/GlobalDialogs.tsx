@@ -6,6 +6,7 @@ import {
   OAuthSsoDialog,
 } from 'uiSrc/components'
 import { FeatureFlags } from 'uiSrc/constants'
+import WhatsNewModal from 'uiSrc/components/whats-new'
 
 const GlobalDialogs = () => (
   <>
@@ -14,6 +15,7 @@ const GlobalDialogs = () => (
       <OAuthSelectPlan />
       <OAuthSsoDialog />
     </FeatureFlagComponent>
+    <WhatsNewModal />
   </>
 )
 

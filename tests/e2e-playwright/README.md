@@ -1,0 +1,382 @@
+# RedisInsight E2E Tests v2
+
+Standalone Playwright E2E test suite for RedisInsight.
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [`TEST_PLAN.md`](./TEST_PLAN.md) | Test coverage status and priorities |
+| [`.ai/skills/e2e-testing/SKILL.md`](../../.ai/skills/e2e-testing/SKILL.md) | Standards and patterns for writing tests |
+
+### AI Commands
+
+Use these commands with Augment AI to generate and fix tests:
+
+| Command | Description |
+|---------|-------------|
+| `@e2e-generate <url> [focus]` | Explore UI with Playwright MCP and generate tests |
+| `@e2e-fix <test-pattern>` | Run tests and fix failures |
+
+Example:
+```
+@e2e-generate http://localhost:8080/browser "add key"
+@e2e-fix "Analytics > Slow Log"
+```
+
+## Prerequisites
+
+### Common Setup (All Projects)
+
+Start Redis Test Environment (RTE) using Docker Compose:
+```bash
+cd tests/e2e
+docker-compose -f rte.docker-compose.yml up -d
+```
+
+For local runs, add these entries to `/etc/hosts` (one-off):
+
+```
+127.0.0.1 host.docker.internal
+127.0.0.1 master-hostname-7-1 master-hostname-7-2 master-hostname-7-3
+```
+
+The clusters advertise these addresses to clients, and the API resolves them on your
+host. Without them, cluster tests fail while creating a database with `500` /
+`errorCode 12500` ("Server closed the connection.").
+
+> **Note:** make sure they are appended as separate lines, and that the previous last
+> line of the file ends with a newline. The result should look like:
+>
+> ```
+> 127.0.0.1 host.docker.internal
+> 127.0.0.1 master-hostname-7-1 master-hostname-7-2 master-hostname-7-3
+> ```
+>
+> not 
+> ```
+> 127.0.0.1 existing-entry127.0.0.1 host.docker.internal <--- these should be 2 lines
+> ```
+> Verify with
+>
+> ```grep -n "host.docker.internal\|master-hostname" /etc/hosts```
+
+### Project-Specific Setup
+
+| Project | Setup Command | Run Tests |
+|---------|---------------|-----------|
+| **Chromium** | `npm run dev:api` + `npm run dev:ui` (two terminals) | `npm run test:chromium` |
+| **Electron** | `npm run package:prod` | `npm run test:electron` |
+
+> **Note:** Setup commands run from the repository root. Test commands run from `tests/e2e-playwright/`.
+
+## Installation
+
+```bash
+cd tests/e2e-playwright
+npm install
+npx playwright install chromium
+```
+
+## Configuration
+
+Copy `example.env` to `.env` and update values for your environment:
+```bash
+cp example.env .env
+```
+
+Environment variables:
+- `RI_CLIENT_URL` - RedisInsight UI URL (default: `http://localhost:8080`)
+- `RI_API_URL` - RedisInsight API URL (default: `http://localhost:5540`)
+- `OSS_STANDALONE_*` - Standalone Redis connection details
+- `OSS_CLUSTER_*` - Cluster Redis connection details
+- `OSS_SENTINEL_*` - Sentinel Redis connection details
+
+## Running Tests
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm test` | Run all tests (all projects) |
+| `npm run test:chromium` | Run Chromium browser tests |
+| `npm run test:chromium:headed` | Run with visible browser window |
+| `npm run test:chromium:debug` | Run with Playwright Inspector (pause & step through) |
+| `npm run test:chromium:ui` | Open interactive UI dashboard |
+| `npm run test:electron` | Run Electron desktop tests |
+| `npm run test:electron:headed` | Run with visible Electron window |
+| `npm run test:electron:debug` | Run with Playwright Inspector |
+| `npm run test:report` | View HTML test report |
+| `npm run test:codegen` | Record actions and generate test code |
+
+### Chromium Browser Tests
+
+```bash
+npm test                      # Run all tests
+npm run test:chromium         # Run Chromium project only
+npm run test:chromium:headed  # Watch tests run
+npm run test:chromium:debug   # Pause and step through tests
+npm run test:chromium:ui      # Interactive test runner
+```
+
+### Electron Desktop Tests
+
+```bash
+npm run test:electron         # Run all Electron tests
+npm run test:electron:headed  # Watch the app
+npm run test:electron:debug   # Debug with Inspector
+```
+
+#### Custom Executable Path
+
+If you need to override the default path (e.g., for a custom build location):
+
+```bash
+ELECTRON_EXECUTABLE_PATH="/path/to/your/app" npm run test:electron
+```
+
+Default paths by platform:
+| Platform | Default Path |
+|----------|--------------|
+| macOS arm64 | `release/mac-arm64/Redis Insight.app/Contents/MacOS/Redis Insight` |
+| macOS x64 | `release/mac-x64/Redis Insight.app/Contents/MacOS/Redis Insight` |
+| Linux | `release/linux-unpacked/redisinsight` |
+| Windows | `release/win-unpacked/Redis Insight.exe` |
+
+#### Electron Test Considerations
+
+- **Single worker**: Electron tests run with 1 worker (sequential execution)
+- **Longer timeouts**: Electron tests have 120s timeout (vs 60s for browser)
+- **UI-based navigation**: All navigation uses UI clicks (works for both browser and Electron)
+- **Same test files**: Browser and Electron tests use the same test files
+
+#### Navigation Methods
+
+All navigation is UI-based for consistency across platforms.
+
+**BasePage** provides fundamental navigation:
+```typescript
+await this.gotoHome();              // Click Redis logo → databases list
+await this.gotoDatabase(dbId);      // Click database → Browser page (default)
+```
+
+**Each page has its own `goto()` method** that handles navigation + waiting:
+```typescript
+// Navigate to specific pages
+await settingsPage.goto();           // Settings page
+await browserPage.goto(dbId);        // Browser page for database
+await workbenchPage.goto(dbId);      // Workbench page for database
+await analyticsPage.goto(dbId);      // Analytics page for database
+await pubSubPage.goto(dbId);         // Pub/Sub page for database
+```
+
+**InstancePage** provides tab switching within a connected database:
+```typescript
+// Switch tabs (when already connected to a database)
+await browserPage.navigationTabs.gotoBrowser();
+await browserPage.navigationTabs.gotoWorkbench();
+await browserPage.navigationTabs.gotoAnalyze();
+await browserPage.navigationTabs.gotoPubSub();
+```
+
+## Multi-Environment Support
+
+The framework supports multiple environments via the `ENV` variable:
+
+```bash
+# Local (default) - uses .env
+npm test
+
+# CI - uses .env.ci
+ENV=ci npm test
+
+# Staging - uses .env.staging
+ENV=staging npm test
+```
+
+Create environment-specific `.env.{name}` files for different environments.
+
+## Folder Structure
+
+```
+tests/e2e-playwright/
+├── config/            # Environment configuration
+├── fixtures/          # Test fixtures (page objects, API helpers)
+├── helpers/           # Utility functions
+├── pages/             # Page Object Models (component-based)
+│   └── databases/
+│       ├── DatabasesPage.ts
+│       └── components/
+│           ├── AddDatabaseDialog.ts
+│           └── DatabaseList.ts
+├── test-data/         # Test data factories
+├── tests/             # Test files organized by project
+│   ├── main/          # Main parallel tests (default)
+│   │   ├── browser/
+│   │   ├── workbench/
+│   │   └── databases/
+│   ├── auto-update/   # Auto-update tests (serial, special setup)
+│   └── electron/      # Electron-specific tests
+├── types/             # TypeScript type definitions
+├── setup/             # Global setup/teardown per project
+│   ├── browser.setup.ts
+│   ├── browser.teardown.ts
+│   ├── electron.setup.ts
+│   └── electron.teardown.ts
+└── playwright.config.ts
+```
+
+### Page Object Structure
+
+Page objects are organized into component-based POMs for better maintainability:
+
+```
+BasePage (abstract)
+  ├── DatabasesPage           # Databases list page
+  ├── SettingsPage            # Settings page
+  └── InstancePage (abstract) # Base for all database instance pages
+        ├── instanceHeader    # Database name, stats, breadcrumb
+        ├── navigationTabs    # Browse, Workbench, Analyze, Pub/Sub
+        ├── bottomPanel       # CLI, Command Helper, Profiler
+        └── BrowserPage       # Browser-specific (extends InstancePage)
+              └── WorkbenchPage (future)
+              └── AnalyzePage (future)
+              └── PubSubPage (future)
+```
+
+- **BasePage** - Common navigation methods for all pages
+- **InstancePage** - Base class for pages within a connected database (provides shared header, tabs, bottom panel)
+- **Component POMs** (`AddDatabaseDialog`, `KeyList`) - Reusable UI components
+
+```typescript
+// Access component POMs through the page
+await databasesPage.addDatabaseDialog.fillForm(config);
+await browserPage.keyList.selectKey(keyName);
+
+// InstancePage provides common components
+await browserPage.instanceHeader.getDatabaseName();
+await browserPage.navigationTabs.gotoWorkbench();
+await browserPage.bottomPanel.openCli();
+```
+
+### Test Structure
+
+Tests are organized into **projects** (folders) based on execution requirements, then by feature:
+
+```
+tests/
+├── parallel/               # Default — safe to run with multiple workers
+│   ├── browser/
+│   │   ├── add-key/
+│   │   └── key-details/
+│   ├── databases/
+│   │   ├── add-database/
+│   │   └── edit-database/
+│   └── workbench/
+└── serial/                 # Must run sequentially (shared DB state,
+    │                       # dangerous commands, vector-index ops, etc.)
+    ├── cli/
+    ├── vector-search/
+    └── workbench/
+```
+
+### Playwright Projects
+
+The folder a test lives in determines its execution mode. Each browser platform has a parallel project and a serial project:
+
+| Project             | Folder              | Parallelism | Use Case |
+|---------------------|---------------------|-------------|----------|
+| `chromium-parallel` | `tests/parallel/`   | Parallel (4 workers) | Standard tests in Chromium browser |
+| `chromium-serial`   | `tests/serial/`     | Serial (1 worker)    | Sequential tests in Chromium browser |
+| `electron-parallel` | `tests/parallel/`   | Serial (1 worker)*   | Standard tests in Electron desktop app |
+| `electron-serial`   | `tests/serial/`     | Serial (1 worker)*   | Sequential tests in Electron desktop app |
+
+\* Electron currently runs with a single worker because there is one app instance.
+
+### Execution order
+
+For each platform, the serial project depends on the parallel project (`dependencies: ['<platform>-parallel']` in `playwright.config.ts`), so the order is always:
+
+1. `<platform>-parallel` runs first (with up to N workers)
+2. `<platform>-serial` runs after, one worker at a time
+
+Why sequential instead of running them concurrently:
+
+- Serial tests perform destructive operations on the shared RTE Redis (`FLUSHDB`, broad `deleteAllIndexes`, dangerous commands). Letting them run alongside parallel tests means a parallel test can observe a flushed/wiped database between its own steps.
+- Electron also can't run the two projects concurrently because the desktop app binds its embedded API on a fixed port (`5530`), and two app instances would collide.
+- Keeping chromium and electron on the same execution model keeps the mental model simple — folder location maps directly to position in the run.
+
+If the serial suite grows large enough that this ordering becomes a CI bottleneck, the right next step is to give serial tests a dedicated Redis instance (or split into a separate CI job), not to revert the ordering.
+
+Run specific projects:
+```bash
+# Full platform run (parallel + serial)
+npx playwright test --project=chromium-parallel --project=chromium-serial
+npx playwright test --project=electron-parallel --project=electron-serial
+
+# Just parallel
+npx playwright test --project=chromium-parallel
+
+# Just serial — pass --no-deps, otherwise the parallel project runs first
+# (it's listed in chromium-serial's dependencies). --no-deps also skips
+# browser-setup, so make sure the app is already running locally.
+npx playwright test --project=chromium-serial --no-deps
+
+npx playwright test                           # All projects
+```
+
+**When to put a test in `tests/serial/`:**
+- Tests share database state via `beforeAll` and would race other workers
+- Tests run dangerous commands or mutate global app state
+- Tests exercise flows that are inherently sequential (e.g. environment gating, single-resource index ops)
+
+## Writing Tests
+
+Tests are organized by feature area. Each test file should:
+- Use descriptive test names
+- Follow AAA pattern (Arrange, Act, Assert)
+- Use Page Object Models for UI interactions
+- Use faker for test data generation
+- Use test data factories from `test-data/`
+- Clean up created data in `afterEach` via API (faster and more reliable)
+
+Example:
+```typescript
+import { test, expect } from '../../../fixtures/base';
+import { getStandaloneConfig } from '../../../test-data/databases';
+
+test.describe('Add Database > Standalone', () => {
+  test.afterEach(async ({ apiHelper }) => {
+    // Clean up all test databases via API (fast)
+    await apiHelper.deleteTestDatabases();
+  });
+
+  test('should add standalone database', async ({ databasesPage }) => {
+    const config = getStandaloneConfig();
+
+    await databasesPage.goto();
+    await databasesPage.addDatabase(config);
+
+    await expect(databasesPage.databaseList.getRow(config.name)).toBeVisible();
+  });
+});
+```
+
+## API Helper
+
+Use the `apiHelper` fixture for test setup/teardown via API (faster than UI):
+
+```typescript
+test('should work with pre-created database', async ({ databasesPage, apiHelper }) => {
+  // Create database via API (fast)
+  const db = await apiHelper.createDatabase(getStandaloneConfig());
+
+  // Test UI behavior
+  await databasesPage.goto();
+  await expect(databasesPage.getDatabaseRow(db.name)).toBeVisible();
+
+  // Cleanup via API
+  await apiHelper.deleteDatabase(db.id);
+});
+```
+

@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { CommandExecutionResult } from 'src/modules/workbench/models/command-execution-result';
 import { Expose, Type } from 'class-transformer';
-import { Default } from 'src/common/decorators';
+import { Default as DefaultDecorator } from 'src/common/decorators';
 
 export enum RunQueryMode {
   Raw = 'RAW',
@@ -79,6 +79,8 @@ export class CommandExecution {
     description: 'Workbench mode',
     default: RunQueryMode.ASCII,
     enum: RunQueryMode,
+
+    enumName: 'RunQueryMode',
   })
   @Expose()
   @IsOptional()
@@ -87,13 +89,15 @@ export class CommandExecution {
       RunQueryMode,
     )}.`,
   })
-  @Default(RunQueryMode.ASCII)
+  @DefaultDecorator(RunQueryMode.ASCII)
   mode?: RunQueryMode;
 
   @ApiPropertyOptional({
     description: 'Workbench result mode',
     default: ResultsMode.Default,
     enum: ResultsMode,
+
+    enumName: 'ResultsMode',
   })
   @Expose()
   @IsOptional()
@@ -102,7 +106,7 @@ export class CommandExecution {
       ResultsMode,
     )}.`,
   })
-  @Default(ResultsMode.Default)
+  @DefaultDecorator(ResultsMode.Default)
   resultsMode?: ResultsMode;
 
   @ApiPropertyOptional({
@@ -157,6 +161,8 @@ export class CommandExecution {
       'Command execution type. Used to distinguish between search and workbench',
     default: CommandExecutionType.Workbench,
     enum: CommandExecutionType,
+
+    enumName: 'CommandExecutionType',
   })
   @Expose()
   @IsOptional()
@@ -165,6 +171,6 @@ export class CommandExecution {
       CommandExecutionType,
     )}.`,
   })
-  @Default(CommandExecutionType.Workbench)
+  @DefaultDecorator(CommandExecutionType.Workbench)
   type?: CommandExecutionType;
 }

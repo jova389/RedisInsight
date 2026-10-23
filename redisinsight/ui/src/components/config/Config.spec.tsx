@@ -82,11 +82,13 @@ describe('Config', () => {
     )
 
     render(<Config />)
+    // Custom tutorials are deprecated and disabled by default
+    // (RED-194229), so `getWBCustomTutorials` is no longer dispatched on
+    // startup.
     const afterRenderActions = [
       setCapability(),
       getServerInfo(),
       getNotifications(),
-      getWBCustomTutorials(),
       processCliClient(),
       getRedisCommands(),
       getContentRecommendations(),
@@ -101,6 +103,21 @@ describe('Config', () => {
     )
   })
 
+  it('should dispatch getWBCustomTutorials when customTutorials feature flag is on', () => {
+    const initialStoreState = set(
+      cloneDeep(initialStateDefault),
+      `app.features.featureFlags.features.${FeatureFlags.customTutorials}`,
+      { flag: true },
+    )
+    const customStore = mockStore(initialStoreState)
+
+    render(<Config />, { store: customStore })
+
+    expect(customStore.getActions()).toEqual(
+      expect.arrayContaining([getWBCustomTutorials()]),
+    )
+  })
+
   it('should render w/o settings spec call', async () => {
     set(
       store,
@@ -110,11 +127,11 @@ describe('Config', () => {
 
     render(<Config />)
 
+    // Custom tutorials are deprecated (RED-194229); not dispatched on startup.
     const afterRenderActions = [
       setCapability(),
       getServerInfo(),
       getNotifications(),
-      getWBCustomTutorials(),
       processCliClient(),
       getRedisCommands(),
       getContentRecommendations(),
@@ -171,11 +188,11 @@ describe('Config', () => {
     })
     userSettingsSelector.mockImplementation(userSettingsSelectorMock)
     render(<Config />)
+    // Custom tutorials are deprecated (RED-194229); not dispatched on startup.
     const afterRenderActions = [
       setCapability(),
       getServerInfo(),
       getNotifications(),
-      getWBCustomTutorials(),
       processCliClient(),
       getRedisCommands(),
       getContentRecommendations(),
@@ -353,14 +370,12 @@ describe('Config', () => {
       },
     })
     userSettingsSelector.mockImplementation(userSettingsSelectorMock)
-    
+
     render(<Config />)
-    
+
     // Check that setSettingsPopupState is called with false
     expect(store.getActions()).toEqual(
-      expect.arrayContaining([
-        setSettingsPopupState(false),
-      ])
+      expect.arrayContaining([setSettingsPopupState(false)]),
     )
   })
 })

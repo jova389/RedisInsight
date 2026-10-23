@@ -1,0 +1,48 @@
+import React from 'react'
+
+import { MIDDLE_SCREEN_RESOLUTION } from 'uiSrc/constants'
+import { RiTooltip } from 'uiSrc/components'
+import { EraserIcon } from 'uiSrc/components/base/icons'
+import { IconButton, EmptyButton } from 'uiSrc/components/base/forms/buttons'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { BASE_TEST_ID, DEFAULT_TITLE } from './constants'
+import { Props } from './ClearResultsAction.types'
+import * as S from './ClearResultsAction.styles'
+
+const ClearResultsAction = ({ width, title, onClick, testIdPrefix }: Props) => {
+  const { t } = useTranslation()
+  const resolvedTitle = title ?? t(DEFAULT_TITLE)
+  const showLabel = width > MIDDLE_SCREEN_RESOLUTION
+  const testId = testIdPrefix ? `${testIdPrefix}-${BASE_TEST_ID}` : BASE_TEST_ID
+  return (
+    <RiTooltip
+      content={showLabel ? '' : resolvedTitle}
+      position="left"
+      anchorClassName="clear-results-action-anchor"
+    >
+      <S.ActionAnchor>
+        {showLabel ? (
+          <EmptyButton
+            size="small"
+            icon={EraserIcon}
+            aria-label={resolvedTitle}
+            onClick={onClick}
+            data-testid={testId}
+          >
+            {resolvedTitle}
+          </EmptyButton>
+        ) : (
+          <IconButton
+            icon={EraserIcon}
+            aria-label={resolvedTitle}
+            onClick={onClick}
+            data-testid={testId}
+          />
+        )}
+      </S.ActionAnchor>
+    </RiTooltip>
+  )
+}
+
+export { ClearResultsAction }

@@ -2,12 +2,12 @@ import React from 'react'
 import { useParams } from 'react-router-dom'
 import styled from 'styled-components'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { bufferToString } from 'uiSrc/utils'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 
+import { CopyButton } from 'uiSrc/components/copy-button'
 import { Text } from 'uiSrc/components/base/text'
-import { IconButton } from 'uiSrc/components/base/forms/buttons'
-import { CopyIcon } from 'uiSrc/components/base/icons'
 import { FlexGroup } from 'uiSrc/components/base/layout/flex'
 import { HorizontalSpacer } from 'uiSrc/components/base/layout'
 
@@ -52,6 +52,7 @@ const RecommendationCopyComponent = ({
   telemetryEvent,
   provider,
 }: IProps) => {
+  const { t } = useTranslation()
   const { instanceId = '' } = useParams<{ instanceId: string }>()
 
   const formattedName = bufferToString(keyName)
@@ -67,12 +68,11 @@ const RecommendationCopyComponent = ({
         provider,
       },
     })
-    navigator?.clipboard?.writeText(formattedName)
   }
 
   return (
     <StyledWrapper>
-      <StyledText>Example of a key that may be relevant:</StyledText>
+      <StyledText>{t('tips.copyKey.label')}</StyledText>
       <StyledKeyNameWrapper align="center" $isDbAnalysis={!live}>
         <StyledKeyName
           className="truncateText"
@@ -81,11 +81,12 @@ const RecommendationCopyComponent = ({
         >
           {formattedName}
         </StyledKeyName>
-        <IconButton
-          onClick={handleCopy}
-          icon={CopyIcon}
-          data-testid="copy-key-name-btn"
-          aria-label="copy key name"
+        <CopyButton
+          copy={formattedName}
+          onCopy={handleCopy}
+          withTooltip={false}
+          data-testid="copy-key-name"
+          aria-label={t('tips.copyKey.copyAria')}
         />
         <HorizontalSpacer size="xs" />
       </StyledKeyNameWrapper>

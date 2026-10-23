@@ -1,15 +1,24 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import parse from 'html-react-parser'
 import cx from 'classnames'
 import { flatten, isArray, isEmpty, map, uniq } from 'lodash'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
+import styled from 'styled-components'
 
-import { ColorText } from '../../../../../components/base/text/ColorText'
-import { IconButton } from '../../../../../components/base/forms/buttons'
-import { CopyIcon } from '../../../../../components/base/icons'
-import { RiTooltip } from '../../../../../components/base/tooltip/RITooltip'
-import { CommandArgument, Command } from '../../constants'
-import { formatLongName, replaceSpaces } from '../../utils'
+import { handleCopy as handleCopyUtil } from 'uiSrc/utils'
+import { Table, ColumnDef } from 'uiSrc/components/base/layout/table'
+import { ColorText } from 'uiSrc/components/base/text/ColorText'
+import { IconButton } from 'uiSrc/components/base/forms/buttons'
+import { CopyIcon } from 'uiSrc/components/base/icons'
+import { RiTooltip } from 'uiSrc/components/base/tooltip/RITooltip'
+import {
+  CommandArgument,
+  Command,
+} from 'uiSrc/packages/redisearch/src/constants'
+import {
+  formatLongName,
+  replaceSpaces,
+} from 'uiSrc/packages/redisearch/src/utils'
+import MultilineEllipsisText from 'uiSrc/components/base/text/MultilineEllipsisText'
 
 export interface Props {
   query: string
@@ -18,12 +27,23 @@ export interface Props {
   cursorId?: null | number
 }
 
+const EllipsisText = styled(ColorText)`
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const TableWrapper = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  min-width: 0;
+  overflow: auto;
+  padding: 2px;
+`
+
 const noResultsMessage = 'No results found.'
 
 const TableResult = React.memo((props: Props) => {
   const { result, query, matched, cursorId } = props
 
-  const [columns, setColumns] = useState<ColumnDefinition<any>[]>([])
+  const [columns, setColumns] = useState<ColumnDef<any>[]>([])
 
   const checkShouldParsedHTML = (query: string) => {
     const command = query.toUpperCase()
@@ -37,7 +57,7 @@ const TableResult = React.memo((props: Props) => {
     event.preventDefault()
     event.stopPropagation()
 
-    navigator.clipboard.writeText(text)
+    handleCopyUtil(text)
   }
 
   useEffect(() => {
@@ -49,7 +69,7 @@ const TableResult = React.memo((props: Props) => {
     const uniqColumns =
       uniq(flatten(map(result, (doc) => Object.keys(doc)))) ?? []
 
-    const newColumns: ColumnDefinition<any>[] = uniqColumns.map(
+    const newColumns: ColumnDef<any>[] = uniqColumns.map(
       (title: string = ' ') => ({
         header: title,
         id: title,
@@ -76,16 +96,19 @@ const TableResult = React.memo((props: Props) => {
               data-testid={`query-column-${title}`}
             >
               <RiTooltip
-                position="bottom"
+                position="left"
                 title={title}
-                className="text-multiline-ellipsis"
                 anchorClassName={cx('tooltip')}
-                content={formatLongName(value.toString())}
+                content={
+                  <MultilineEllipsisText lineCount={7} paddingBlock="s">
+                    {formatLongName(value.toString())}
+                  </MultilineEllipsisText>
+                }
               >
                 <div className="copy-btn-wrapper">
-                  <ColorText className={cx('cell', 'test')}>
+                  <EllipsisText className={cx('cell', 'test')}>
                     {cellContent}
-                  </ColorText>
+                  </EllipsisText>
                   <IconButton
                     icon={CopyIcon}
                     aria-label="Copy result"
@@ -109,6 +132,12 @@ const TableResult = React.memo((props: Props) => {
     !React.isValidElement(result) && !(isArray(result) && isEmpty(result))
   const isDataEl = React.isValidElement(result)
 
+  const MIN_COLUMN_WIDTH = 180
+  const tableMinWidth = useMemo(
+    () => `${Math.max(columns.length * MIN_COLUMN_WIDTH, 920)}px`,
+    [columns.length],
+  )
+
   return (
     <div className={cx('queryResultsContainer', 'container')}>
       <div className="queryHeader">
@@ -120,9 +149,9 @@ const TableResult = React.memo((props: Props) => {
         )}
       </div>
       {isDataArr && (
-        <div data-testid={`query-table-result-${query}`}>
-          <Table columns={columns} data={result ?? []} />
-        </div>
+        <TableWrapper data-testid={`query-table-result-${query}`}>
+          <Table columns={columns} data={result ?? []} minWidth={tableMinWidth} />
+        </TableWrapper>
       )}
       {isDataEl && <div className={cx('resultEl')}>{result}</div>}
       {!isDataArr && !isDataEl && (

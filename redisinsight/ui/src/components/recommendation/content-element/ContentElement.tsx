@@ -1,6 +1,7 @@
 import React from 'react'
 import { isArray, isString } from 'lodash'
 import cx from 'classnames'
+import { useTranslation } from 'uiSrc/i18n'
 import { OAuthSsoHandlerDialog, OAuthConnectFreeDb } from 'uiSrc/components'
 import { getUtmExternalLink } from 'uiSrc/utils/links'
 import { replaceVariables } from 'uiSrc/utils/recommendation'
@@ -33,6 +34,7 @@ const ContentElement = (props: Props) => {
     insights,
     idx,
   } = props
+  const { t } = useTranslation()
   const { type, value, parameter } = content
 
   const replacedValue = replaceVariables(value, parameter, params)
@@ -41,6 +43,7 @@ const ContentElement = (props: Props) => {
     case 'paragraph':
       return (
         <ColorText
+          size="M"
           data-testid={`paragraph-${telemetryName}-${idx}`}
           key={`${telemetryName}-${idx}`}
           component="div"
@@ -53,6 +56,7 @@ const ContentElement = (props: Props) => {
     case 'code':
       return (
         <ColorText
+          size="M"
           data-testid={`code-${telemetryName}-${idx}`}
           className={cx(styles.code, { [styles.insights]: insights })}
           key={`${telemetryName}-${idx}`}
@@ -64,6 +68,7 @@ const ContentElement = (props: Props) => {
     case 'span':
       return (
         <ColorText
+          size="M"
           data-testid={`span-${telemetryName}-${idx}`}
           key={`${telemetryName}-${idx}`}
           color="primary"
@@ -81,7 +86,8 @@ const ContentElement = (props: Props) => {
           key={`${telemetryName}-${idx}`}
           data-testid={`link-${telemetryName}-${idx}`}
           target="_blank"
-          variant="small-inline"
+          variant="inline"
+          size="M"
           href={getUtmExternalLink(value.href, {
             medium: UTM_MEDIUMS.Recommendation,
             campaign: telemetryName,
@@ -99,7 +105,8 @@ const ContentElement = (props: Props) => {
               key={`${telemetryName}-${idx}`}
               data-testid={`link-sso-${telemetryName}-${idx}`}
               target="_blank"
-              variant="small-inline"
+              variant="inline"
+              size="M"
               onClick={(e) => {
                 ssoCloudHandlerClick?.(e, {
                   source: telemetryName as OAuthSocialSource,
@@ -124,7 +131,8 @@ const ContentElement = (props: Props) => {
           key={`${telemetryName}-${idx}`}
           data-testid={`code-link-${telemetryName}-${idx}`}
           target="_blank"
-          variant="small-inline"
+          variant="inline"
+          size="M"
           href={getUtmExternalLink(value.href, {
             medium: UTM_MEDIUMS.Recommendation,
             campaign: telemetryName,
@@ -181,7 +189,7 @@ const ContentElement = (props: Props) => {
         />
       )
     default:
-      return isString(value) ? <>{value}</> : <b>*Unknown format*</b>
+      return isString(value) ? <>{value}</> : <b>{t('tips.unknownFormat')}</b>
   }
 }
 

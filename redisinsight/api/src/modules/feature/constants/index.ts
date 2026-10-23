@@ -31,6 +31,16 @@ export enum KnownFeatures {
   HashFieldExpiration = 'hashFieldExpiration',
   EnhancedCloudUI = 'enhancedCloudUI',
   DatabaseManagement = 'databaseManagement',
+  CustomTutorials = 'customTutorials',
+  AzureEntraId = 'azureEntraId',
+  DevAzureEntraId = 'dev-azureEntraId',
+  DevBrowser = 'dev-browser',
+  Array = 'array',
+  DevLanguage = 'dev-language',
+  DevRdiUi = 'dev-rdiUi',
+  VectorSearchEnhancements = 'vectorSearchEnhancements',
+  ValueDecoder = 'valueDecoder',
+  AppUpdateStrategySettings = 'appUpdateStrategySettings',
 }
 
 export interface IFeatureFlag {

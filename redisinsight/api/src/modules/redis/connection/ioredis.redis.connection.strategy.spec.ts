@@ -22,6 +22,7 @@ import {
 import { InternalServerErrorException } from '@nestjs/common';
 import ERROR_MESSAGES from 'src/constants/error-messages';
 import { ReplyError } from 'src/models';
+import { Database } from 'src/modules/database/models/database';
 
 const REDIS_CLIENTS_CONFIG = apiConfig.get(
   'redis_clients',
@@ -218,6 +219,18 @@ describe('IoredisRedisConnectionStrategy', () => {
         .then(fail)
         .catch(checkError(done));
     });
+    it('should include family: 0 for dual-stack IPv4/IPv6 support', (done) => {
+      service
+        .createStandaloneClient(mockClientMetadata, mockDatabase, {})
+        .then(() => {
+          expect(spyRedis).toHaveBeenCalledWith(
+            expect.objectContaining({ family: 0 }),
+          );
+          done();
+        });
+
+      process.nextTick(() => mockIoredisNativeClient.emit('ready'));
+    });
   });
 
   describe('createClusterClient', () => {
@@ -369,5 +382,28 @@ describe('IoredisRedisConnectionStrategy', () => {
         )
         .catch(checkError(done));
     });
+  });
+
+  describe('getTLSConfig', () => {
+    it('should reject unauthorized when verifyServerCert is true', async () => {
+      const config = await service['getTLSConfig']({
+        ...mockDatabaseWithTlsAuth,
+        verifyServerCert: true,
+      });
+
+      expect(config.rejectUnauthorized).toEqual(true);
+    });
+
+    it.each([false, undefined, null])(
+      'should not reject unauthorized when verifyServerCert is %s',
+      async (verifyServerCert) => {
+        const config = await service['getTLSConfig']({
+          ...mockDatabaseWithTlsAuth,
+          verifyServerCert,
+        } as Database);
+
+        expect(config.rejectUnauthorized).toEqual(false);
+      },
+    );
   });
 });

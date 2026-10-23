@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import {
   appFeatureOnboardingSelector,
   setOnboardNextStep,
@@ -14,14 +14,17 @@ import { EmptyButton, PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
 import { RiPopover } from 'uiSrc/components/base'
+import { Row } from 'uiSrc/components/base/layout/flex'
+import { Trans, useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 const OnboardingStartPopover = () => {
-  const { id: connectedInstanceId = '' } = useSelector(
+  const { t } = useTranslation()
+  const { id: connectedInstanceId = '' } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { isActive, currentStep } = useSelector(appFeatureOnboardingSelector)
-  const dispatch = useDispatch()
+  const { isActive, currentStep } = useAppSelector(appFeatureOnboardingSelector)
+  const dispatch = useAppDispatch()
 
   const sendTelemetry = (action: string) =>
     sendEventTelemetry({
@@ -50,26 +53,25 @@ const OnboardingStartPopover = () => {
       ownFocus={false}
       closePopover={() => {}}
       panelClassName={styles.onboardingStartPopover}
-      anchorPosition="upCenter"
+      anchorPosition="downRight"
       data-testid="onboarding-start-popover"
-      style={{ display: 'none' }}
     >
-      <Title size="S">Take a quick tour of Redis Insight?</Title>
+      <Title size="S">{t('browser.onboarding.title')}</Title>
       <Spacer size="s" />
       <Text data-testid="onboarding-start-content">
-        Hi! Redis Insight has many tools that can help you to optimize the
-        development process.
-        <br />
-        Would you like us to show them to you?
+        <Trans
+          i18nKey="browser.onboarding.content"
+          components={{ lineBreak: <br /> }}
+        />
       </Text>
-      <div className={styles.onboardingActions}>
+      <Spacer />
+      <Row justify="between">
         <EmptyButton
           onClick={handleSkip}
-          className={styles.skipTourBtn}
           size="small"
           data-testid="skip-tour-btn"
         >
-          Skip tour
+          {t('browser.onboarding.button.skip')}
         </EmptyButton>
         <PrimaryButton
           onClick={handleStart}
@@ -77,9 +79,9 @@ const OnboardingStartPopover = () => {
           size="s"
           data-testid="start-tour-btn"
         >
-          Show me around
+          {t('browser.onboarding.button.start')}
         </PrimaryButton>
-      </div>
+      </Row>
     </RiPopover>
   )
 }

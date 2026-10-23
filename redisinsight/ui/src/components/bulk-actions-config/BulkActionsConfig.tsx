@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { AxiosError } from 'axios'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { Socket } from 'socket.io-client'
 
 import {
@@ -7,15 +8,13 @@ import {
   bulkActionsSelector,
   disconnectBulkDeleteAction,
   setBulkActionConnected,
-  setBulkActionsInitialState,
   setBulkDeleteLoading,
   setDeleteOverview,
   setDeleteOverviewStatus,
-  setLoading,
 } from 'uiSrc/slices/browser/bulkActions'
-import { getSocketApiUrl, Nullable } from 'uiSrc/utils'
+import { deleteKeysByPattern } from 'uiSrc/slices/browser/keys'
+import { getSocketApiUrl, Nullable, triggerDownloadFromUrl } from 'uiSrc/utils'
 import { sessionStorageService } from 'uiSrc/services'
-import { keysSelector } from 'uiSrc/slices/browser/keys'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { isProcessingBulkAction } from 'uiSrc/pages/browser/components/bulk-actions/utils'
 import {
@@ -28,22 +27,26 @@ import {
 import { addErrorNotification } from 'uiSrc/slices/app/notifications'
 import { appCsrfSelector } from 'uiSrc/slices/app/csrf'
 import { useIoConnection } from 'uiSrc/services/hooks/useIoConnection'
+import { getBaseUrl } from 'uiSrc/services/apiService'
 
 const BulkActionsConfig = () => {
-  const { id: instanceId = '', db } = useSelector(connectedInstanceSelector)
-  const { isConnected } = useSelector(bulkActionsSelector)
-  const { isActionTriggered: isDeleteTriggered } = useSelector(
-    bulkActionsDeleteSelector,
-  )
-  const { filter, search } = useSelector(keysSelector)
-  const { token } = useSelector(appCsrfSelector)
+  const { id: instanceId = '', db } = useAppSelector(connectedInstanceSelector)
+  const { isConnected } = useAppSelector(bulkActionsSelector)
+  const {
+    isActionTriggered: isDeleteTriggered,
+    generateReport,
+    filter,
+    search,
+    confirmedThrough,
+  } = useAppSelector(bulkActionsDeleteSelector)
+  const { token } = useAppSelector(appCsrfSelector)
   const socketRef = useRef<Nullable<Socket>>(null)
   const connectIo = useIoConnection(getSocketApiUrl('bulk-actions'), {
     token,
     query: { instanceId },
   })
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (!isDeleteTriggered || !instanceId || socketRef.current?.connected) {
@@ -56,7 +59,6 @@ const BulkActionsConfig = () => {
     socketRef.current.on(SocketEvent.Connect, () => {
       clearTimeout(retryTimer)
       dispatch(setBulkActionConnected(true))
-
       emitBulkDelete(`${Date.now()}`)
     })
 
@@ -90,28 +92,51 @@ const BulkActionsConfig = () => {
     dispatch(setBulkDeleteLoading(true))
     sessionStorageService.set(BrowserStorageItem.bulkActionDeleteId, id)
 
+    // Register overview listener BEFORE emitting Create to avoid missing early events
+    // Server may start sending Overview events immediately after receiving Create
+    socketRef.current?.off(BulkActionsServerEvent.Overview)
+    socketRef.current?.on(BulkActionsServerEvent.Overview, (payload: any) => {
+      dispatch(setBulkDeleteLoading(isProcessingBulkAction(payload.status)))
+      dispatch(setDeleteOverview(payload))
+
+      if (payload.status === BulkActionsStatus.Failed) {
+        dispatch(disconnectBulkDeleteAction())
+      }
+
+      // Remove deleted keys from local state when bulk delete completes
+      // Use payload.filter values (what server actually used) to avoid race conditions
+      // if user changed search/filter while delete was running
+      if (payload.status === BulkActionsStatus.Completed) {
+        const deletedCount = payload.summary?.succeed || 0
+        const pattern = payload.filter?.match
+        // Only do local filtering for specific patterns, not for '*' (all keys)
+        if (pattern && pattern !== '*') {
+          dispatch(
+            deleteKeysByPattern({
+              pattern,
+              deletedCount,
+              filterType: payload.filter?.type || null,
+            }),
+          )
+        }
+      }
+    })
+
     socketRef.current?.emit(
       BulkActionsServerEvent.Create,
       {
         id,
         databaseId: instanceId,
         db: db || 0,
-        type: BulkActionsType.Delete,
+        type: BulkActionsType.Unlink,
         filter: {
           type: filter,
           match: search || '*',
         },
+        generateReport,
+        ...(confirmedThrough ? { confirmedThrough } : {}),
       },
       onBulkDeleting,
-    )
-  }
-
-  const getBulkAction = (id: string) => {
-    dispatch(setLoading(true))
-    socketRef.current?.emit(
-      BulkActionsServerEvent.Get,
-      { id: `${id}` },
-      fetchBulkAction,
     )
   }
 
@@ -124,27 +149,20 @@ const BulkActionsConfig = () => {
     )
   }
 
-  const fetchBulkAction = (data: any) => {
-    if (data.status === BulkActionsServerEvent.Error) {
-      sessionStorageService.set(BrowserStorageItem.bulkActionDeleteId, '')
-      dispatch(setBulkActionsInitialState())
-    }
-  }
-
   const onBulkDeleting = (data: any) => {
     if (data.status === BulkActionsServerEvent.Error) {
       dispatch(disconnectBulkDeleteAction())
-      dispatch(addErrorNotification({ response: { data: data.error } }))
+      dispatch(
+        addErrorNotification({
+          response: { data: data.error },
+        } as AxiosError),
+      )
     }
 
-    socketRef.current?.on(BulkActionsServerEvent.Overview, (payload: any) => {
-      dispatch(setBulkDeleteLoading(isProcessingBulkAction(payload.status)))
-      dispatch(setDeleteOverview(payload))
-
-      if (payload.status === BulkActionsStatus.Failed) {
-        dispatch(disconnectBulkDeleteAction())
-      }
-    })
+    // Trigger download if report URL is provided
+    if ('downloadUrl' in data && data.downloadUrl) {
+      triggerDownloadFromUrl(`${getBaseUrl()}${data.downloadUrl}`)
+    }
   }
 
   const onBulkDeleteAborted = (data: any) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import cx from 'classnames'
 
 import * as keys from 'uiSrc/constants/keys'
@@ -18,6 +18,11 @@ import {
   setFilter,
   setSearchMatch,
 } from 'uiSrc/slices/browser/keys'
+import {
+  setBulkDeleteFilter,
+  setBulkDeleteKeyCount,
+  setBulkDeleteSearch,
+} from 'uiSrc/slices/browser/bulkActions'
 import {
   KeyViewType,
   SearchHistoryItem,
@@ -40,28 +45,29 @@ import { FeatureFlags } from 'uiSrc/constants'
 import { FeatureFlagComponent } from 'uiSrc/components'
 import { EmptyButton } from 'uiSrc/components/base/forms/buttons'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
-const placeholders = {
-  [SearchMode.Pattern]: 'Filter by Key Name or Pattern',
-  [SearchMode.Redisearch]: 'Search per Values of Keys',
-}
-
 const SearchKeyList = () => {
-  const { id } = useSelector(connectedInstanceSelector)
-  const { search, viewType, searchMode } = useSelector(keysSelector)
+  const { t } = useTranslation()
+  const placeholders = {
+    [SearchMode.Pattern]: t('browser.search.placeholder.pattern'),
+    [SearchMode.Redisearch]: t('browser.search.placeholder.redisearch'),
+  }
+  const { id } = useAppSelector(connectedInstanceSelector)
+  const { search, filter, viewType, searchMode } = useAppSelector(keysSelector)
   const { search: redisearchQuery, selectedIndex } =
-    useSelector(redisearchSelector)
+    useAppSelector(redisearchSelector)
   const { data: rediSearchHistory, loading: rediSearchHistoryLoading } =
-    useSelector(redisearchHistorySelector)
-  const { data: searchHistory, loading: searchHistoryLoading } = useSelector(
+    useAppSelector(redisearchHistorySelector)
+  const { data: searchHistory, loading: searchHistoryLoading } = useAppSelector(
     keysSearchHistorySelector,
   )
 
   const [value, setValue] = useState(search || '')
   const [disableSubmit, setDisableSubmit] = useState(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (id) {
@@ -84,10 +90,22 @@ const SearchKeyList = () => {
       value: item.filter?.match,
     })) || []
 
-  const handleApply = (match = value, telemetryProperties: {} = {}) => {
+  const handleApply = (
+    match = value,
+    telemetryProperties: {} = {},
+    filterOverride?: typeof filter,
+  ) => {
     if (disableSubmit) return
 
+    const effectiveFilter =
+      filterOverride !== undefined ? filterOverride : filter
+
     dispatch(setSearchMatch(match, searchMode))
+
+    // Sync to bulk delete state
+    dispatch(setBulkDeleteSearch(match))
+    dispatch(setBulkDeleteFilter(effectiveFilter))
+    dispatch(setBulkDeleteKeyCount(null))
 
     if (viewType === KeyViewType.Tree) {
       dispatch(resetBrowserTree())
@@ -118,7 +136,7 @@ const SearchKeyList = () => {
   const handleChangeOptions = () => {
     // now only one filter, so we delete option
     dispatch(setFilter(null))
-    handleApply()
+    handleApply(value, {}, null)
   }
 
   const handleApplySuggestion = (suggestion?: {
@@ -132,7 +150,11 @@ const SearchKeyList = () => {
 
     dispatch(setFilter(suggestion.option))
     setValue(suggestion.value)
-    handleApply(suggestion.value, { source: 'history' })
+    handleApply(
+      suggestion.value,
+      { source: 'history' },
+      suggestion.option as typeof filter,
+    )
   }
 
   const handleDeleteSuggestions = (ids: string[]) => {
@@ -148,7 +170,7 @@ const SearchKeyList = () => {
   const onClear = () => {
     handleChangeValue('')
     dispatch(setFilter(null))
-    handleApply('')
+    handleApply('', {}, null)
   }
 
   const handleClickAskCopilot = () => {
@@ -175,7 +197,7 @@ const SearchKeyList = () => {
               ? searchHistory
               : rediSearchHistory,
           ),
-          buttonTooltipTitle: 'Show History',
+          buttonTooltipTitle: t('browser.search.showHistory'),
           loading:
             searchMode === SearchMode.Pattern
               ? searchHistoryLoading

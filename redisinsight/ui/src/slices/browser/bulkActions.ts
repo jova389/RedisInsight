@@ -3,7 +3,9 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import axios, { AxiosError } from 'axios'
 import {
   ApiEndpoints,
+  BulkActionConfirmation,
   BulkActionsType,
+  KeyTypes,
   MAX_BULK_ACTION_ERRORS_LENGTH,
 } from 'uiSrc/constants'
 import { apiService } from 'uiSrc/services'
@@ -33,6 +35,11 @@ export const initialState: StateBulkActions = {
     loading: false,
     error: '',
     overview: null,
+    generateReport: false,
+    filter: null,
+    search: '',
+    keyCount: null,
+    confirmedThrough: null,
   },
   bulkUpload: {
     loading: false,
@@ -77,6 +84,33 @@ const bulkActionsSlice = createSlice({
     },
     toggleBulkDeleteActionTriggered: (state) => {
       state.bulkDelete.isActionTriggered = !state.bulkDelete.isActionTriggered
+    },
+    setBulkDeleteGenerateReport: (
+      state,
+      { payload }: PayloadAction<boolean>,
+    ) => {
+      state.bulkDelete.generateReport = payload
+    },
+    setBulkDeleteConfirmedThrough: (
+      state,
+      { payload }: PayloadAction<Nullable<BulkActionConfirmation>>,
+    ) => {
+      state.bulkDelete.confirmedThrough = payload
+    },
+    setBulkDeleteFilter: (
+      state,
+      { payload }: PayloadAction<Nullable<KeyTypes>>,
+    ) => {
+      state.bulkDelete.filter = payload
+    },
+    setBulkDeleteSearch: (state, { payload }: PayloadAction<string>) => {
+      state.bulkDelete.search = payload
+    },
+    setBulkDeleteKeyCount: (
+      state,
+      { payload }: PayloadAction<Nullable<number>>,
+    ) => {
+      state.bulkDelete.keyCount = payload
     },
     setDeleteOverview: (
       state,
@@ -153,6 +187,11 @@ export const {
   toggleBulkActions,
   disconnectBulkDeleteAction,
   toggleBulkDeleteActionTriggered,
+  setBulkDeleteGenerateReport,
+  setBulkDeleteConfirmedThrough,
+  setBulkDeleteFilter,
+  setBulkDeleteSearch,
+  setBulkDeleteKeyCount,
   setDeleteOverview,
   setDeleteOverviewStatus,
   setBulkActionsInitialState,

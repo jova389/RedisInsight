@@ -2,8 +2,21 @@ require('dotenv').config({ path: './redisinsight/ui/.env.test' });
 
 /** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
 module.exports = {
+  // Limit discovery to UI sources and the api-client they import, so watch
+  // only reruns on relevant changes.
+  roots: [
+    '<rootDir>/redisinsight/ui',
+    '<rootDir>/redisinsight/__mocks__',
+    '<rootDir>/redisinsight/api-client',
+  ],
+  // Fuzzy filename / test-name filtering in --watch (the `p` and `t` prompts).
+  watchPlugins: [
+    'jest-watch-typeahead/filename',
+    'jest-watch-typeahead/testname',
+  ],
   testEnvironmentOptions: {
     url: 'http://localhost/',
+    customExportConditions: [''],
   },
   moduleNameMapper: {
     '\\.(jpg|jpeg|png|ico|gif|eot|otf|webp|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
@@ -13,21 +26,15 @@ module.exports = {
     '\\.scss\\?inline$': '<rootDir>/redisinsight/__mocks__/scssRaw.js',
     'uiSrc/slices/store$': '<rootDir>/redisinsight/ui/src/utils/test-store.ts',
     'uiSrc/(.*)': '<rootDir>/redisinsight/ui/src/$1',
-    'apiSrc/(.*)': '<rootDir>/redisinsight/api/src/$1',
+    '^apiClient$': '<rootDir>/redisinsight/api-client',
+    'apiClient/(.*)': '<rootDir>/redisinsight/api-client/$1',
     '@redislabsdev/redis-ui-components': '@redis-ui/components',
     '@redislabsdev/redis-ui-styles': '@redis-ui/styles',
     '@redislabsdev/redis-ui-icons': '@redis-ui/icons',
     '@redislabsdev/redis-ui-table': '@redis-ui/table',
     'monaco-editor': '<rootDir>/redisinsight/__mocks__/monacoMock.js',
     'monaco-yaml': '<rootDir>/redisinsight/__mocks__/monacoYamlMock.js',
-    unified: '<rootDir>/redisinsight/__mocks__/unified.js',
-    'remark-parse': '<rootDir>/redisinsight/__mocks__/remarkParse.js',
-    'remark-gfm': '<rootDir>/redisinsight/__mocks__/remarkGfm.js',
-    'remark-rehype': '<rootDir>/redisinsight/__mocks__/remarkRehype.js',
-    'rehype-stringify': '<rootDir>/redisinsight/__mocks__/rehypeStringify.js',
-    'unist-util-visit': '<rootDir>/redisinsight/__mocks__/unistUtilsVisit.js',
-    'react-children-utilities':
-      '<rootDir>/redisinsight/__mocks__/react-children-utilities.js',
+    '@rdi-ui/pipeline': '<rootDir>/redisinsight/__mocks__/rdiUiPipelineMock.js',
     d3: '<rootDir>/node_modules/d3/dist/d3.min.js',
     '^uuid$': require.resolve('uuid'),
     msgpackr: require.resolve('msgpackr'),
@@ -41,10 +48,16 @@ module.exports = {
   ],
   setupFilesAfterEnv: ['<rootDir>/redisinsight/ui/src/setup-tests.ts'],
   moduleDirectories: ['node_modules', 'redisinsight/node_modules'],
-  moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json'],
-  testEnvironment: 'jest-environment-jsdom',
+  moduleFileExtensions: ['js', 'mjs', 'jsx', 'ts', 'tsx', 'json'],
+  testEnvironment: 'jest-fixed-jsdom',
+  transform: {
+    '\\.[jt]sx?$': 'babel-jest',
+    '\\.mjs$': 'babel-jest',
+  },
+  // ESM packages that need transpiling. The `.*` matches an allow-listed name
+  // at any depth, so an entry holds whether npm hoists or nests the package.
   transformIgnorePatterns: [
-    'node_modules/(?!(monaco-editor|react-monaco-editor|brotli-dec-wasm)/)',
+    'node_modules/(?!.*(monaco-editor|react-monaco-editor|brotli-dec-wasm|until-async|rettime|@open-draft/deferred-promise|uuid|react-markdown|devlop|hast-util-.*|comma-separated-tokens|property-information|space-separated-tokens|unist-util-.*|vfile|vfile-message|html-url-attributes|mdast-util-.*|micromark.*|decode-named-character-reference|character-entities.*|trim-lines|remark-.*|rehype-.*|unified|bail|is-plain-obj|trough|estree-util-is-identifier-name|hastscript|web-namespaces|zwitch|ccount|escape-string-regexp|markdown-table|longest-streak|html-void-elements|stringify-entities)/)',
   ],
   // TODO: add tests for plugins
   modulePathIgnorePatterns: [

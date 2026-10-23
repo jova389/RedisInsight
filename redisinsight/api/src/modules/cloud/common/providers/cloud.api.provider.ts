@@ -7,6 +7,7 @@ import config, { Config } from 'src/utils/config';
 import { CloudApiUnauthorizedException } from 'src/modules/cloud/common/exceptions';
 import { CloudSessionService } from 'src/modules/cloud/session/cloud-session.service';
 import { Injectable } from '@nestjs/common';
+import { CloudAuthIdpType } from 'src/modules/cloud/auth/models';
 
 const serverConfig = config.get('server') as Config['server'];
 const cloudConfig = config.get('cloud');
@@ -72,6 +73,10 @@ export class CloudApiProvider {
 
     if (credentials?.csrf) {
       headers['x-csrf-token'] = credentials.csrf;
+    }
+
+    if (credentials?.idToken && credentials?.idpType === CloudAuthIdpType.Sso) {
+      headers['Sm-Id-Token'] = credentials.idToken;
     }
 
     return {

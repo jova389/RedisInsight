@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import cx from 'classnames'
 import { useParams } from 'react-router-dom'
 import { isNull } from 'lodash'
+import i18n from 'uiSrc/i18n'
 import { KeyboardKeys as keys } from 'uiSrc/constants/keys'
 
 import { LoadingContent } from 'uiSrc/components/base/layout'
@@ -28,8 +29,11 @@ import {
   CommandExecutionResult,
   IPluginVisualization,
 } from 'uiSrc/slices/interfaces'
-import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import { toggleOpenWBResult } from 'uiSrc/slices/workbench/wb-results'
+import {
+  getWbTsResultPreferences,
+  setWbTsResultPreferences,
+  REDISTIMESERIES_CHART_ID,
+} from 'uiSrc/pages/workbench/utils/tsResultPreferences'
 
 import QueryCardHeader from './QueryCardHeader'
 import QueryCardCliResultWrapper from './QueryCardCliResultWrapper'
@@ -39,6 +43,7 @@ import QueryCardCommonResult, {
 } from './QueryCardCommonResult'
 
 import styles from './styles.module.scss'
+import { useQueryResultsContext } from '../context/query-results.context'
 
 export interface Props {
   id: string
@@ -57,9 +62,9 @@ export interface Props {
   isNotStored?: boolean
   executionTime?: number
   db?: number
+  onToggleOpen?: (id: string, isOpen: boolean) => void
   onQueryDelete: () => void
   onQueryReRun: () => void
-  onQueryOpen: () => void
   onQueryProfile: (type: ProfileQueryType) => void
 }
 
@@ -67,15 +72,53 @@ const getDefaultPlugin = (views: IPluginVisualization[], query: string) =>
   getVisualizationsByCommand(query, views).find((view) => view.default)
     ?.uniqId || DEFAULT_TEXT_VIEW_TYPE.id
 
+const hasTimeSeriesVisualization = (
+  views: IPluginVisualization[],
+  query: string,
+): boolean =>
+  getVisualizationsByCommand(query, views).some(
+    (v) => v.uniqId === REDISTIMESERIES_CHART_ID,
+  )
+
+const resolveInitialView = (
+  views: IPluginVisualization[],
+  query: string,
+  instanceId: string,
+): { viewType: WBQueryType; selectedValue: string } | null => {
+  if (!hasTimeSeriesVisualization(views, query)) {
+    return null
+  }
+
+  const prefs = getWbTsResultPreferences(instanceId)
+  if (!prefs) {
+    return null
+  }
+
+  if (prefs.selectedView === 'text') {
+    return {
+      viewType: WBQueryType.Text,
+      selectedValue: DEFAULT_TEXT_VIEW_TYPE.id,
+    }
+  }
+
+  return {
+    viewType: WBQueryType.Plugin,
+    selectedValue: REDISTIMESERIES_CHART_ID,
+  }
+}
+
 export const getSummaryText = (
   summary?: ResultsSummary,
   mode?: ResultsMode,
 ) => {
   if (summary) {
     const { total, success, fail } = summary
-    const summaryText = `${total} Command(s) - ${success} success`
+    const summaryText = i18n.t('query.card.summary.commands', {
+      count: total,
+      success,
+    })
     if (!isSilentModeWithoutError(mode, summary?.fail)) {
-      return `${summaryText}, ${fail} error(s)`
+      return `${summaryText}${i18n.t('query.card.summary.errors', { count: fail })}`
     }
     return summaryText
   }
@@ -94,7 +137,7 @@ const QueryCard = (props: Props) => {
     summary,
     isOpen,
     createdAt,
-    onQueryOpen,
+    onToggleOpen,
     onQueryDelete,
     onQueryProfile,
     onQueryReRun,
@@ -106,21 +149,28 @@ const QueryCard = (props: Props) => {
     db,
   } = props
 
-  const { visualizations = [] } = useSelector(appPluginsSelector)
+  const { visualizations = [] } = useAppSelector(appPluginsSelector)
 
   const { instanceId = '' } = useParams<{ instanceId: string }>()
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false)
   const [queryType, setQueryType] = useState<WBQueryType>(
     getWBQueryType(command, visualizations),
   )
-  const [viewTypeSelected, setViewTypeSelected] =
-    useState<WBQueryType>(queryType)
+  const [viewTypeSelected, setViewTypeSelected] = useState<WBQueryType>(() => {
+    const iv = resolveInitialView(visualizations, command, instanceId)
+    return iv?.viewType ?? getWBQueryType(command, visualizations)
+  })
   const [message, setMessage] = useState<string>('')
-  const [selectedViewValue, setSelectedViewValue] = useState<string>(
-    getDefaultPlugin(visualizations, command || '') || queryType,
-  )
+  const [selectedViewValue, setSelectedViewValue] = useState<string>(() => {
+    const iv = resolveInitialView(visualizations, command, instanceId)
+    return (
+      iv?.selectedValue ??
+      getDefaultPlugin(visualizations, command || '') ??
+      getWBQueryType(command, visualizations)
+    )
+  })
 
-  const dispatch = useDispatch()
+  const { telemetry } = useQueryResultsContext()
 
   useEffect(() => {
     window.addEventListener('keydown', handleEscFullScreen)
@@ -137,12 +187,9 @@ const QueryCard = (props: Props) => {
 
   const toggleFullScreen = () => {
     setIsFullScreen((isFull) => {
-      sendEventTelemetry({
-        event: TelemetryEvent.WORKBENCH_RESULTS_IN_FULL_SCREEN,
-        eventData: {
-          databaseId: instanceId,
-          state: isFull ? 'Close' : 'Open',
-        },
+      telemetry.onFullScreenToggled?.({
+        databaseId: instanceId,
+        state: isFull ? 'Close' : 'Open',
       })
 
       return !isFull
@@ -157,10 +204,17 @@ const QueryCard = (props: Props) => {
     if (visualizations.length) {
       const type = getWBQueryType(command, visualizations)
       setQueryType(type)
-      setViewTypeSelected(type)
-      setSelectedViewValue(
-        getDefaultPlugin(visualizations, command) || queryType,
-      )
+
+      const persisted = resolveInitialView(visualizations, command, instanceId)
+      if (persisted) {
+        setViewTypeSelected(persisted.viewType)
+        setSelectedViewValue(persisted.selectedValue)
+      } else {
+        setViewTypeSelected(type)
+        setSelectedViewValue(
+          getDefaultPlugin(visualizations, command) || queryType,
+        )
+      }
     }
   }, [visualizations])
 
@@ -168,17 +222,24 @@ const QueryCard = (props: Props) => {
     if (isFullScreen || isSilentModeWithoutError(resultsMode, summary?.fail))
       return
 
-    dispatch(toggleOpenWBResult(id))
-
-    if (!isOpen && !result) {
-      onQueryOpen()
-    }
+    onToggleOpen?.(id, !isOpen)
   }
 
-  const changeViewTypeSelected = (type: WBQueryType, value: string) => {
-    setViewTypeSelected(type)
-    setSelectedViewValue(value)
-  }
+  const changeViewTypeSelected = useCallback(
+    (type: WBQueryType, value: string) => {
+      setViewTypeSelected(type)
+      setSelectedViewValue(value)
+
+      if (hasTimeSeriesVisualization(visualizations, command)) {
+        const selectedView =
+          value === REDISTIMESERIES_CHART_ID
+            ? ('plugin:redistimeseries-chart' as const)
+            : ('text' as const)
+        setWbTsResultPreferences(instanceId, { selectedView })
+      }
+    },
+    [visualizations, command, instanceId],
+  )
 
   const commonError = CommonErrorResponse(id, command, result)
 
@@ -204,6 +265,7 @@ const QueryCard = (props: Props) => {
       <div
         className={cx(styles.container)}
         data-testid={`query-card-container-${id}`}
+        data-full-screen={isFullScreen}
       >
         <QueryCardHeader
           isOpen={isOpen}

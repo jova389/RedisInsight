@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -28,6 +29,8 @@ import {
 } from 'src/modules/redis/redis.client.factory';
 import { RedisClientStorage } from 'src/modules/redis/redis.client.storage';
 import { RedisConnectionSentinelMasterRequiredException } from 'src/modules/redis/exceptions/connection';
+import { CredentialStrategyProvider } from 'src/modules/database/credentials/credential-strategy.provider';
+import { AzureEntraIdCredentialStrategy } from 'src/modules/database/credentials/strategies/azure-entra-id.credential-strategy';
 
 @Injectable()
 export class DatabaseService {
@@ -45,6 +48,7 @@ export class DatabaseService {
   static connectionFields: string[] = [
     'host',
     'port',
+    'connectionFamily',
     'db',
     'username',
     'password',
@@ -68,6 +72,7 @@ export class DatabaseService {
     private databaseFactory: DatabaseFactory,
     private analytics: DatabaseAnalytics,
     private eventEmitter: EventEmitter2,
+    private credentialProvider: CredentialStrategyProvider,
   ) {}
 
   static isConnectionAffected(dto: object) {
@@ -80,6 +85,39 @@ export class DatabaseService {
     return Object.keys(omitBy(dto, isUndefined)).some((field) =>
       this.endpointFields.includes(field),
     );
+  }
+
+  /**
+   * Checks whether the endpoint (host/port) in the dto differs from the stored one.
+   * Unlike isEndpointAffected, this compares values so an unchanged host/port
+   * present in the payload is not treated as a change.
+   */
+  static isEndpointChanged(
+    dto: UpdateDatabaseDto,
+    database: Database,
+  ): boolean {
+    return (
+      (dto.host !== undefined && dto.host !== database.host) ||
+      (dto.port !== undefined && dto.port !== database.port)
+    );
+  }
+
+  /**
+   * A database is considered managed when its endpoint is owned by a cloud
+   * provider (Redis Cloud subscription or Azure). For such databases the
+   * host/port are tied to provider metadata (cloudDetails/providerDetails) that
+   * would become stale if the endpoint were edited manually.
+   */
+  static isManagedDatabase(database: Database): boolean {
+    return !!database.cloudDetails?.cloudId || !!database.providerDetails;
+  }
+
+  /**
+   * Whether the database name is still the default "host:port" derived from its
+   * current endpoint (i.e. the user never set a custom alias).
+   */
+  static hasDefaultEndpointName(database: Database): boolean {
+    return database.name === `${database.host}:${database.port}`;
   }
 
   private async merge(
@@ -179,7 +217,7 @@ export class DatabaseService {
     try {
       this.logger.debug('Creating new database.', sessionMetadata);
 
-      const database = await this.repository.create(
+      let database = await this.repository.create(
         sessionMetadata,
         {
           ...(await this.databaseFactory.createDatabaseModel(
@@ -194,13 +232,16 @@ export class DatabaseService {
 
       // todo: clarify if we need this and if yes - rethink implementation
       try {
+        const databaseWithCredentials =
+          await this.credentialProvider.resolve(database);
+
         const client = await this.redisClientFactory.createClient(
           {
             sessionMetadata,
             databaseId: database.id,
             context: ClientContext.Common,
           },
-          database,
+          databaseWithCredentials,
         );
         const redisInfo =
           await this.databaseInfoProvider.getRedisGeneralInfo(client);
@@ -240,9 +281,33 @@ export class DatabaseService {
     this.logger.debug(`Updating database: ${id}`, sessionMetadata);
     const oldDatabase = await this.get(sessionMetadata, id, true);
 
+    if (
+      DatabaseService.isEndpointChanged(dto, oldDatabase) &&
+      DatabaseService.isManagedDatabase(oldDatabase)
+    ) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.HOST_PORT_NOT_EDITABLE_FOR_MANAGED_DATABASE,
+      );
+    }
+
+    // When the name is still the default "host:port" and the endpoint changes,
+    // keep the name in sync with the new endpoint. Computed before merge (which
+    // mutates oldDatabase) and skipped when the caller sets a name explicitly or
+    // the user has a custom alias.
+    const syncedName =
+      dto.name === undefined &&
+      DatabaseService.isEndpointChanged(dto, oldDatabase) &&
+      DatabaseService.hasDefaultEndpointName(oldDatabase)
+        ? `${dto.host ?? oldDatabase.host}:${dto.port ?? oldDatabase.port}`
+        : undefined;
+
     let database: Database;
     try {
       database = await this.merge(oldDatabase, dto);
+
+      if (syncedName !== undefined) {
+        database.name = syncedName;
+      }
 
       if (DatabaseService.isConnectionAffected(dto)) {
         if (DatabaseService.isEndpointAffected(dto)) {
@@ -435,8 +500,6 @@ export class DatabaseService {
     ids: string[],
     withSecrets = false,
   ): Promise<ExportDatabase[]> {
-    const paths = !withSecrets ? this.exportSecurityFields : [];
-
     this.logger.debug(`Exporting many database: ${ids}`, sessionMetadata);
 
     if (!ids.length) {
@@ -444,7 +507,7 @@ export class DatabaseService {
       throw new NotFoundException(ERROR_MESSAGES.INVALID_DATABASE_INSTANCE_ID);
     }
 
-    const entities: ExportDatabase[] = reject(
+    const entities: Database[] = reject(
       await Promise.all(
         ids.map(async (id) => {
           try {
@@ -457,10 +520,24 @@ export class DatabaseService {
       isEmpty,
     );
 
-    return entities.map((database) =>
-      classToClass(ExportDatabase, omit(database, paths), {
+    return entities.map((database) => {
+      // For Azure Entra ID databases, always strip credentials
+      // (username/password are temporary tokens) and include providerDetails
+      const isAzureEntraId = AzureEntraIdCredentialStrategy.isAzureEntraIdAuth(
+        database.providerDetails,
+      );
+
+      let paths: string[];
+      if (isAzureEntraId) {
+        // Always strip credentials for Azure Entra ID databases
+        paths = [...this.exportSecurityFields, 'username'];
+      } else {
+        paths = !withSecrets ? this.exportSecurityFields : [];
+      }
+
+      return classToClass(ExportDatabase, omit(database, paths), {
         groups: ['security'],
-      }),
-    );
+      });
+    });
   }
 }

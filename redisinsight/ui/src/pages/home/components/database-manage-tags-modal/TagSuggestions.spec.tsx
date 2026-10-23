@@ -1,18 +1,23 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
-
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { fireEvent, render, screen } from 'uiSrc/utils/test-utils'
 
 import { Tag } from 'uiSrc/slices/interfaces/tag'
 import { TagSuggestions, TagSuggestionsProps } from './TagSuggestions'
 import { presetTagSuggestions } from './constants'
 
+jest.mock('uiSrc/slices/hooks', () => ({
+  ...jest.requireActual('uiSrc/slices/hooks'),
+  useAppSelector: jest.fn(),
+}))
+
 jest.mock('react-redux', () => ({
-  useSelector: jest.fn(),
   connect: () => (Component: any) => Component,
 }))
 
-const mockSelector = useSelector as jest.MockedFunction<typeof useSelector>
+const mockSelector = useAppSelector as jest.MockedFunction<
+  typeof useAppSelector
+>
 
 const mockTags: Tag[] = [
   {
@@ -77,7 +82,7 @@ describe('TagSuggestions', () => {
 
   it('should display the correct number of tags', () => {
     renderComponent()
-    const tagElements = screen.getAllByRole('option')
+    const tagElements = screen.getAllByRole('listitem')
 
     expect(tagElements.length).toBe(7)
   })
@@ -88,7 +93,7 @@ describe('TagSuggestions', () => {
     })
 
     renderComponent()
-    const tagElements = screen.getAllByRole('option')
+    const tagElements = screen.getAllByRole('listitem')
 
     expect(tagElements.length).toBe(7)
   })
@@ -101,7 +106,7 @@ describe('TagSuggestions', () => {
     renderComponent({
       targetKey: 'environment',
     })
-    const tagElements = screen.getAllByRole('option')
+    const tagElements = screen.getAllByRole('listitem')
 
     expect(tagElements.length).toBe(3)
   })

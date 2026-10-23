@@ -1,16 +1,17 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   HttpException,
   InternalServerErrorException,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ReplyError } from 'src/models';
-import { RedisErrorCodes, CertificatesErrorCodes } from 'src/constants';
+import {
+  RedisErrorCodes,
+  RedisearchErrorCodes,
+  CertificatesErrorCodes,
+} from 'src/constants';
 import ERROR_MESSAGES from 'src/constants/error-messages';
-import { EncryptionServiceErrorException } from 'src/modules/encryption/exceptions';
 import { RedisClientCommandReply } from 'src/modules/redis/client';
 import {
   RedisConnectionAuthUnsupportedException,
@@ -52,7 +53,9 @@ export const getRedisConnectionException = (
 
   if (error?.message) {
     if (error.message.includes(RedisErrorCodes.SentinelParamsRequired)) {
-      return new RedisConnectionSentinelMasterRequiredException(undefined, { cause: error });
+      return new RedisConnectionSentinelMasterRequiredException(undefined, {
+        cause: error,
+      });
     }
 
     if (
@@ -67,15 +70,21 @@ export const getRedisConnectionException = (
       error.message.includes(RedisErrorCodes.AuthRequired) ||
       error.message === 'ERR invalid password'
     ) {
-      return new RedisConnectionUnauthorizedException(undefined, { cause: error });
+      return new RedisConnectionUnauthorizedException(undefined, {
+        cause: error,
+      });
     }
 
     if (error.message === "ERR unknown command 'auth'") {
-      return new RedisConnectionAuthUnsupportedException(undefined, { cause: error });
+      return new RedisConnectionAuthUnsupportedException(undefined, {
+        cause: error,
+      });
     }
 
     if (error.message.includes(RedisErrorCodes.ClusterAllFailedError)) {
-      return new RedisConnectionClusterNodesUnavailableException(undefined, { cause: error });
+      return new RedisConnectionClusterNodesUnavailableException(undefined, {
+        cause: error,
+      });
     }
 
     if (
@@ -85,18 +94,14 @@ export const getRedisConnectionException = (
       error?.code === RedisErrorCodes.ConnectionReset
     ) {
       return new RedisConnectionUnavailableException(
-        ERROR_MESSAGES.INCORRECT_DATABASE_URL(
-          errorPlaceholder || `${host}:${port}`,
-        ),
+        errorPlaceholder || `${host}:${port}`,
         { cause: error },
       );
     }
 
     if (isCertError(error)) {
       return new RedisConnectionIncorrectCertificateException(
-        ERROR_MESSAGES.INCORRECT_CERTIFICATES(
-          errorPlaceholder || `${host}:${port}`,
-        ),
+        errorPlaceholder || `${host}:${port}`,
         { cause: error },
       );
     }
@@ -115,9 +120,7 @@ export const catchRedisConnectionError = (
 
 export const catchAclError = (error: ReplyError): HttpException => {
   // todo: Move to other place after refactoring
-  if (
-    error instanceof HttpException
-  ) {
+  if (error instanceof HttpException) {
     throw error;
   }
 
@@ -159,6 +162,14 @@ export const catchMultiTransactionError = (
   });
 };
 
+const REDISEARCH_CLIENT_ERROR_PATTERNS = [
+  RedisearchErrorCodes.Invalid,
+  RedisearchErrorCodes.BadArguments,
+  RedisearchErrorCodes.Duplicate,
+  RedisearchErrorCodes.Missing,
+  RedisearchErrorCodes.WrongNumberOfArguments,
+];
+
 export const catchRedisSearchError = (
   error: ReplyError,
   options?: { searchLimit?: number },
@@ -178,6 +189,16 @@ export const catchRedisSearchError = (
     error.message?.toLowerCase()?.includes('no such index')
   ) {
     throw new NotFoundException(error.message);
+  }
+
+  // Check for client-side errors (invalid input, bad arguments, etc.)
+  // These should return 400 Bad Request, not 500 Internal Server Error
+  if (
+    REDISEARCH_CLIENT_ERROR_PATTERNS.some((pattern) =>
+      error.message?.startsWith(pattern),
+    )
+  ) {
+    throw new BadRequestException(error.message);
   }
 
   throw catchAclError(error);

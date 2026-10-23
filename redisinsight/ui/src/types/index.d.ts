@@ -9,6 +9,7 @@ import {
   UintArray,
 } from 'uiSrc/slices/interfaces'
 import { Config } from 'uiSrc/config'
+import { AppUpdateState } from 'uiSrc/electron/constants'
 import { IPCHandler } from '../../../desktop/preload'
 
 declare global {
@@ -45,8 +46,12 @@ export interface RedisInsight {
 export interface WindowApp {
   sendWindowId: any
   cloudOauthCallback: any
+  azureOauthCallback: any
   deepLinkAction: any
   updateAvailable: any
+  updateState: (
+    callback: (event: unknown, state: AppUpdateState) => void,
+  ) => void
   ipc: IPCHandler
   config: {
     apiPort: string

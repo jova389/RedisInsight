@@ -1,0 +1,245 @@
+name: E2E Playwright Tests (v2)
+
+# E2E is expensive, so it does not run on every pull request. These are the only
+# cases where it runs:
+#
+#   1. Dependabot opens a dependency PR. Its branch is `dependabot/**`, and the
+#      push that creates that branch starts this workflow.
+#   2. Dependabot rebases a dependency PR. That is another push to the same
+#      branch, so the run restarts on the new commit.
+#   3. Someone adds `e2e-tests` or `run-all-tests` to a PR.
+#   4. The nightly schedule, at 00:00 UTC.
+#   5. Someone starts it by hand from the Actions tab.
+#
+# `skip-e2e` on a PR overrides cases 1, 2 and 3. It stops a run already going and
+# keeps later ones off.
+#
+# Opening a PR or pushing to it does not start E2E unless the branch is
+# `dependabot/**`. Case 3 is how you ask for it, and removing then re-adding the
+# label is how you rerun it.
+
+on:
+  # Case 5.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run tests'
+        type: choice
+        options:
+          - staging
+        default: 'staging'
+      debug:
+        description: 'Enable SSH debugging'
+        type: boolean
+        default: false
+
+  # Cases 1 and 2. The branch name is the only way to limit this to Dependabot: a
+  # `pull_request` trigger cannot filter on who opened the PR, so it would start a
+  # run on every PR in the repo just to work out that it is not wanted.
+  push:
+    branches: ['dependabot/**']
+
+  # Case 3, and `skip-e2e`.
+  pull_request:
+    types: [labeled]
+
+  # Case 4.
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  # One run per branch at a time. A new push replaces the one already going,
+  # which is what case 2 needs.
+  #
+  # The key is the branch rather than the PR so that a push (cases 1 and 2) and a
+  # label (case 3) on the same PR land in the same group. That is what lets
+  # `skip-e2e` stop a run a push started.
+  #
+  # The `-noop-<run id>` on the end puts labels this workflow ignores in a group
+  # of their own, where they cancel nothing. Without it every label added to a PR
+  # would kill the run: the group is worked out before any job `if` is read, so
+  # skipping the jobs is too late. Dependabot adds `dependencies` and `javascript`
+  # twice each within two seconds, so this matters on every dependency PR.
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}${{
+    github.event.action == 'labeled' &&
+    !contains(fromJSON('["e2e-tests","run-all-tests","skip-e2e"]'), github.event.label.name)
+    && format('-noop-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  # Works out which case this event is, and whether it runs anything.
+  check-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      # A push event carries no PR, so the labels have to be fetched to honour
+      # `skip-e2e` in cases 1 and 2.
+      - name: Read labels for the pushed branch
+        id: pushed-pr
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          labels=$(gh pr list --head "$BRANCH" --state open --json labels \
+            --jq '[.[0].labels[].name] | join(",")' || true)
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+
+      - name: Check trigger conditions
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          LABEL_ADDED: ${{ github.event.label.name }}
+          PUSHED_PR_LABELS: ${{ steps.pushed-pr.outputs.labels }}
+          HAS_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+        run: |
+          # Case 3. The same list appears in the concurrency group above, next to
+          # `skip-e2e`. Changing one without the other breaks quietly.
+          OPT_IN_LABELS='e2e-tests run-all-tests'
+
+          should_run=false
+          case "$EVENT_NAME" in
+            workflow_dispatch | schedule)
+              # Cases 4 and 5, always.
+              should_run=true
+              ;;
+            push)
+              # Cases 1 and 2. The branch filter has already narrowed this to
+              # dependency branches, so `skip-e2e` is the only thing left to check.
+              if [[ ",$PUSHED_PR_LABELS," != *",skip-e2e,"* ]]; then
+                should_run=true
+              fi
+              ;;
+            pull_request)
+              if [[ "$HAS_SKIP_LABEL" == "true" ]]; then
+                # `skip-e2e` wins, even when an opt-in label arrives after it.
+                should_run=false
+              elif [[ "$ACTION" == "labeled" ]]; then
+                # Case 3. Every other label reaches this point too, in its own
+                # concurrency group, and leaves should_run false.
+                for label in $OPT_IN_LABELS; do
+                  [[ "$LABEL_ADDED" == "$label" ]] && should_run=true
+                done
+              fi
+              ;;
+          esac
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+  # Lint and type-check E2E code
+  lint:
+    name: Lint
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should_run == 'true'
+    uses: ./.github/workflows/tests-e2e-playwright-lint.yml
+
+  # Chromium tests (local dev mode) - no build required
+  e2e-dev-chromium:
+    name: Chromium (Dev)
+    needs: lint
+    uses: ./.github/workflows/tests-e2e-playwright-chromium.yml
+    secrets: inherit
+    with:
+      environment: ${{ inputs.environment || 'staging' }}
+      debug: ${{ inputs.debug || false }}
+
+  # Build Docker image for Docker tests
+  build-docker:
+    name: Build Docker
+    needs: lint
+    uses: ./.github/workflows/pipeline-build-docker.yml
+    secrets: inherit
+    with:
+      debug: ${{ inputs.debug || false }}
+      for_e2e_tests: true
+
+  # Docker tests (Chromium against Docker image)
+  e2e-docker:
+    name: Docker
+    needs: build-docker
+    uses: ./.github/workflows/tests-e2e-playwright-docker.yml
+    secrets: inherit
+    with:
+      environment: ${{ inputs.environment || 'staging' }}
+      debug: ${{ inputs.debug || false }}
+
+  # Build Linux AppImage for Electron tests
+  build-linux:
+    name: Build Linux
+    needs: lint
+    uses: ./.github/workflows/pipeline-build-linux.yml
+    secrets: inherit
+    with:
+      environment: ${{ inputs.environment || 'staging' }}
+      target: 'build_linux_appimage_x64'
+      debug: ${{ inputs.debug || false }}
+      enterprise: false
+
+  # Electron tests (Linux AppImage)
+  e2e-electron:
+    name: Electron (Linux)
+    needs: build-linux
+    uses: ./.github/workflows/tests-e2e-playwright-electron.yml
+    secrets: inherit
+    with:
+      environment: ${{ inputs.environment || 'staging' }}
+      debug: ${{ inputs.debug || false }}
+
+  # Alert on any non-success nightly result (incl. 'cancelled' from a timeout).
+  notify-slack:
+    name: Notify Slack on nightly failure
+    needs:
+      - lint
+      - build-docker
+      - build-linux
+      - e2e-dev-chromium
+      - e2e-docker
+      - e2e-electron
+    if: |
+      always() &&
+      github.event_name == 'schedule' &&
+      (needs.lint.result != 'success' ||
+       needs.build-docker.result != 'success' ||
+       needs.build-linux.result != 'success' ||
+       needs.e2e-dev-chromium.result != 'success' ||
+       needs.e2e-docker.result != 'success' ||
+       needs.e2e-electron.result != 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        uses: slackapi/slack-github-action@v4.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_TEST_REPORT_KEY }}
+          payload: |
+            channel: "${{ secrets.SLACK_TEST_REPORT_CHANNEL }}"
+            text: "<!here> *Nightly E2E did not succeed* — `${{ github.repository }}` on `${{ github.ref_name }}` @ `${{ github.sha }}`"
+            attachments:
+              - color: "#cc0000"
+                title: "${{ github.workflow }}"
+                title_link: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                fields:
+                  - title: "Lint"
+                    value: "${{ needs.lint.result }}"
+                    short: true
+                  - title: "Build Docker"
+                    value: "${{ needs.build-docker.result }}"
+                    short: true
+                  - title: "Build Linux"
+                    value: "${{ needs.build-linux.result }}"
+                    short: true
+                  - title: "Chromium (Dev)"
+                    value: "${{ needs.e2e-dev-chromium.result }}"
+                    short: true
+                  - title: "Docker"
+                    value: "${{ needs.e2e-docker.result }}"
+                    short: true
+                  - title: "Electron (Linux)"
+                    value: "${{ needs.e2e-electron.result }}"
+                    short: true

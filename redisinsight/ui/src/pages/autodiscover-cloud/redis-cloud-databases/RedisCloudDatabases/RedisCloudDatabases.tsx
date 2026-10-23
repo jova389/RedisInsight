@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { map, pick } from 'lodash'
-import { useSelector } from 'react-redux'
-import { useHistory } from 'react-router-dom'
 
-import { cloudSelector } from 'uiSrc/slices/instances/cloud'
 import { InstanceRedisCloud } from 'uiSrc/slices/interfaces'
-import validationErrors from 'uiSrc/constants/validationErrors'
+import { getValidationErrors } from 'uiSrc/constants/validationErrors'
 import { AutodiscoveryPageTemplate } from 'uiSrc/templates'
 
-import { Row } from 'uiSrc/components/base/layout/flex'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { InfoIcon } from 'uiSrc/components/base/icons'
 import {
   DestructiveButton,
@@ -16,24 +13,28 @@ import {
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
 import { RiPopover, RiTooltip } from 'uiSrc/components/base'
-import { Pages } from 'uiSrc/constants'
-import { SearchInput } from 'uiSrc/components/base/inputs'
 import { Text } from 'uiSrc/components/base/text'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
+import { useTranslation } from 'uiSrc/i18n'
+import {
+  ColumnDef,
+  RowSelectionState,
+  Table,
+} from 'uiSrc/components/base/layout/table'
 import styles from '../styles.module.scss'
 import { Spacer } from 'uiSrc/components/base/layout'
 import {
+  DatabaseContainer,
   DatabaseWrapper,
   Footer,
-  PageSubTitle,
-  PageTitle,
-  SearchContainer,
-  SearchForm,
+  Header,
 } from 'uiSrc/components/auto-discover'
 
 export interface Props {
-  columns: ColumnDefinition<InstanceRedisCloud>[]
+  columns: ColumnDef<InstanceRedisCloud>[]
+  instances: InstanceRedisCloud[]
   selection: InstanceRedisCloud[]
+  loading: boolean
+  onSelectionChange: (currentSelected: RowSelectionState) => void
   onClose: () => void
   onBack: () => void
   onSubmit: (
@@ -48,43 +49,35 @@ interface IPopoverProps {
   isPopoverOpen: boolean
 }
 
-const loadingMsg = 'loading...'
-const notFoundMsg = 'Not found'
-const noResultsMessage =
-  'Your Redis Enterprise Сloud has no databases available'
-
 const RedisCloudDatabasesPage = ({
   columns,
   selection,
+  instances,
+  loading,
+  onSelectionChange,
   onClose,
   onBack,
   onSubmit,
 }: Props) => {
+  const { t } = useTranslation()
+  const validationErrors = getValidationErrors(t)
+  const loadingMsg = t('autodiscover.cloud.loading')
+  const notFoundMsg = t('autodiscover.cloud.notFound')
+  const noResultsMessage = t('autodiscover.cloud.databases.noResults')
+
   const [items, setItems] = useState<InstanceRedisCloud[]>([])
   const [message, setMessage] = useState(loadingMsg)
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
-
-  const history = useHistory()
-
-  const { loading, data: instances } = useSelector(cloudSelector)
 
   useEffect(() => {
     if (instances !== null) {
       setItems(instances)
     }
-  }, [instances])
 
-  useEffect(() => {
-    if (instances === null) {
-      history.push(Pages.home)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (instances?.length === 0) {
+    if (instances?.length === 0 && !loading) {
       setMessage(noResultsMessage)
     }
-  }, [instances])
+  }, [instances, loading])
 
   const handleSubmit = () => {
     onSubmit(
@@ -134,14 +127,11 @@ const RedisCloudDatabasesPage = ({
           className="btn-cancel"
           data-testid="btn-cancel"
         >
-          Cancel
+          {t('autodiscover.cloud.cancel.button')}
         </SecondaryButton>
       }
     >
-      <Text size="m">
-        Your changes have not been saved.&#10;&#13; Do you want to proceed to
-        the list of databases?
-      </Text>
+      <Text size="m">{t('autodiscover.cloud.cancel.confirm')}</Text>
       <br />
       <div>
         <DestructiveButton
@@ -149,7 +139,7 @@ const RedisCloudDatabasesPage = ({
           onClick={onClose}
           data-testid="btn-cancel-proceed"
         >
-          Proceed
+          {t('autodiscover.cloud.cancel.proceed')}
         </DestructiveButton>
       </div>
     </RiPopover>
@@ -174,37 +164,28 @@ const RedisCloudDatabasesPage = ({
         icon={isDisabled ? InfoIcon : undefined}
         data-testid="btn-add-databases"
       >
-        Add selected Databases
+        {t('autodiscover.cloud.databases.addSelected')}
       </PrimaryButton>
     </RiTooltip>
   )
 
   return (
     <AutodiscoveryPageTemplate>
-      <div className="databaseContainer">
-        <PageTitle data-testid="title">Redis Cloud Databases</PageTitle>
-
-        <Row align="end" gap="s">
-          <PageSubTitle>
-            These are {items.length > 1 ? 'databases ' : 'database '}
-            in your Redis Cloud. Select the
-            {items.length > 1 ? ' databases ' : ' database '} that you want to
-            add.
-          </PageSubTitle>
-        </Row>
-        <SearchContainer>
-          <SearchForm>
-            <SearchInput
-              placeholder="Search..."
-              onChange={onQueryChange}
-              aria-label="Search"
-              data-testid="search"
-            />
-          </SearchForm>
-        </SearchContainer>
-        <Spacer size="l" />
+      <DatabaseContainer justify="start">
+        <Header
+          title={t('autodiscover.cloud.databases.title')}
+          onBack={onBack}
+          onQueryChange={onQueryChange}
+          subTitle={t('autodiscover.cloud.databases.subtitle', {
+            count: items.length,
+          })}
+        />
+        <Spacer size="m" />
         <DatabaseWrapper>
           <Table
+            rowSelectionMode="multiple"
+            onRowSelectionChange={onSelectionChange}
+            getRowId={(row) => `${row.databaseId}`}
             columns={columns}
             data={items}
             defaultSorting={[
@@ -213,20 +194,27 @@ const RedisCloudDatabasesPage = ({
                 desc: false,
               },
             ]}
+            paginationEnabled={items.length > 10}
+            stripedRows
+            pageSizes={[5, 10, 25, 50, 100]}
+            emptyState={() => (
+              <Col centered full>
+                <FlexItem padding={13}>
+                  <Text size="L">{message}</Text>
+                </FlexItem>
+              </Col>
+            )}
           />
-          {!items.length && <Text size="S">{message}</Text>}
+          {!items.length && (
+            <Col centered full>
+              <Text size="L">{message}</Text>
+            </Col>
+          )}
         </DatabaseWrapper>
-      </div>
-      <Footer padding={4}>
-        <Row justify="between">
-          <SecondaryButton
-            onClick={onBack}
-            className="btn-cancel btn-back"
-            data-testid="btn-back-to-adding"
-          >
-            Back to adding databases
-          </SecondaryButton>
-          <Row grow={false} gap="m">
+      </DatabaseContainer>
+      <Footer>
+        <Row justify="end">
+          <Row gap="m" grow={false}>
             <CancelButton isPopoverOpen={isPopoverOpen} />
             <SubmitButton isDisabled={selection.length < 1} />
           </Row>

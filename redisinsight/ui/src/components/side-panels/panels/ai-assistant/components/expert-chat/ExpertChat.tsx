@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
 import {
   aiExpertChatSelector,
@@ -40,17 +40,17 @@ import { ChatForm, ChatHistory } from '../shared'
 import styles from './styles.module.scss'
 
 const ExpertChat = () => {
-  const { messages, agreements, loading } = useSelector(aiExpertChatSelector)
+  const { messages, agreements, loading } = useAppSelector(aiExpertChatSelector)
   const {
     name: connectedInstanceName,
     modules,
     provider,
-  } = useSelector(connectedInstanceSelector)
-  const { commandsArray: REDIS_COMMANDS_ARRAY } = useSelector(
+  } = useAppSelector(connectedInstanceSelector)
+  const { commandsArray: REDIS_COMMANDS_ARRAY } = useAppSelector(
     appRedisCommandsSelector,
   )
-  const { data: userOAuthProfile } = useSelector(oauthCloudUserSelector)
-  const freeInstances = useSelector(freeInstancesSelector) || []
+  const { data: userOAuthProfile } = useAppSelector(oauthCloudUserSelector)
+  const freeInstances = useAppSelector(freeInstancesSelector) || []
 
   const [isNoIndexes, setIsNoIndexes] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -63,7 +63,7 @@ const ExpertChat = () => {
   const isAgreementsAccepted =
     agreements.includes(instanceId) || messages.length > 0
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const history = useHistory()
 
   useEffect(() => {
@@ -198,16 +198,16 @@ const ExpertChat = () => {
       return {
         title: 'Open a database',
         content:
-          'Open your Redis database with Redis Query Engine, or create a new database to get started.',
+          'Open your Redis database with Redis Search, or create a new database to get started.',
       }
     }
 
     if (!isRedisearchAvailable(modules)) {
       return {
-        title: 'Redis Query Engine capability is not available',
+        title: 'Redis Search capability is not available',
         content: freeInstances?.length
-          ? 'Use your free trial all-in-one Redis Cloud database to start exploring these capabilities.'
-          : 'Create a free trial Redis Stack database with Redis Query Engine capability that extends the core capabilities of open-source Redis.',
+          ? 'Use your free all-in-one Redis Cloud database to start exploring these capabilities.'
+          : 'Create a free Redis Cloud database with Redis Search capability that extends the core capabilities of open-source Redis.',
         icon: <TelescopeImg className={styles.iconTelescope} />,
       }
     }

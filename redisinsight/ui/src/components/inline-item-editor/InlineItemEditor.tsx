@@ -4,13 +4,13 @@ import cx from 'classnames'
 import { useTheme } from '@redis-ui/styles'
 
 import * as keys from 'uiSrc/constants/keys'
-import { RiPopover, RiTooltip } from 'uiSrc/components/base'
+import { RiTooltip } from 'uiSrc/components/base'
 import { FlexItem } from 'uiSrc/components/base/layout/flex'
 import { WindowEvent } from 'uiSrc/components/base/utils/WindowEvent'
 import { FocusTrap } from 'uiSrc/components/base/utils/FocusTrap'
 import { OutsideClickDetector } from 'uiSrc/components/base/utils'
 import { DestructiveButton } from 'uiSrc/components/base/forms/buttons'
-import { Text } from 'uiSrc/components/base/text'
+import ConfirmationPopover from 'uiSrc/components/confirmation-popover'
 
 import {
   ActionsContainer,
@@ -21,11 +21,11 @@ import {
   StyledTextInput,
 } from './InlineItemEditor.styles'
 
-
 import styles from './styles.module.scss'
 
 type Positions = 'top' | 'bottom' | 'left' | 'right' | 'inside'
 type Design = 'default' | 'separate'
+type InputVariant = 'outline' | 'underline'
 
 export interface Props {
   onDecline: (event?: React.MouseEvent<HTMLElement>) => void
@@ -59,14 +59,15 @@ export interface Props {
   approveByValidation?: (value: string) => boolean
   approveText?: { title: string; text: string }
   textFiledClassName?: string
+  variant?: InputVariant
   styles?: {
     inputContainer?: {
-      width?: string,
-      height?: string,
+      width?: string
+      height?: string
     }
     input?: {
-      width?: string,
-      height?: string,
+      width?: string
+      height?: string
     }
     actionsContainer?: {
       width?: string
@@ -89,7 +90,6 @@ const InlineItemEditor = (props: Props) => {
     children,
     expandable,
     isLoading,
-    isInvalid,
     disableEmpty,
     disableByValidation,
     validation,
@@ -106,6 +106,7 @@ const InlineItemEditor = (props: Props) => {
     approveByValidation,
     approveText,
     textFiledClassName,
+    variant,
     styles: customStyles,
   } = props
   const containerEl: Ref<HTMLDivElement> = useRef(null)
@@ -214,7 +215,10 @@ const InlineItemEditor = (props: Props) => {
       {viewChildrenMode ? (
         children
       ) : (
-        <OutsideClickDetector onOutsideClick={handleClickOutside}>
+        <OutsideClickDetector
+          onOutsideClick={handleClickOutside}
+          isDisabled={isShowApprovePopover}
+        >
           <IIEContainer ref={containerEl}>
             <WindowEvent event="keydown" handler={handleOnEsc} />
             <FocusTrap disabled={disableFocusTrap}>
@@ -224,7 +228,7 @@ const InlineItemEditor = (props: Props) => {
                   handleFormSubmit(e as React.MouseEvent<HTMLElement>)
                 }
                 style={{
-                  ...customStyles?.inputContainer
+                  ...customStyles?.inputContainer,
                 }}
               >
                 <FlexItem grow>
@@ -241,9 +245,9 @@ const InlineItemEditor = (props: Props) => {
                         value={value}
                         onChange={handleChangeValue}
                         loading={isLoading}
-                        valid={!isInvalid}
                         data-testid="inline-item-editor"
                         autoComplete={autoComplete}
+                        variant={variant}
                         ref={inputRef}
                       />
                       {expandable && (
@@ -278,7 +282,7 @@ const InlineItemEditor = (props: Props) => {
                   )}
                   {approveByValidation && (
                     <ActionsWrapper $size={size}>
-                      <RiPopover
+                      <ConfirmationPopover
                         anchorPosition="leftCenter"
                         isOpen={isShowApprovePopover}
                         closePopover={() => setIsShowApprovePopover(false)}
@@ -288,38 +292,21 @@ const InlineItemEditor = (props: Props) => {
                         )}
                         panelClassName={cx(styles.popoverPanel)}
                         button={ApplyBtn}
-                      >
-                        <div
-                          className={styles.popover}
-                          data-testid="approve-popover"
-                        >
-                          <Text size="m" component="div">
-                            {!!approveText?.title && (
-                              <h4>
-                                <b>{approveText?.title}</b>
-                              </h4>
-                            )}
-                            <Text
-                              size="s"
-                              color="subdued"
-                              className={styles.approveText}
-                            >
-                              {approveText?.text}
-                            </Text>
-                          </Text>
-                          <div className={styles.popoverFooter}>
-                            <DestructiveButton
-                              aria-label="Save"
-                              className={cx(styles.btn, styles.saveBtn)}
-                              disabled={isDisabledApply()}
-                              onClick={handleFormSubmit}
-                              data-testid="save-btn"
-                            >
-                              Save
-                            </DestructiveButton>
-                          </div>
-                        </div>
-                      </RiPopover>
+                        title={approveText?.title}
+                        message={approveText?.text}
+                        confirmButton={
+                          <DestructiveButton
+                            aria-label="Save"
+                            size="small"
+                            className={cx(styles.btn, styles.saveBtn)}
+                            disabled={isDisabledApply()}
+                            onClick={handleFormSubmit}
+                            data-testid="save-btn"
+                          >
+                            Save
+                          </DestructiveButton>
+                        }
+                      />
                     </ActionsWrapper>
                   )}
                 </ActionsContainer>

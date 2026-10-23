@@ -1,12 +1,14 @@
 import React from 'react'
-import cx from 'classnames'
-
+import { useTranslation } from 'uiSrc/i18n'
 import { ConnectionType } from 'uiSrc/slices/interfaces'
-import { Text } from 'uiSrc/components/base/text'
+import { Text, Title } from 'uiSrc/components/base/text'
+import { Col } from 'uiSrc/components/base/layout/flex'
+import { Banner } from 'uiSrc/components/base/display'
+import { CallOut } from 'uiSrc/components/base/display/call-out/CallOut'
+import LightBulbImage from 'uiSrc/assets/img/pub-sub/light-bulb.svg'
 
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import styles from './styles.module.scss'
-import { Row } from 'uiSrc/components/base/layout/flex'
+import SubscribeForm from '../../subscribe-form'
+import { HeroImage, InnerContainer, Wrapper } from './EmptyMessagesList.styles'
 
 export interface Props {
   connectionType?: ConnectionType
@@ -16,39 +18,45 @@ export interface Props {
 const EmptyMessagesList = ({
   connectionType,
   isSpublishNotSupported,
-}: Props) => (
-  <div className={styles.container} data-testid="empty-messages-list">
-    <div
-      className={cx(styles.content, {
-        [styles.contentCluster]: connectionType === ConnectionType.Cluster,
-      })}
-    >
-      <Text className={styles.title}>No messages to display</Text>
-      <Text className={styles.summary}>
-        Subscribe to the Channel to see all the messages published to your
-        database
-      </Text>
-      <Row>
-        <RiIcon type="ToastDangerIcon" className={styles.alertIcon} />
-        <Text className={styles.alert}>
-          Running in production may decrease performance and memory available
-        </Text>
-      </Row>
-      {connectionType === ConnectionType.Cluster && isSpublishNotSupported && (
-        <>
-          <div className={styles.separator} />
-          <Text
-            className={styles.cluster}
-            data-testid="empty-messages-list-cluster"
-          >
-            {'Messages published with '}
-            <span className={styles.badge}>SPUBLISH</span>
-            {' will not appear in this channel'}
-          </Text>
-        </>
-      )}
-    </div>
-  </div>
-)
+}: Props) => {
+  const { t } = useTranslation()
+
+  return (
+    <Wrapper>
+      <InnerContainer
+        align="center"
+        justify="center"
+        data-testid="empty-messages-list"
+        gap="xxl"
+      >
+        <HeroImage src={LightBulbImage} alt={t('pubsub.empty.imageAlt')} />
+
+        <Col align="center" justify="center" grow={false} gap="s">
+          <Title size="XXL">{t('pubsub.empty.title')}</Title>
+
+          <Text>{t('pubsub.empty.description')}</Text>
+        </Col>
+
+        <SubscribeForm grow={false} />
+
+        <CallOut variant="attention">
+          {t('pubsub.empty.productionWarning')}
+        </CallOut>
+
+        {connectionType === ConnectionType.Cluster &&
+          isSpublishNotSupported && (
+            <>
+              <Banner
+                data-testid="empty-messages-list-cluster"
+                variant="attention"
+                showIcon={true}
+                message={t('pubsub.empty.spublishWarning')}
+              />
+            </>
+          )}
+      </InnerContainer>
+    </Wrapper>
+  )
+}
 
 export default EmptyMessagesList

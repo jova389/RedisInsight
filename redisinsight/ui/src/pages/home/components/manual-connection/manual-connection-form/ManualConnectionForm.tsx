@@ -2,9 +2,8 @@ import { FormikErrors, useFormik } from 'formik'
 import { isEmpty, pick } from 'lodash'
 import React, { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
-import cx from 'classnames'
 import * as keys from 'uiSrc/constants/keys'
 import { resetInstanceUpdateAction } from 'uiSrc/slices/instances/instances'
 import { ConnectionType } from 'uiSrc/slices/interfaces'
@@ -12,6 +11,7 @@ import { BuildType } from 'uiSrc/constants/env'
 import { appRedirectionSelector } from 'uiSrc/slices/app/url-handling'
 import { UrlHandlingActions } from 'uiSrc/slices/interfaces/urlHandling'
 
+import { ParseKeys } from 'i18next'
 import { fieldDisplayNames, SubmitBtnText } from 'uiSrc/pages/home/constants'
 import { getFormErrors } from 'uiSrc/pages/home/utils'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
@@ -25,16 +25,20 @@ import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { useModalHeader } from 'uiSrc/contexts/ModalTitleProvider'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import { ArrowLeftIcon } from 'uiSrc/components/base/icons'
+import { ChevronLeftIcon } from 'uiSrc/components/base/icons'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import TabsComponent from 'uiSrc/components/base/layout/tabs'
 import { Title } from 'uiSrc/components/base/text/Title'
+import i18n, { useTranslation } from 'uiSrc/i18n'
 import { MANUAL_FORM_TABS, ManualFormTab } from './constants'
 import CloneConnection from './components/CloneConnection'
 import FooterActions from './components/FooterActions'
 import { AddConnection, EditConnection, EditSentinelConnection } from './forms'
 
-import styles from './styles.module.scss'
+import {
+  ScrollableWrapper,
+  ContentWrapper,
+} from '../../ManualConnection.styles'
 
 export interface Props {
   formFields: DbConnectionInfo
@@ -43,6 +47,8 @@ export interface Props {
   buildType?: BuildType
   isEditMode: boolean
   isCloneMode: boolean
+  isFromAzure?: boolean
+  isManaged?: boolean
   setIsCloneMode: (value: boolean) => void
   onSubmit: (values: DbConnectionInfo) => void
   onTestConnection: (values: DbConnectionInfo) => void
@@ -52,12 +58,16 @@ export interface Props {
 
 const getInitFieldsDisplayNames = ({ host, port, name }: any) => {
   if (!host || !port || !name) {
-    return pick(fieldDisplayNames, ['host', 'port', 'name'])
+    const picked = pick(fieldDisplayNames, ['host', 'port', 'name'])
+    return Object.fromEntries(
+      Object.entries(picked).map(([key, value]) => [key, i18n.t(value)]),
+    )
   }
   return {}
 }
 
 const ManualConnectionForm = (props: Props) => {
+  const { t } = useTranslation()
   const {
     formFields,
     onClose,
@@ -70,6 +80,8 @@ const ManualConnectionForm = (props: Props) => {
     isEditMode,
     isCloneMode,
     setIsCloneMode,
+    isFromAzure = false,
+    isManaged = false,
   } = props
 
   const {
@@ -85,10 +97,10 @@ const ManualConnectionForm = (props: Props) => {
     modules,
   } = formFields
 
-  const { action } = useSelector(appRedirectionSelector)
-  const { data: caCertificates } = useSelector(caCertsSelector)
-  const { data: certificates } = useSelector(clientCertsSelector)
-  const { server } = useSelector(appInfoSelector)
+  const { action } = useAppSelector(appRedirectionSelector)
+  const { data: caCertificates } = useAppSelector(caCertsSelector)
+  const { data: certificates } = useAppSelector(clientCertsSelector)
+  const { server } = useAppSelector(appInfoSelector)
 
   const [errors, setErrors] = useState<FormikErrors<DbConnectionInfo>>(
     getInitFieldsDisplayNames({ host, port, name }),
@@ -99,7 +111,7 @@ const ManualConnectionForm = (props: Props) => {
 
   const { setModalHeader } = useModalHeader()
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -114,11 +126,11 @@ const ManualConnectionForm = (props: Props) => {
       connectionType === ConnectionType.Sentinel &&
       !values.sentinelMasterName
     ) {
-      errs.sentinelMasterName = fieldDisplayNames.sentinelMasterName
+      errs.sentinelMasterName = t(fieldDisplayNames.sentinelMasterName)
     }
 
     if (!values.name) {
-      errs.name = fieldDisplayNames.name
+      errs.name = t(fieldDisplayNames.name)
     }
 
     setErrors(errs)
@@ -161,13 +173,13 @@ const ManualConnectionForm = (props: Props) => {
           <FlexItem>
             <IconButton
               onClick={handleClickBackClone}
-              icon={ArrowLeftIcon}
-              aria-label="back"
+              icon={ChevronLeftIcon}
+              aria-label={t('home.form.ariaLabel.back')}
               data-testid="back-btn"
             />
           </FlexItem>
           <FlexItem grow>
-            <Title size="M">Clone Database</Title>
+            <Title size="L">{t('home.form.manual.title.cloneDatabase')}</Title>
           </FlexItem>
         </Row>,
       )
@@ -175,12 +187,17 @@ const ManualConnectionForm = (props: Props) => {
     }
 
     if (isEditMode) {
-      setModalHeader(<Title size="M">Edit Database</Title>)
+      setModalHeader(
+        <Title size="L">{t('home.form.manual.title.editDatabase')}</Title>,
+      )
       return
     }
 
-    setModalHeader(<Title size="M">Connection Settings</Title>, true)
-  }, [isEditMode, isCloneMode])
+    setModalHeader(
+      <Title size="L">{t('home.form.manual.title.connectionSettings')}</Title>,
+      true,
+    )
+  }, [isEditMode, isCloneMode, t])
 
   useEffect(() => {
     formik.resetForm()
@@ -225,7 +242,10 @@ const ManualConnectionForm = (props: Props) => {
 
   const Tabs = () => (
     <TabsComponent
-      tabs={MANUAL_FORM_TABS}
+      tabs={MANUAL_FORM_TABS.map((tab) => ({
+        ...tab,
+        label: t(tab.label as ParseKeys),
+      }))}
       value={activeTab}
       onChange={(id) => handleTabClick(id as ManualFormTab)}
       data-testid="manual-form-tabs"
@@ -233,22 +253,18 @@ const ManualConnectionForm = (props: Props) => {
   )
 
   return (
-    <div
-      className={styles.container}
-      data-testid="add-db_manual"
-      style={{ height: '100%' }}
-    >
+    <ContentWrapper data-testid="add-db_manual">
       {isEditMode &&
         !isCloneMode &&
         server?.buildType !== BuildType.RedisStack && (
           <CloneConnection id={id} setIsCloneMode={setIsCloneMode} />
         )}
-      <div className={cx('getStartedForm', styles.content)} ref={formRef}>
+      <ContentWrapper as="div" ref={formRef}>
         {!isEditMode && !isFromCloud && (
           <>
             <Tabs />
             <Spacer />
-            <div className="eui-yScroll">
+            <ScrollableWrapper>
               <AddConnection
                 activeTab={activeTab}
                 formik={formik}
@@ -258,7 +274,7 @@ const ManualConnectionForm = (props: Props) => {
                 caCertificates={caCertificates}
                 buildType={buildType}
               />
-            </div>
+            </ScrollableWrapper>
           </>
         )}
         {(isEditMode || isCloneMode || isFromCloud) &&
@@ -275,18 +291,21 @@ const ManualConnectionForm = (props: Props) => {
                     nameFromProvider={nameFromProvider}
                     nodes={nodes}
                     isFromCloud={isFromCloud}
+                    isManaged={isManaged}
                   />
                   <Spacer />
                 </>
               )}
               <Tabs />
               <Spacer />
-              <div className="eui-yScroll">
+              <ScrollableWrapper>
                 <EditConnection
                   activeTab={activeTab}
                   isCloneMode={isCloneMode}
                   isEditMode={isEditMode}
                   isFromCloud={isFromCloud}
+                  isFromAzure={isFromAzure}
+                  isManaged={isManaged}
                   formik={formik}
                   onKeyDown={onKeyDown}
                   onHostNamePaste={onHostNamePaste}
@@ -294,7 +313,7 @@ const ManualConnectionForm = (props: Props) => {
                   caCertificates={caCertificates}
                   buildType={buildType}
                 />
-              </div>
+              </ScrollableWrapper>
             </>
           )}
         {(isEditMode || isCloneMode) &&
@@ -314,7 +333,7 @@ const ManualConnectionForm = (props: Props) => {
               )}
               <Tabs />
               <Spacer />
-              <div className="eui-yScroll">
+              <ScrollableWrapper>
                 <EditSentinelConnection
                   activeTab={activeTab}
                   isCloneMode={isCloneMode}
@@ -325,12 +344,12 @@ const ManualConnectionForm = (props: Props) => {
                   caCertificates={caCertificates}
                   db={db}
                 />
-              </div>
+              </ScrollableWrapper>
             </>
           )}
-      </div>
+      </ContentWrapper>
       <Footer />
-    </div>
+    </ContentWrapper>
   )
 }
 

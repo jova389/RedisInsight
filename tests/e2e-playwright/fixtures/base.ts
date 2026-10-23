@@ -1,0 +1,297 @@
+import { test as base, ElectronApplication, _electron as electron } from '@playwright/test';
+import {
+  BrowserPage,
+  CliPanel,
+  CommandHelperPanel,
+  DatabasesPage,
+  WorkbenchPage,
+  AnalyticsPage,
+  SettingsPage,
+  PubSubPage,
+  EulaPage,
+  SidebarPanel,
+  InsightsPanel,
+  ProfilerPanel,
+  TypeToConfirmModal,
+  VectorSearchPage,
+} from 'e2eSrc/pages';
+import { ApiHelper, retry } from 'e2eSrc/helpers';
+
+/**
+ * Extended ElectronApplication with windowId for API authentication
+ */
+interface ElectronAppWithWindowId extends ElectronApplication {
+  windowId?: string;
+}
+
+/**
+ * Test-scoped fixtures
+ */
+type Fixtures = {
+  apiHelper: ApiHelper;
+  /**
+   * Feature flag overrides applied via route interception on GET /api/features.
+   * Keys are feature names (e.g. 'vectorSearchV2'), values are the desired flag state.
+   * Set per-file or per-describe with test.use({ featureFlags: { vectorSearchV2: true } }).
+   */
+  featureFlags: Record<string, boolean>;
+  /**
+   * Browser page fixture
+   * Use browserPage.goto(databaseId) to navigate
+   */
+  browserPage: BrowserPage;
+  cliPanel: CliPanel;
+  commandHelperPanel: CommandHelperPanel;
+  databasesPage: DatabasesPage;
+  workbenchPage: WorkbenchPage;
+  analyticsPage: AnalyticsPage;
+  settingsPage: SettingsPage;
+  pubSubPage: PubSubPage;
+  eulaPage: EulaPage;
+  sidebarPanel: SidebarPanel;
+  insightsPanel: InsightsPanel;
+  profilerPanel: ProfilerPanel;
+  typeToConfirmModal: TypeToConfirmModal;
+  vectorSearchPage: VectorSearchPage;
+};
+
+/**
+ * Worker-scoped fixtures and options (shared across all tests in a worker)
+ */
+type WorkerFixtures = {
+  /** Path to Electron executable - when set, tests run in Electron mode */
+  electronExecutablePath: string | undefined;
+  apiUrl: string;
+  electronApp: ElectronAppWithWindowId | undefined;
+};
+
+/**
+ * Base test with custom options and common fixtures
+ */
+const baseTest = base.extend<Fixtures, WorkerFixtures>({
+  // Custom options - can be set per-project in playwright.config.ts
+  // Worker-scoped so they're available to worker-scoped fixtures
+  electronExecutablePath: [undefined, { option: true, scope: 'worker' }],
+  apiUrl: ['', { option: true, scope: 'worker' }],
+  featureFlags: [{}, { option: true }],
+
+  // Electron app - worker-scoped, shared across all tests in a worker
+  // Only launched when electronExecutablePath is set
+  electronApp: [
+    async ({ electronExecutablePath, apiUrl }, use) => {
+      if (!electronExecutablePath) {
+        // Browser mode - no Electron app needed
+        await use(undefined);
+        return;
+      }
+
+      console.log(`Launching Electron app: ${electronExecutablePath}`);
+
+      const electronApp = await electron.launch({
+        executablePath: electronExecutablePath,
+        args: ['--no-sandbox'],
+        timeout: 60000,
+      });
+
+      try {
+        // Log Electron console messages for debugging
+        electronApp.on('console', (msg) => {
+          console.log(`[Electron] ${msg.type()}: ${msg.text()}`);
+        });
+
+        // Capture main process output for CI diagnostics
+        const electronProcess = electronApp.process();
+        electronProcess.stderr?.on('data', (data: Buffer) => {
+          console.log(`[Electron stderr] ${data.toString().trimEnd()}`);
+        });
+
+        // Wait for the main window (not the splash screen)
+        let mainWindow = await electronApp.firstWindow();
+
+        // If we got the splash screen, wait for the main window
+        if (mainWindow.url().includes('splash')) {
+          console.log('Waiting for main window (splash detected)...');
+          mainWindow = await electronApp.waitForEvent('window', {
+            timeout: 5000,
+          });
+        }
+
+        // Wait for the page to fully load
+        await mainWindow.waitForLoadState('load');
+
+        // Additional wait for React to render and IPC to complete
+        // The windowId is set in indexElectron.tsx after the IPC message is received
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Extract windowId from the Electron app's window object
+        // The windowId is set via IPC and may take a moment to be available
+        let windowId: string | undefined;
+        const getWindowId = async () => {
+          if (mainWindow.isClosed()) {
+            throw new Error('Window was closed unexpectedly');
+          }
+          windowId = await mainWindow.evaluate(() => (window as Window & { windowId?: string }).windowId);
+          if (!windowId) {
+            throw new Error('windowId not yet available');
+          }
+        };
+        await retry(getWindowId, {
+          maxAttempts: 5,
+          errorMessage: 'windowId not available - Electron app may not have initialized correctly',
+        });
+        console.log(`Got Electron windowId: ${windowId}`);
+
+        // Wait for API to be available with windowId for authentication
+        const apiHelper = new ApiHelper({ apiUrl, windowId });
+        const checkApi = async () => {
+          console.log(`Checking API at ${apiUrl} with windowId...`);
+          await apiHelper.getDatabases();
+          console.log('Electron API is ready');
+        };
+        await retry(checkApi, {
+          maxAttempts: 5,
+          errorMessage: 'Electron API did not become available',
+        });
+        await apiHelper.dispose();
+
+        // Create extended electronApp with windowId
+        const electronAppWithWindowId: ElectronAppWithWindowId = Object.assign(electronApp, {
+          windowId: windowId,
+        });
+
+        await use(electronAppWithWindowId);
+      } finally {
+        console.log('Closing Electron app...');
+        await electronApp.close();
+      }
+    },
+    { scope: 'worker' },
+  ],
+
+  // Page - from Electron app or browser depending on mode
+  page: async ({ electronApp, page, baseURL, featureFlags }, use) => {
+    const setupFeatureFlagOverrides = async (targetPage: typeof page) => {
+      if (Object.keys(featureFlags).length === 0) return;
+
+      await targetPage.route('**/api/features', async (route) => {
+        const response = await route.fetch();
+        const json = await response.json();
+
+        json.features = json.features || {};
+        for (const [name, flag] of Object.entries(featureFlags)) {
+          json.features[name] = { ...json.features[name], name, flag };
+        }
+
+        await route.fulfill({ json });
+      });
+    };
+
+    if (!electronApp) {
+      // Browser mode — set up route interception before navigating
+      await setupFeatureFlagOverrides(page);
+
+      if (page.url() === 'about:blank' && baseURL) {
+        await page.goto(baseURL);
+        await page.waitForLoadState('domcontentloaded');
+      }
+      // Skip onboarding by setting localStorage (faster than waiting for UI)
+      // Setting to null marks onboarding as completed/skipped
+      await page.evaluate(() => {
+        localStorage.setItem('onboardingStep', 'null');
+      });
+      await use(page);
+      return;
+    }
+
+    // Electron mode - get page from Electron app
+    const electronPage = await electronApp.firstWindow();
+
+    // Set up route interception before reload so features are overridden
+    await setupFeatureFlagOverrides(electronPage);
+
+    // Skip onboarding by setting localStorage before reload
+    // This ensures the app reads the value when it initializes
+    await electronPage.evaluate(() => {
+      localStorage.setItem('onboardingStep', 'null');
+    });
+    // Reload to pick up any data created in beforeAll (e.g., databases via API)
+    // and to apply the localStorage setting
+    await electronPage.reload();
+    await electronPage.waitForLoadState('domcontentloaded');
+
+    await use(electronPage);
+
+    // Remove route handlers so they don't leak to subsequent tests
+    // sharing this Electron page within the same worker.
+    await electronPage.unrouteAll({ behavior: 'wait' });
+  },
+
+  apiHelper: async ({ apiUrl, electronApp }, use) => {
+    // Get windowId from electronApp if available (for Electron API authentication)
+    const windowId = electronApp?.windowId;
+
+    const helper = new ApiHelper({ apiUrl, windowId });
+    await helper.ensureEulaAccepted();
+    await use(helper);
+    await helper.dispose();
+  },
+
+  browserPage: async ({ page }, use) => {
+    await use(new BrowserPage(page));
+  },
+
+  cliPanel: async ({ page }, use) => {
+    await use(new CliPanel(page));
+  },
+
+  commandHelperPanel: async ({ page }, use) => {
+    await use(new CommandHelperPanel(page));
+  },
+
+  databasesPage: async ({ page }, use) => {
+    await use(new DatabasesPage(page));
+  },
+
+  workbenchPage: async ({ page }, use) => {
+    await use(new WorkbenchPage(page));
+  },
+
+  analyticsPage: async ({ page }, use) => {
+    await use(new AnalyticsPage(page));
+  },
+
+  settingsPage: async ({ page }, use) => {
+    await use(new SettingsPage(page));
+  },
+
+  pubSubPage: async ({ page }, use) => {
+    await use(new PubSubPage(page));
+  },
+
+  eulaPage: async ({ page }, use) => {
+    await use(new EulaPage(page));
+  },
+
+  sidebarPanel: async ({ page }, use) => {
+    await use(new SidebarPanel(page));
+  },
+
+  insightsPanel: async ({ page }, use) => {
+    await use(new InsightsPanel(page));
+  },
+
+  profilerPanel: async ({ page }, use) => {
+    await use(new ProfilerPanel(page));
+  },
+
+  typeToConfirmModal: async ({ page }, use) => {
+    await use(new TypeToConfirmModal(page));
+  },
+
+  vectorSearchPage: async ({ page }, use) => {
+    await use(new VectorSearchPage(page));
+  },
+});
+
+export const test = baseTest;
+export { expect } from '@playwright/test';

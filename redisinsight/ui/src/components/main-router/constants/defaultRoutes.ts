@@ -2,7 +2,6 @@ import { lazy } from 'react'
 import { IRoute, FeatureFlags, PageNames, Pages } from 'uiSrc/constants'
 import {
   BrowserPage,
-  VectorSearchPageRouter,
   HomePage,
   InstancePage,
   RedisCloudDatabasesPage,
@@ -10,7 +9,12 @@ import {
   RedisCloudPage,
   RedisCloudSubscriptionsPage,
   RedisClusterDatabasesPage,
+  AzurePage,
+  AzureSubscriptionsPage,
+  AzureDatabasesPage,
+  AzureManualConnectionPage,
 } from 'uiSrc/pages'
+import { VectorSearchPageRouter } from 'uiSrc/pages/vector-search'
 import WorkbenchPage from 'uiSrc/pages/workbench'
 import PubSubPage from 'uiSrc/pages/pub-sub'
 import AnalyticsPage from 'uiSrc/pages/analytics'
@@ -18,6 +22,7 @@ import RdiPage from 'uiSrc/pages/rdi/home'
 import RdiInstancePage from 'uiSrc/pages/rdi/instance'
 import RdiStatisticsPage from 'uiSrc/pages/rdi/statistics'
 import PipelineManagementPage from 'uiSrc/pages/rdi/pipeline-management'
+import PipelineManagementV2Page from 'uiSrc/pages/rdi/pipeline-management-v2'
 import { ANALYTICS_ROUTES, RDI_PIPELINE_MANAGEMENT_ROUTES } from './sub-routes'
 import COMMON_ROUTES from './commonRoutes'
 import { getRouteIncludedByEnv, LAZY_LOAD } from '../config'
@@ -25,7 +30,7 @@ import { VECTOR_SEARCH_ROUTES } from './sub-routes/vectorSearchRoutes'
 
 const LazyBrowserPage = lazy(() => import('uiSrc/pages/browser'))
 const LazyVectorSearchPageRouter = lazy(
-  () => import('uiSrc/pages/vector-search/pages/VectorSearchPageRouter'),
+  () => import('uiSrc/pages/vector-search/VectorSearchPageRouter'),
 )
 const LazyHomePage = lazy(() => import('uiSrc/pages/home'))
 const LazyWorkbenchPage = lazy(() => import('uiSrc/pages/workbench'))
@@ -47,11 +52,24 @@ const LazyAnalyticsPage = lazy(() => import('uiSrc/pages/analytics'))
 const LazyRedisCloudPage = lazy(
   () => import('uiSrc/pages/autodiscover-cloud/redis-cloud'),
 )
+const LazyAzurePage = lazy(() => import('uiSrc/pages/autodiscover-azure/azure'))
+const LazyAzureSubscriptionsPage = lazy(
+  () => import('uiSrc/pages/autodiscover-azure/azure-subscriptions'),
+)
+const LazyAzureDatabasesPage = lazy(
+  () => import('uiSrc/pages/autodiscover-azure/azure-databases'),
+)
+const LazyAzureManualConnectionPage = lazy(
+  () => import('uiSrc/pages/autodiscover-azure/azure-manual-connection'),
+)
 const LazyRdiPage = lazy(() => import('uiSrc/pages/rdi/home'))
 const LazyRdiInstancePage = lazy(() => import('uiSrc/pages/rdi/instance'))
 const LazyRdiStatisticsPage = lazy(() => import('uiSrc/pages/rdi/statistics'))
 const LazyPipelineManagementPage = lazy(
   () => import('uiSrc/pages/rdi/pipeline-management'),
+)
+const LazyPipelineManagementV2Page = lazy(
+  () => import('uiSrc/pages/rdi/pipeline-management-v2'),
 )
 
 const INSTANCE_ROUTES: IRoute[] = [
@@ -139,9 +157,38 @@ const ROUTES: IRoute[] = [
       ],
     },
     {
+      path: Pages.azure,
+      component: LAZY_LOAD ? LazyAzurePage : AzurePage,
+      routes: [
+        {
+          path: Pages.azureSubscriptions,
+          component: LAZY_LOAD
+            ? LazyAzureSubscriptionsPage
+            : AzureSubscriptionsPage,
+        },
+        {
+          path: Pages.azureDatabases,
+          component: LAZY_LOAD ? LazyAzureDatabasesPage : AzureDatabasesPage,
+        },
+        {
+          path: Pages.azureManualConnection,
+          component: LAZY_LOAD
+            ? LazyAzureManualConnectionPage
+            : AzureManualConnectionPage,
+        },
+      ],
+    },
+    {
       path: Pages.rdi,
       component: LAZY_LOAD ? LazyRdiPage : RdiPage,
       exact: true,
+      featureFlag: FeatureFlags.rdi,
+    },
+    {
+      path: Pages.rdiPipelineManagementV2(':rdiInstanceId'),
+      component: LAZY_LOAD
+        ? LazyPipelineManagementV2Page
+        : PipelineManagementV2Page,
       featureFlag: FeatureFlags.rdi,
     },
     {

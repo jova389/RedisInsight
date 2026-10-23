@@ -30,7 +30,6 @@ const DatabaseOverview = () => {
     isBdbPackages,
     lastRefreshTime,
     handleEnableAutoRefresh,
-    handleRefreshClick,
     handleRefresh,
   } = useDatabaseOverview()
 
@@ -102,7 +101,6 @@ const DatabaseOverview = () => {
                       DATABASE_OVERVIEW_MINIMUM_REFRESH_INTERVAL,
                     )}
                     onRefresh={handleRefresh}
-                    onRefreshClicked={handleRefreshClick}
                     onEnableAutoRefresh={handleEnableAutoRefresh}
                   />
                 </FlexItem>
@@ -118,11 +116,11 @@ const DatabaseOverview = () => {
 const getTooltipContent = (metric: IMetric) => {
   if (!metric.children?.length) {
     return (
-      <>
+      <Row>
         <span>{metric.tooltip?.content}</span>
         &nbsp;
         <span>{metric.tooltip?.title}</span>
-      </>
+      </Row>
     )
   }
   return metric.children

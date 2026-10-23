@@ -19,7 +19,7 @@ export const AddKeysContainer = styled.div<
   border-top-width: 1px;
   width: 100%;
 
-  z-index: 2;
+  z-index: 3;
 
   max-height: 100%;
   overflow-y: auto;
@@ -31,7 +31,7 @@ export const AddKeysContainer = styled.div<
   }
 `
 export const EntryContent = styled(Col)`
-  max-height: 234px;
+  max-height: calc(50vh - 100px);
   scroll-padding-bottom: 60px;
   overflow-y: auto;
 `

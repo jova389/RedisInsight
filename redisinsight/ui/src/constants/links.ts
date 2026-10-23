@@ -17,18 +17,25 @@ export const EXTERNAL_LINKS = {
   rdiQuickStart:
     'https://redis.io/docs/latest/integrate/redis-data-integration/ingest/quick-start-guide/',
   rdiPipeline:
-    'https://redis.io/docs/latest/integrate/redis-data-integration/ingest/data-pipelines/data-pipelines/',
+    'https://redis.io/docs/latest/integrate/redis-data-integration/data-pipelines/',
   rdiPipelineTransforms:
     'https://redis.io/docs/latest/integrate/redis-data-integration/ingest/data-pipelines/transform-examples/',
   pubSub: 'https://redis.io/docs/latest/commands/psubscribe/',
   legalPrivacyPolicy: 'https://redis.io/legal/privacy-policy/',
   redisEnterpriseCloud: 'https://redis.io/redis-enterprise-cloud/overview/',
   redisQueryEngine: 'https://redis.io/docs/latest/develop/ai/search-and-query/',
+  redisForAI: 'https://redis.io/redis-for-ai/',
+  vectorDatabaseGettingStarted:
+    'https://redis.io/docs/latest/develop/get-started/vector-database/',
+  redisSandbox: 'https://redis.io/try/sandbox/',
+  searchIndexes:
+    'https://redis.io/docs/latest/develop/ai/search-and-query/query/vector-search/',
 }
 
 export const UTM_CAMPAINGS: Record<any, string> = {
   [OAuthSocialSource.Tutorials]: 'redisinsight_tutorials',
   [OAuthSocialSource.BrowserSearch]: 'redisinsight_browser_search',
+  [OAuthSocialSource.BrowserFiltering]: 'redisinsight_browser_filtering',
   [OAuthSocialSource.Workbench]: 'redisinsight_workbench',
   [CloudSsoUtmCampaign.BrowserFilter]: 'browser_filter',
   [OAuthSocialSource.EmptyDatabasesList]: 'empty_db_list',
@@ -44,4 +51,5 @@ export const UTM_MEDIUMS = {
   Rdi: 'rdi',
   Recommendation: 'recommendation',
   Settings: 'settings',
+  VectorSearchOnboarding: 'vss_onboarding',
 }

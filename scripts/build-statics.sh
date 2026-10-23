@@ -17,28 +17,32 @@ mkdir -p "${PLUGINS_VENDOR_DIR}"
 cp -R "./vendor/." "${PLUGINS_VENDOR_DIR}"
 
 
-# Install developing tools for plugins
+# Install developing tools for plugins (must be first: provides node_modules/vite
+# that the plugins link to via "vite": "file:../node_modules/vite")
 PACKAGES_DIR="./redisinsight/ui/src/packages"
-yarn --cwd "${PACKAGES_DIR}"
+npm install --prefix "${PACKAGES_DIR}"
 
 # Install plugins dependencies
 REDISEARCH_DIR="./redisinsight/ui/src/packages/redisearch"
-yarn --cwd "${REDISEARCH_DIR}"
+npm install --prefix "${REDISEARCH_DIR}"
 
 REDISGRAPH_DIR="./redisinsight/ui/src/packages/redisgraph"
-yarn --cwd "${REDISGRAPH_DIR}"
+npm install --prefix "${REDISGRAPH_DIR}"
 
 REDISTIMESERIES_DIR="./redisinsight/ui/src/packages/redistimeseries-app"
-yarn --cwd "${REDISTIMESERIES_DIR}"
+npm install --prefix "${REDISTIMESERIES_DIR}"
 
 RI_EXPLIAIN_DIR="./redisinsight/ui/src/packages/ri-explain"
-yarn --cwd "${RI_EXPLIAIN_DIR}"
+npm install --prefix "${RI_EXPLIAIN_DIR}"
 
 CLIENTS_LIST_DIR="./redisinsight/ui/src/packages/clients-list"
-yarn --cwd "${CLIENTS_LIST_DIR}"
+npm install --prefix "${CLIENTS_LIST_DIR}"
+
+GEODATA_DIR="./redisinsight/ui/src/packages/geodata"
+npm install --prefix "${GEODATA_DIR}"
 
 # Build all plugins and common libraries
-NODE_OPTIONS=--max_old_space_size=4096 yarn --cwd "${PACKAGES_DIR}" build
+NODE_OPTIONS=--max_old_space_size=4096 npm run build --prefix "${PACKAGES_DIR}"
 
 # Copy common libraries to plugins
 COMMON_DIR="./redisinsight/ui/src/packages/common"
@@ -76,4 +80,10 @@ fi
 if [ $pluginsOnlyInstall != 1 ]; then
   mkdir -p "${PLUGINS_DIR}/clients-list"
   cp -R "${CLIENTS_LIST_DIR}/dist" "${CLIENTS_LIST_DIR}/package.json" "${PLUGINS_DIR}/clients-list"
+fi
+
+# Copy geodata plugin
+if [ $pluginsOnlyInstall != 1 ]; then
+  mkdir -p "${PLUGINS_DIR}/geodata"
+  cp -R "${GEODATA_DIR}/dist" "${GEODATA_DIR}/package.json" "${PLUGINS_DIR}/geodata"
 fi

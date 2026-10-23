@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import { useAppSelector, useAppDispatch } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { last, toNumber } from 'lodash'
 import cx from 'classnames'
@@ -17,18 +17,19 @@ import {
 } from 'uiSrc/slices/browser/keys'
 import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
 import { getFormatTime, getNextId } from 'uiSrc/utils/streamUtils'
-import { SortOrder, TEXT_CONSUMER_NAME_TOO_LONG } from 'uiSrc/constants'
+import { SortOrder } from 'uiSrc/constants'
 import { SCAN_COUNT_DEFAULT } from 'uiSrc/constants/api'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { isTruncatedString } from 'uiSrc/utils'
 import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
 import { FlexItem } from 'uiSrc/components/base/layout/flex'
 import {
   AckPendingEntriesResponse,
   PendingEntryDto,
   ClaimPendingEntryDto,
   ClaimPendingEntriesResponse,
-} from 'apiSrc/modules/browser/stream/dto'
+} from 'apiClient'
 
 import MessagesView from './MessagesView'
 import MessageClaimPopover from './MessageClaimPopover'
@@ -44,20 +45,21 @@ const ackPrefix = '-ack'
 export interface Props {}
 
 const MessagesViewWrapper = (props: Props) => {
+  const { t } = useTranslation()
   const {
     lastRefreshTime,
     data: loadedMessages = [],
     name: consumerName,
     pending = 0,
-  } = useSelector(selectedConsumerSelector) ?? {}
+  } = useAppSelector(selectedConsumerSelector) ?? {}
   const isTruncatedConsumerName = isTruncatedString(consumerName)
-  const { name: group } = useSelector(selectedGroupSelector) ?? { name: '' }
-  const { name: key } = useSelector(selectedKeyDataSelector) ?? { name: '' }
+  const { name: group } = useAppSelector(selectedGroupSelector) ?? { name: '' }
+  const { name: key } = useAppSelector(selectedKeyDataSelector) ?? { name: '' }
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const [openPopover, setOpenPopover] = useState<string>('')
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     dispatch(updateSelectedKeyRefreshTime(lastRefreshTime))
@@ -116,7 +118,7 @@ const MessagesViewWrapper = (props: Props) => {
   const columns: ITableColumn[] = [
     {
       id: 'id',
-      label: 'Entry ID',
+      label: t('browser.stream.column.entryId'),
       absoluteWidth: minColumnWidth,
       minWidth: minColumnWidth,
       className: styles.cell,
@@ -126,7 +128,7 @@ const MessagesViewWrapper = (props: Props) => {
         return (
           <FlexItem>
             <Text
-              color="subdued"
+              color="secondary"
               size="s"
               style={{ maxWidth: '100%' }}
               className="truncateText streamItem"
@@ -148,7 +150,7 @@ const MessagesViewWrapper = (props: Props) => {
     },
     {
       id: 'idle',
-      label: 'Last Message Delivered',
+      label: t('browser.stream.messages.lastDeliveredColumn'),
       minWidth: 256,
       absoluteWidth: 106,
       truncateText: true,
@@ -159,7 +161,7 @@ const MessagesViewWrapper = (props: Props) => {
         return (
           <Text
             className="truncateText streamItem"
-            color="subdued"
+            color="secondary"
             size="s"
             data-testid={`stream-message-${id}-idle`}
             style={{ maxWidth: '100%' }}
@@ -171,11 +173,12 @@ const MessagesViewWrapper = (props: Props) => {
     },
     {
       id: 'delivered',
-      label: 'Times Message Delivered',
+      label: t('browser.stream.messages.timesDeliveredColumn'),
       minWidth: 106,
       truncateText: true,
       headerClassName: cx('streamItemHeader', styles.deliveredHeaderCell),
       headerCellClassName: 'truncateText',
+      render: (cellData: number) => <Text color="secondary">{cellData}</Text>,
     },
     {
       id: 'actions',
@@ -218,7 +221,9 @@ const MessagesViewWrapper = (props: Props) => {
         loadMoreItems={loadMoreItems}
         {...props}
         noItemsMessageString={
-          isTruncatedConsumerName ? TEXT_CONSUMER_NAME_TOO_LONG : undefined
+          isTruncatedConsumerName
+            ? t('browser.stream.consumers.nameTooLong')
+            : undefined
         }
       />
     </>

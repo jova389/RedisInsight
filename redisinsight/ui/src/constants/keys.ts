@@ -1,3 +1,4 @@
+import { ParseKeys } from 'i18next'
 import { StreamViewType } from 'uiSrc/slices/interfaces/stream'
 import { ApiEndpoints } from 'uiSrc/constants'
 import { CommandGroup } from './commands'
@@ -11,7 +12,11 @@ export enum KeyTypes {
   ReJSON = 'ReJSON-RL',
   JSON = 'json',
   Stream = 'stream',
+  VectorSet = 'vectorset',
+  Array = 'array',
 }
+
+export const SEARCHABLE_KEY_TYPES: KeyTypes[] = [KeyTypes.Hash, KeyTypes.ReJSON]
 
 export enum ModulesKeyTypes {
   Graph = 'graphdata',
@@ -27,6 +32,8 @@ export const GROUP_TYPES_DISPLAY = Object.freeze({
   [KeyTypes.ReJSON]: 'JSON',
   [KeyTypes.JSON]: 'JSON',
   [KeyTypes.Stream]: 'Stream',
+  [KeyTypes.VectorSet]: 'Vector Set',
+  [KeyTypes.Array]: 'Array',
   [ModulesKeyTypes.TimeSeries]: 'Time Series',
   [CommandGroup.Bitmap]: 'Bitmap',
   [CommandGroup.Cluster]: 'Cluster',
@@ -59,6 +66,8 @@ export const GROUP_TYPES_COLORS = Object.freeze({
   [KeyTypes.ReJSON]: 'var(--typeReJSONColor)',
   [KeyTypes.JSON]: 'var(--typeReJSONColor)',
   [KeyTypes.Stream]: 'var(--typeStreamColor)',
+  [KeyTypes.VectorSet]: 'var(--typeVectorSetColor)',
+  [KeyTypes.Array]: 'var(--typeArrayColor)',
   [ModulesKeyTypes.Graph]: 'var(--typeGraphColor)',
   [ModulesKeyTypes.TimeSeries]: 'var(--typeTimeSeriesColor)',
   [CommandGroup.SortedSet]: 'var(--groupSortedSetColor)',
@@ -96,20 +105,22 @@ export const STREAM_ADD_GROUP_VIEW_TYPES = [
   StreamViewType.Messages,
 ]
 
-export const STREAM_ADD_ACTION = Object.freeze({
-  [StreamViewType.Data]: {
-    name: 'New Entry',
-  },
-  [StreamViewType.Groups]: {
-    name: 'New Group',
-  },
-  [StreamViewType.Consumers]: {
-    name: 'New Group',
-  },
-  [StreamViewType.Messages]: {
-    name: 'New Group',
-  },
-})
+// `name` holds an i18n key resolved with t() at render time.
+export const STREAM_ADD_ACTION: Record<StreamViewType, { name: ParseKeys }> =
+  Object.freeze({
+    [StreamViewType.Data]: {
+      name: 'browser.stream.addAction.newEntry',
+    },
+    [StreamViewType.Groups]: {
+      name: 'browser.stream.addAction.newGroup',
+    },
+    [StreamViewType.Consumers]: {
+      name: 'browser.stream.addAction.newGroup',
+    },
+    [StreamViewType.Messages]: {
+      name: 'browser.stream.addAction.newGroup',
+    },
+  })
 
 export enum SortOrder {
   ASC = 'ASC',
@@ -117,14 +128,15 @@ export enum SortOrder {
 }
 
 export interface LengthNamingByType {
-  [key: string]: string
+  // i18n keys resolved with t() at render time.
+  [key: string]: ParseKeys
 }
 
 export const LENGTH_NAMING_BY_TYPE: LengthNamingByType = Object.freeze({
-  [ModulesKeyTypes.Graph]: 'Nodes',
-  [ModulesKeyTypes.TimeSeries]: 'Samples',
-  [KeyTypes.Stream]: 'Entries',
-  [KeyTypes.ReJSON]: 'Top-level values',
+  [ModulesKeyTypes.Graph]: 'browser.keyDetails.length.nodes',
+  [ModulesKeyTypes.TimeSeries]: 'browser.keyDetails.length.samples',
+  [KeyTypes.Stream]: 'browser.keyDetails.length.entries',
+  [KeyTypes.ReJSON]: 'browser.keyDetails.length.topLevelValues',
 })
 
 export interface ModulesKeyTypesNames {
@@ -150,6 +162,7 @@ export enum KeyValueFormat {
   Vector32Bit = 'Vector 32-bit',
   Vector64Bit = 'Vector 64-bit',
   DateTime = 'DateTime',
+  Markdown = 'Markdown',
 }
 
 export const DATETIME_FORMATTER_DEFAULT = 'HH:mm:ss d MMM yyyy'
@@ -184,6 +197,8 @@ export const ENDPOINT_BASED_ON_KEY_TYPE = Object.freeze({
   [KeyTypes.List]: ApiEndpoints.LIST,
   [KeyTypes.ReJSON]: ApiEndpoints.REJSON,
   [KeyTypes.Stream]: ApiEndpoints.STREAMS,
+  [KeyTypes.VectorSet]: ApiEndpoints.VECTOR_SET,
+  [KeyTypes.Array]: ApiEndpoints.ARRAY,
 })
 
 export type EndpointBasedOnKeyType = keyof typeof ENDPOINT_BASED_ON_KEY_TYPE

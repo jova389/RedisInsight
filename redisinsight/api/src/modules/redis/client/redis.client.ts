@@ -1,5 +1,5 @@
 import { ClientContext, ClientMetadata } from 'src/common/models';
-import { isNumber } from 'lodash';
+import { isNumber, pick } from 'lodash';
 import { RedisString, UNKNOWN_REDIS_INFO } from 'src/common/constants';
 import apiConfig from 'src/utils/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -8,6 +8,8 @@ import { convertArrayReplyToObject } from '../utils';
 import * as semverCompare from 'node-version-compare';
 import { RedisDatabaseHelloResponse } from 'src/modules/database/dto/redis-info.dto';
 import { plainToClass } from 'class-transformer';
+import { Database } from 'src/modules/database/models/database';
+import { BrowserToolArrayCommands } from 'src/modules/browser/constants/browser-tool-commands';
 
 const REDIS_CLIENTS_CONFIG = apiConfig.get('redis_clients');
 
@@ -26,6 +28,9 @@ export interface IRedisClientCommandOptions {
   firstKey?: RedisString;
   readOnly?: boolean;
   replyEncoding?: 'utf8' | null;
+  // Opt a command's integer replies into exact BigInt (instead of the default
+  // Number) so u64 values above 2^53 — array indexes/counts — aren't rounded.
+  integerReply?: 'number' | 'bigint';
   unknownCommands?: boolean;
 }
 
@@ -47,6 +52,7 @@ export type RedisClientCommand = [
 export type RedisClientCommandReply =
   | string
   | number
+  | bigint
   | Buffer
   | null
   | undefined
@@ -54,13 +60,23 @@ export type RedisClientCommandReply =
 
 export enum RedisFeature {
   HashFieldsExpiration = 'HashFieldsExpiration',
+  UnlinkCommand = 'UnlinkCommand',
+  VsimWithAttribs = 'VsimWithAttribs',
+  ArrayCommands = 'ArrayCommands',
 }
+
+const CLIENT_DATABASE_FIELDS: (keyof Database)[] = ['providerDetails'];
 
 export abstract class RedisClient extends EventEmitter2 {
   public readonly id: string;
 
+  public readonly database: Partial<Database>;
+
   protected _redisVersion: string | undefined;
+
   protected _isInfoCommandDisabled: boolean | undefined;
+
+  protected _arrayCommandGroupSupported: boolean | undefined;
 
   protected lastTimeUsed: number;
 
@@ -68,11 +84,17 @@ export abstract class RedisClient extends EventEmitter2 {
     public readonly clientMetadata: ClientMetadata,
     protected readonly client: unknown,
     public readonly options: IRedisClientOptions,
+    database: Partial<Database> = {},
   ) {
     super();
     this.clientMetadata = RedisClient.prepareClientMetadata(clientMetadata);
+    this.database = RedisClient.pickDatabaseMetadata(database);
     this.lastTimeUsed = Date.now();
     this.id = RedisClient.generateId(this.clientMetadata);
+  }
+
+  static pickDatabaseMetadata(database: Partial<Database>): Partial<Database> {
+    return pick(database, CLIENT_DATABASE_FIELDS);
   }
 
   /**
@@ -162,18 +184,63 @@ export abstract class RedisClient extends EventEmitter2 {
   public async isFeatureSupported(feature: RedisFeature): Promise<boolean> {
     switch (feature) {
       case RedisFeature.HashFieldsExpiration:
-        try {
-          const redisVersion = await this.getRedisVersion();
-          return redisVersion && semverCompare('7.3', redisVersion) < 1;
-        } catch (e) {
-          return false;
-        }
+        return this.isRedisVersionAtLeast('7.3');
+      case RedisFeature.UnlinkCommand:
+        // UNLINK command was introduced in Redis 4.0.0
+        return this.isRedisVersionAtLeast('4.0.0');
+      case RedisFeature.VsimWithAttribs:
+        // VSIM WITHATTRIBS option is broken on 8.0.0–8.0.2 and was fixed in 8.0.3
+        return this.isRedisVersionAtLeast('8.0.3');
+      case RedisFeature.ArrayCommands:
+        // @array command group is preview-status in Redis 8.8+. Probe via
+        // COMMAND INFO because some 8.8.0+ builds may omit the group; fall
+        // back to a version check if the probe itself is not allowed.
+        return this.isArrayCommandGroupSupported();
       default:
         return false;
     }
   }
 
-  private async getRedisVersion(): Promise<string> {
+  private async isArrayCommandGroupSupported(): Promise<boolean> {
+    if (this._arrayCommandGroupSupported !== undefined) {
+      return this._arrayCommandGroupSupported;
+    }
+
+    try {
+      const reply = (await this.call(
+        ['command', 'info', BrowserToolArrayCommands.ArGet],
+        { replyEncoding: 'utf8' },
+      )) as RedisClientCommandReply[];
+
+      this._arrayCommandGroupSupported =
+        Array.isArray(reply) && reply.some((info) => info != null);
+    } catch (e) {
+      // COMMAND INFO is categorised under @slow / @connection in Redis ACL,
+      // so a least-privilege user with only data-command access can still
+      // run @array commands but cannot run the probe. Fall back to a
+      // version check so we don't misclassify supported servers as
+      // unsupported; this matches how every other RedisFeature case resolves
+      // support today.
+      this._arrayCommandGroupSupported =
+        await this.isRedisVersionAtLeast('8.8');
+    }
+
+    return this._arrayCommandGroupSupported;
+  }
+
+  private async isRedisVersionAtLeast(minVersion: string): Promise<boolean> {
+    try {
+      const redisVersion = await this.getRedisVersion();
+      if (!redisVersion) {
+        return false;
+      }
+      return semverCompare(minVersion, redisVersion) < 1;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  private async getRedisVersion(): Promise<string | undefined> {
     if (!this._redisVersion) {
       const infoData = await this.getInfo('server');
       this._redisVersion = infoData?.server?.redis_version;
@@ -274,6 +341,7 @@ export abstract class RedisClient extends EventEmitter2 {
 
     const uId = [
       cm.sessionMetadata?.userId || empty,
+      cm.sessionMetadata?.accountId || empty,
       cm.sessionMetadata?.sessionId || empty,
       cm.sessionMetadata?.uniqueId || empty,
     ].join(separator);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import styled from 'styled-components'
 
 import * as keys from 'uiSrc/constants/keys'
@@ -18,6 +18,7 @@ import { TextInput } from 'uiSrc/components/base/inputs'
 import ConfirmOverwrite from './ConfirmOverwrite'
 import { isValidJSON, isValidKey, parseJsonData, wrapPath } from '../../utils'
 import { JSONErrors } from '../../constants'
+import { useTranslation } from 'uiSrc/i18n'
 
 import styles from '../../styles.module.scss'
 
@@ -36,10 +37,11 @@ export interface Props {
 
 const AddItem = (props: Props) => {
   const { isPair, leftPadding = 0, onCancel, onSubmit, parentPath } = props
+  const { t } = useTranslation()
   const [isConfirmationVisible, setIsConfirmationVisible] =
     useState<boolean>(false)
 
-  const { data } = useSelector(rejsonDataSelector)
+  const { data } = useAppSelector(rejsonDataSelector)
   const jsonContent = parseJsonData(data)
 
   const [key, setKey] = useState<string>('')
@@ -61,12 +63,12 @@ const AddItem = (props: Props) => {
     e.preventDefault()
 
     if (isPair && !isValidKey(key)) {
-      setError(JSONErrors.keyCorrectSyntax)
+      setError(t(JSONErrors.keyCorrectSyntax))
       return
     }
 
     if (!isValidJSON(value)) {
-      setError(JSONErrors.valueJSONFormat)
+      setError(t(JSONErrors.valueJSONFormat))
       return
     }
 
@@ -108,9 +110,8 @@ const AddItem = (props: Props) => {
                     name="newRootKey"
                     value={key}
                     error={error || undefined}
-                    placeholder="Enter JSON key"
-                    onChange={setKey
-                    }
+                    placeholder={t('browser.rejson.jsonKeyPlaceholder')}
+                    onChange={setKey}
                     data-testid="json-key"
                   />
                 </FlexItem>
@@ -119,11 +120,9 @@ const AddItem = (props: Props) => {
                 <TextInput
                   name="newValue"
                   value={value}
-                  placeholder="Enter JSON value"
+                  placeholder={t('browser.rejson.jsonValuePlaceholder')}
                   error={error || undefined}
-                  onChange={value =>
-                    setValue(value)
-                  }
+                  onChange={(value) => setValue(value)}
                   data-testid="json-value"
                 />
               </FlexItem>
@@ -137,7 +136,7 @@ const AddItem = (props: Props) => {
                     size="M"
                     icon={CancelSlimIcon}
                     color="primary"
-                    aria-label="Cancel editing"
+                    aria-label={t('browser.rejson.cancelAddAria')}
                     className={styles.declineBtn}
                     onClick={() => onCancel?.()}
                   />
@@ -147,7 +146,7 @@ const AddItem = (props: Props) => {
                     icon={CheckThinIcon}
                     color="primary"
                     type="submit"
-                    aria-label="Apply"
+                    aria-label={t('browser.rejson.applyAria')}
                     className={styles.applyBtn}
                     data-testid="apply-btn"
                   />

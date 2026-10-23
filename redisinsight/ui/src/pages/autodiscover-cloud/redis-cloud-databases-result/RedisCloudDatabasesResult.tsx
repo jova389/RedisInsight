@@ -1,43 +1,44 @@
-import React, { useState, useEffect } from 'react'
-import { useSelector } from 'react-redux'
-import {
-  InstanceRedisCloud,
-  AddRedisDatabaseStatus,
-} from 'uiSrc/slices/interfaces'
-import { cloudSelector } from 'uiSrc/slices/instances/cloud'
+import React, { useEffect, useState } from 'react'
+import type { InstanceRedisCloud } from 'uiSrc/slices/interfaces'
+import { AddRedisDatabaseStatus } from 'uiSrc/slices/interfaces'
 import MessageBar from 'uiSrc/components/message-bar/MessageBar'
+import { riToast } from 'uiSrc/components/base/display/toast'
 import { AutodiscoveryPageTemplate } from 'uiSrc/templates'
 
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from 'uiSrc/components/base/forms/buttons'
-import { SearchInput } from 'uiSrc/components/base/inputs'
-import { Text } from 'uiSrc/components/base/text'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
+import { Row } from 'uiSrc/components/base/layout/flex'
+import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
+import type { ColumnDef } from 'uiSrc/components/base/layout/table'
+import { Table } from 'uiSrc/components/base/layout/table'
 import { Spacer } from 'uiSrc/components/base/layout'
 import {
+  DatabaseContainer,
   DatabaseWrapper,
+  EmptyState,
   Footer,
-  PageTitle,
-  SearchForm,
+  Header,
 } from 'uiSrc/components/auto-discover'
+import { useTranslation } from 'uiSrc/i18n'
+import { SummaryText } from './components'
 
 export interface Props {
-  columns: ColumnDefinition<InstanceRedisCloud>[]
+  instances: InstanceRedisCloud[]
+  columns: ColumnDef<InstanceRedisCloud>[]
   onView: () => void
   onBack: () => void
 }
 
-const loadingMsg = 'loading...'
-const notFoundMsg = 'Not found'
+const RedisCloudDatabaseListResult = ({
+  instances,
+  columns,
+  onBack,
+  onView,
+}: Props) => {
+  const { t } = useTranslation()
+  const loadingMsg = t('autodiscover.cloud.loading')
+  const notFoundMsg = t('autodiscover.cloud.notFound')
 
-const RedisCloudDatabaseListResult = ({ columns, onBack, onView }: Props) => {
   const [items, setItems] = useState<InstanceRedisCloud[]>([])
   const [message, setMessage] = useState(loadingMsg)
-
-  const { dataAdded: instances } = useSelector(cloudSelector)
 
   useEffect(() => setItems(instances), [instances])
 
@@ -67,40 +68,15 @@ const RedisCloudDatabaseListResult = ({ columns, onBack, onView }: Props) => {
     setItems(itemsTemp)
   }
 
-  const SummaryText = () => (
-    <Text color="secondary" size="S">
-      <b>Summary: </b>
-      {countSuccessAdded ? (
-        <span>
-          Successfully added {countSuccessAdded} database(s)
-          {countFailAdded ? '. ' : '.'}
-        </span>
-      ) : null}
-      {countFailAdded ? (
-        <span>Failed to add {countFailAdded} database(s).</span>
-      ) : null}
-    </Text>
-  )
-
   return (
     <AutodiscoveryPageTemplate>
-      <div className="databaseContainer">
-        <PageTitle data-testid="title">
-          Redis Enterprise Databases Added
-        </PageTitle>
-        <Row justify="end" gap="s">
-          <FlexItem>
-            <SearchForm>
-              <SearchInput
-                placeholder="Search..."
-                onChange={onQueryChange}
-                aria-label="Search"
-                data-testid="search"
-              />
-            </SearchForm>
-          </FlexItem>
-        </Row>
-        <Spacer size="l" />
+      <DatabaseContainer>
+        <Header
+          title={t('autodiscover.cloud.result.title')}
+          onBack={onBack}
+          onQueryChange={onQueryChange}
+        />
+        <Spacer size="m" />
         <DatabaseWrapper>
           <Table
             columns={columns}
@@ -111,24 +87,33 @@ const RedisCloudDatabaseListResult = ({ columns, onBack, onView }: Props) => {
                 desc: false,
               },
             ]}
+            paginationEnabled={items.length > 10}
+            stripedRows
+            emptyState={() => <EmptyState message={message} />}
           />
-          {!items.length && <Text>{message}</Text>}
         </DatabaseWrapper>
-        <MessageBar opened={!!countSuccessAdded || !!countFailAdded}>
-          <SummaryText />
+        <MessageBar
+          opened={!!countSuccessAdded || !!countFailAdded}
+          variant={
+            !!countFailAdded
+              ? riToast.Variant.Attention
+              : riToast.Variant.Success
+          }
+        >
+          <SummaryText
+            countSuccessAdded={countSuccessAdded}
+            countFailAdded={countFailAdded}
+          />
         </MessageBar>
-      </div>
-      <Footer padding={4}>
-        <Row justify="between">
-          <SecondaryButton
-            onClick={onBack}
-            className="btn-cancel btn-back"
-            data-testid="btn-back-to-adding"
+      </DatabaseContainer>
+      <Footer>
+        <Row justify="end">
+          <PrimaryButton
+            onClick={onView}
+            data-testid="btn-view-databases"
+            disabled={items.length === 0}
           >
-            Back to adding databases
-          </SecondaryButton>
-          <PrimaryButton onClick={onView} data-testid="btn-view-databases">
-            View Databases
+            {t('autodiscover.cloud.result.viewDatabases')}
           </PrimaryButton>
         </Row>
       </Footer>

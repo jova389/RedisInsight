@@ -1,7 +1,8 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import cx from 'classnames'
 import { useParams } from 'react-router-dom'
+import styled from 'styled-components'
 
 import { generateArgsNames } from 'uiSrc/utils'
 import { setSearchedCommand } from 'uiSrc/slices/cli/cli-settings'
@@ -9,7 +10,7 @@ import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { appRedisCommandsSelector } from 'uiSrc/slices/app/redis-commands'
 
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { ColorText, Text } from 'uiSrc/components/base/text'
+import { Text } from 'uiSrc/components/base/text'
 import { Link } from 'uiSrc/components/base/link/Link'
 import styles from './styles.module.scss'
 
@@ -17,10 +18,18 @@ export interface Props {
   searchedCommands: string[]
 }
 
+const UnderlineReverseLink = styled(Link)`
+  text-decoration: underline !important;
+
+  &:hover {
+    text-decoration: none !important;
+  }
+`
+
 const CHSearchOutput = ({ searchedCommands }: Props) => {
   const { instanceId = '' } = useParams<{ instanceId: string }>()
-  const dispatch = useDispatch()
-  const { spec: ALL_REDIS_COMMANDS } = useSelector(appRedisCommandsSelector)
+  const dispatch = useAppDispatch()
+  const { spec: ALL_REDIS_COMMANDS } = useAppSelector(appRedisCommandsSelector)
 
   const handleClickCommand = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -47,7 +56,6 @@ const CHSearchOutput = ({ searchedCommands }: Props) => {
       return (
         <Text
           size="s"
-          color="primary"
           className={styles.description}
           data-testid={`cli-helper-output-args-${command}`}
         >
@@ -58,7 +66,7 @@ const CHSearchOutput = ({ searchedCommands }: Props) => {
     return (
       <Text
         size="s"
-        color="subdued"
+        color="primary"
         className={cx(styles.description, styles.summary)}
         data-testid={`cli-helper-output-summary-${command}`}
       >
@@ -82,13 +90,15 @@ const CHSearchOutput = ({ searchedCommands }: Props) => {
                     handleClickCommand(e, command)
                   }}
                 >
-                  <Link color="subdued">
+                  <UnderlineReverseLink href="#" color="text" variant="inline">
                     {command}
-                  </Link>
+                  </UnderlineReverseLink>
                 </Text>
               </FlexItem>
               <FlexItem style={{ flexDirection: 'row', overflow: 'hidden' }}>
-                {renderDescription(command)}
+                <Text color="text" size="s">
+                  {renderDescription(command)}
+                </Text>
               </FlexItem>
             </Row>
           ))}
@@ -96,9 +106,7 @@ const CHSearchOutput = ({ searchedCommands }: Props) => {
       )}
       {searchedCommands.length === 0 && (
         <div className={styles.defaultScreen}>
-          <ColorText color="subdued" data-testid="search-cmds-no-results">
-            No results found.
-          </ColorText>
+          <Text data-testid="search-cmds-no-results">No results found.</Text>
         </div>
       )}
     </>

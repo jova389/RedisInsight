@@ -1,8 +1,9 @@
 import React, { Ref, useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import { monaco as monacoEditor } from 'react-monaco-editor'
 
+import { Trans, escapeTrans, useTranslation } from 'uiSrc/i18n'
 import {
   getMonacoLines,
   getParsedParamsInQuery,
@@ -50,6 +51,13 @@ import {
   changeSidePanel,
 } from 'uiSrc/slices/panels/sidePanels'
 import { InsightsPanelTabs, SidePanels } from 'uiSrc/slices/interfaces/insights'
+import { useDatabaseEnvironment } from 'uiSrc/components/hooks/useDatabaseEnvironment'
+import {
+  AclTip,
+  toRedisConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import { getCommandsForExecution } from 'uiSrc/utils/monaco/monacoUtils'
 import WBView from './WBView'
 
 interface IState {
@@ -70,7 +78,9 @@ let state: IState = {
   scriptEl: null,
 }
 
+/** @deprecated Use useQuery hook from 'pages/vector-search/pages/VectorSearchQueryPage/hooks/useQuery' instead. */
 const WBViewWrapper = () => {
+  const { t } = useTranslation()
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const {
@@ -81,18 +91,20 @@ const WBViewWrapper = () => {
     processing,
     activeRunQueryMode,
     resultsMode,
-  } = useSelector(workbenchResultsSelector)
+  } = useAppSelector(workbenchResultsSelector)
   const { unsupportedCommands, blockingCommands } =
-    useSelector(cliSettingsSelector)
-  const { cleanup: cleanupWB } = useSelector(userSettingsWBSelector)
-  const { script: scriptContext } = useSelector(appContextWorkbench)
+    useAppSelector(cliSettingsSelector)
+  const { cleanup: cleanupWB } = useAppSelector(userSettingsWBSelector)
+  const { script: scriptContext } = useAppSelector(appContextWorkbench)
 
   const [script, setScript] = useState(scriptContext)
   const [scriptEl, setScriptEl] =
     useState<Nullable<monacoEditor.editor.IStandaloneCodeEditor>>(null)
 
-  const instance = useSelector(connectedInstanceSelector)
-  const { visualizations = [] } = useSelector(appPluginsSelector)
+  const instance = useAppSelector(connectedInstanceSelector)
+  const { isDangerousCommand } = useDatabaseEnvironment()
+  const { requestConfirmation } = useProductionWriteConfirmation()
+  const { visualizations = [] } = useAppSelector(appPluginsSelector)
   state = {
     scriptEl,
     loading,
@@ -104,7 +116,7 @@ const WBViewWrapper = () => {
   const scrollDivRef: Ref<HTMLDivElement> = useRef(null)
   const scriptRef = useRef(script)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     dispatch(fetchWBHistoryAction(instanceId))
@@ -234,13 +246,11 @@ const WBViewWrapper = () => {
     setScript('')
   }
 
-  const sourceValueSubmit = (
-    value: string = script,
-    commandId?: Nullable<string>,
-    executeParams: CodeButtonParams = { clearEditor: true },
+  const runSubmission = (
+    value: string,
+    commandId: Maybe<Nullable<string>>,
+    executeParams: CodeButtonParams,
   ) => {
-    if (state.loading || (!value && !script)) return
-
     const lines = getMonacoLines(value)
     const parsedParams: Maybe<CodeButtonParams> = getParsedParamsInQuery(value)
 
@@ -250,6 +260,55 @@ const WBViewWrapper = () => {
     if (cleanupWB && clearEditor && lines.length) {
       resetCommand()
     }
+  }
+
+  const confirmationText =
+    instance?.name || `${instance?.host}:${instance?.port}`
+
+  const sourceValueSubmit = (
+    value: string = script,
+    commandId?: Nullable<string>,
+    executeParams: CodeButtonParams = { clearEditor: true },
+  ) => {
+    if (state.loading || (!value && !script)) return
+
+    const effectiveValue = value || script
+    const commands = getCommandsForExecution(effectiveValue)
+    const dangerousCommands = commands.filter((cmd) =>
+      isDangerousCommand(cmd.split(/\s+/)[0]),
+    )
+    if (dangerousCommands.length > 0) {
+      const dangerousVerbs = Array.from(
+        new Set(
+          dangerousCommands.map((cmd) =>
+            toRedisConfirmationCommandId(cmd.split(/\s+/)[0].toUpperCase()),
+          ),
+        ),
+      )
+      requestConfirmation({
+        title: t('workbench.runConfirm.title'),
+        actionDescription: (
+          <Trans
+            i18nKey="workbench.runConfirm.body"
+            count={dangerousCommands.length}
+            values={{
+              commands: escapeTrans(dangerousCommands.join(', ')),
+              db: escapeTrans(confirmationText),
+            }}
+            components={{ bold: <strong /> }}
+          />
+        ),
+        confirmButtonText: t('workbench.runConfirm.button.run'),
+        commandId: dangerousVerbs,
+        tip: <AclTip />,
+        onConfirm: () => {
+          runSubmission(effectiveValue, commandId, executeParams)
+        },
+      })
+      return
+    }
+
+    runSubmission(effectiveValue, commandId, executeParams)
   }
 
   return (

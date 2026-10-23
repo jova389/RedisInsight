@@ -1,13 +1,22 @@
 const path = require('path');
 
+const noUnusedVarsConfig = [
+  'error',
+  {
+    argsIgnorePattern: '^_',
+    varsIgnorePattern: '^_',
+    destructuredArrayIgnorePattern: '^_',
+  },
+];
+
 module.exports = {
   root: true,
   env: {
     node: true,
     browser: true,
   },
-  extends: ['airbnb-typescript', 'prettier', 'plugin:prettier/recommended'],
-  plugins: ['@typescript-eslint', 'import', 'prettier'],
+  extends: ['airbnb-typescript', 'plugin:prettier/recommended'],
+  plugins: ['@typescript-eslint', 'import'],
   parser: '@typescript-eslint/parser',
   rules: {
     quotes: [2, 'single', { avoidEscape: true }],
@@ -67,24 +76,14 @@ module.exports = {
         node: true,
         browser: false,
       },
-      extends: [
-        'airbnb-typescript/base',
-        'prettier',
-        'plugin:prettier/recommended',
-      ],
-      plugins: ['@typescript-eslint', 'sonarjs', 'import', 'prettier'],
+      extends: ['airbnb-typescript/base', 'plugin:prettier/recommended'],
+      plugins: ['@typescript-eslint', 'sonarjs', 'import'],
       rules: {
         'max-len': ['warn', 120],
         '@typescript-eslint/return-await': 'off',
         '@typescript-eslint/dot-notation': 'off',
         'import/no-extraneous-dependencies': 'off',
-        '@typescript-eslint/no-unused-vars': [
-          'error',
-          {
-            argsIgnorePattern: '^_',
-            varsIgnorePattern: '^_',
-          },
-        ],
+        '@typescript-eslint/no-unused-vars': noUnusedVarsConfig,
         // SonarJS rules (manually enabled since v2.x doesn't have recommended config)
         'sonarjs/cognitive-complexity': ['error', 15],
         'sonarjs/no-duplicate-string': 'error',
@@ -130,7 +129,6 @@ module.exports = {
       extends: [
         'airbnb-typescript',
         'airbnb/hooks',
-        'prettier',
         'plugin:prettier/recommended',
       ],
       plugins: [
@@ -140,13 +138,11 @@ module.exports = {
         'react',
         'react-hooks',
         'jsx-a11y',
-        'prettier',
       ],
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
-        project: path.join(__dirname, 'tsconfig.json'),
-        createDefaultProgram: true,
+        project: path.join(__dirname, 'redisinsight/ui/tsconfig.json'),
       },
       rules: {
         radix: 'off',
@@ -197,6 +193,25 @@ module.exports = {
         'no-unneeded-ternary': 'error',
         'prefer-template': 'error',
         'prefer-const': 'error',
+        '@typescript-eslint/no-unused-vars': noUnusedVarsConfig,
+        // Force every UI callsite onto the typed Redux hooks so the
+        // `AppDispatch` (incl. thunk overload) and `RootState` types are
+        // never accidentally dropped. The wrapper file itself
+        // (`uiSrc/slices/hooks.ts`) is allowed to import the originals — see
+        // the override below.
+        'no-restricted-imports': [
+          'error',
+          {
+            paths: [
+              {
+                name: 'react-redux',
+                importNames: ['useDispatch', 'useSelector'],
+                message:
+                  'Use useAppDispatch / useAppSelector from uiSrc/slices/hooks instead.',
+              },
+            ],
+          },
+        ],
         'import/order': [
           1,
           {
@@ -215,11 +230,6 @@ module.exports = {
                 position: 'after',
               },
               {
-                pattern: 'apiSrc/**',
-                group: 'internal',
-                position: 'after',
-              },
-              {
                 pattern: '{.,..}/*.scss',
                 group: 'object',
                 position: 'after',
@@ -231,12 +241,30 @@ module.exports = {
         ],
       },
     },
+    // Typed Redux hooks wrapper — only file allowed to import the bare
+    // `useDispatch` / `useSelector` from `react-redux` (it's what wraps them).
+    {
+      files: ['redisinsight/ui/src/slices/hooks.ts'],
+      rules: {
+        'no-restricted-imports': 'off',
+      },
+    },
     // UI test files
     {
       files: ['redisinsight/ui/**/*.spec.ts', 'redisinsight/ui/**/*.spec.tsx'],
       env: {
         jest: true,
       },
+    },
+    // Storybook files only
+    {
+      files: [
+        '.storybook/**/*.@(ts|tsx|js|jsx)',
+        'stories/**/*.@(ts|tsx|js|jsx)',
+        '**/*.stories.@(ts|tsx|js|jsx)',
+        '**/*.story.@(ts|tsx|js|jsx)',
+      ],
+      extends: ['plugin:storybook/recommended'],
     },
     // TypeScript files (general) - MUST BE LAST to override other rules
     {
@@ -261,9 +289,6 @@ module.exports = {
       rules: {
         semi: 'off',
         '@typescript-eslint/semi': 'off',
-        '@typescript-eslint/no-unused-vars': 'off',
-        '@typescript-eslint/no-use-before-define': 'off',
-        '@typescript-eslint/no-unused-expressions': 'off',
         'sonarjs/no-identical-functions': 'off',
         'sonarjs/prefer-immediate-return': 'off',
         'sonarjs/no-duplicate-string': 'off',
@@ -274,14 +299,10 @@ module.exports = {
         'no-underscore-dangle': 'off',
         'import/no-duplicates': 'off',
         'no-console': 'off',
-        'prettier/prettier': 'off',
         'prefer-destructuring': 'off',
         'no-unneeded-ternary': 'off',
         'prefer-template': 'off',
         'prefer-const': 'off',
-        '@typescript-eslint/naming-convention': 'off',
-        '@typescript-eslint/lines-between-class-members': 'off',
-        '@typescript-eslint/no-shadow': 'off',
         // REDUNDANT: These are OFF by default in newer Airbnb config
         // 'prefer-arrow-callback': 'off',
         // 'no-restricted-syntax': 'off',
@@ -309,14 +330,12 @@ module.exports = {
         'prefer-template': 'off',
         'import/order': 'off',
         '@typescript-eslint/no-use-before-define': 'off',
-        '@typescript-eslint/no-unused-vars': 'off',
         '@typescript-eslint/no-shadow': 'off',
         '@typescript-eslint/no-unused-expressions': 'off',
         '@typescript-eslint/naming-convention': 'off',
         'sonarjs/no-duplicate-string': 'off',
         'sonarjs/prefer-immediate-return': 'off',
         'sonarjs/cognitive-complexity': 'off',
-        'prettier/prettier': 'off',
         'max-len': 'off',
         'prefer-destructuring': 'off',
         'prefer-const': 'off',
@@ -365,12 +384,10 @@ module.exports = {
       files: ['redisinsight/ui/**/*.ts*'],
       rules: {
         'sonarjs/cognitive-complexity': 'off',
-        '@typescript-eslint/no-unused-vars': 'off',
         'import/extensions': 'off',
         'react/prop-types': 'off',
         'import/order': 'off',
         'prefer-const': 'off',
-        'prettier/prettier': 'off',
         'prefer-destructuring': 'off',
         // REDUNDANT: These are OFF by default in newer Airbnb config
         // 'react/jsx-boolean-value': 'off',
@@ -387,35 +404,11 @@ module.exports = {
         // 'no-template-curly-in-string': 'off',
       },
     },
-    // Temporary disable some rules for UI packages
-    {
-      // In order to lint just UI packages
-      // make sure there's no override on 'redisinsight/ui'
-      // a.k.a. comment the above section
-      files: ['redisinsight/ui/src/packages/**/*.ts*'],
-      rules: {
-        'import/extensions': 'off',
-        'react/prop-types': 'off',
-        'react-hooks/rules-of-hooks': 'off',
-        'sonarjs/cognitive-complexity': 'off',
-        'max-len': 'off',
-        '@typescript-eslint/no-unused-vars': 'off',
-        'prefer-destructuring': 'off',
-      },
-    },
-    // Temporary disable some rules for Playwright tests
-    {
-      files: ['tests/playwright/**/*.ts*'],
-      rules: {
-        'prettier/prettier': 'off',
-      },
-    },
   ],
   parserOptions: {
-    project: './tsconfig.json',
+    project: true,
     ecmaVersion: 2020,
     sourceType: 'module',
-    createDefaultProgram: true,
   },
   settings: {
     react: {
@@ -427,7 +420,9 @@ module.exports = {
     'node_modules',
     'release',
     'redisinsight/ui/src/packages/**/icons/*.js*',
+    'redisinsight/ui/src/packages/**',
     'redisinsight/api/report/**',
+    'redisinsight/api/static/**',
     'redisinsight/api/migration/**',
     // Config files that don't need linting
     '.eslintrc.js',

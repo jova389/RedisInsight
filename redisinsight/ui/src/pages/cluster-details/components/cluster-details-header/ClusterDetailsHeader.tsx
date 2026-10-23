@@ -1,8 +1,7 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
-import cx from 'classnames'
-import { capitalize } from 'lodash'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { LoadingContent } from 'uiSrc/components/base/layout'
 import {
   truncateNumberToFirstUnit,
@@ -15,66 +14,77 @@ import {
   ConnectionType,
   CONNECTION_TYPE_DISPLAY,
 } from 'uiSrc/slices/interfaces'
-import AnalyticsTabs from 'uiSrc/components/analytics-tabs'
 import { clusterDetailsSelector } from 'uiSrc/slices/analytics/clusterDetails'
 import { Text } from 'uiSrc/components/base/text'
 import { RiTooltip } from 'uiSrc/components'
+import { AnalyticsPageHeader } from 'uiSrc/pages/database-analysis/components/analytics-page-header'
 
-import styles from './styles.module.scss'
+import {
+  Container,
+  Content,
+  Item,
+  Loading,
+} from './ClusterDetailsHeader.styles'
 
 interface IMetrics {
+  id: string
   label: string
   value: any
   border?: 'left'
 }
 
 const MAX_NAME_LENGTH = 30
-const DEFAULT_USERNAME = 'Default'
 
 const ClusterDetailsHeader = () => {
-  const {
-    username = DEFAULT_USERNAME,
-    connectionType = ConnectionType.Cluster,
-  } = useSelector(connectedInstanceSelector)
+  const { t } = useTranslation()
+  const { username, connectionType = ConnectionType.Cluster } = useAppSelector(
+    connectedInstanceSelector,
+  )
 
-  const { data, loading } = useSelector(clusterDetailsSelector)
+  const { data, loading } = useAppSelector(clusterDetailsSelector)
+
+  const defaultUsername = t('analytics.clusterDetails.header.defaultUsername')
 
   const metrics: IMetrics[] = [
     {
-      label: 'Type',
+      id: 'Type',
+      label: t('analytics.clusterDetails.header.type'),
       value: CONNECTION_TYPE_DISPLAY[connectionType],
     },
     {
-      label: 'Version',
+      id: 'Version',
+      label: t('analytics.clusterDetails.header.version'),
       value: data?.version || '',
     },
     {
-      label: 'User',
+      id: 'User',
+      label: t('analytics.clusterDetails.header.user'),
       value:
-        (username || DEFAULT_USERNAME)?.length < MAX_NAME_LENGTH ? (
-          username || DEFAULT_USERNAME
+        (username || defaultUsername)?.length < MAX_NAME_LENGTH ? (
+          username || defaultUsername
         ) : (
           <RiTooltip
-            className={styles.tooltip}
             anchorClassName="truncateText"
             position="bottom"
-            content={<>{formatLongName(username || DEFAULT_USERNAME)}</>}
+            content={<>{formatLongName(username || defaultUsername)}</>}
           >
             <div data-testid="cluster-details-username">
-              {formatLongName(username || DEFAULT_USERNAME, MAX_NAME_LENGTH, 5)}
+              {formatLongName(username || defaultUsername, MAX_NAME_LENGTH, 5)}
             </div>
           </RiTooltip>
         ),
     },
     {
-      label: 'Uptime',
+      id: 'Uptime',
+      label: t('analytics.clusterDetails.header.uptime'),
       border: 'left',
       value: (
         <RiTooltip
-          className={styles.tooltip}
           position="top"
           content={
             <>
+              {/* seconds suffix kept literal to match the untranslated
+                  duration from truncateNumberToDuration below */}
               {`${nullableNumberWithSpaces(data?.uptimeSec) || 0} s`}
               <br />
               {`(${truncateNumberToDuration(data?.uptimeSec || 0)})`}
@@ -90,34 +100,28 @@ const ClusterDetailsHeader = () => {
   ]
 
   return (
-    <div className={styles.container} data-testid="cluster-details-header">
-      <AnalyticsTabs />
-
+    <Container data-testid="cluster-details-header">
+      <AnalyticsPageHeader />
       {loading && !data && (
-        <div className={styles.loading} data-testid="cluster-details-loading">
+        <Loading as="div" data-testid="cluster-details-loading">
           <LoadingContent lines={2} />
-        </div>
+        </Loading>
       )}
       {data && (
-        <div
-          className={cx(styles.content)}
-          data-testid="cluster-details-content"
-        >
-          {metrics.map(({ value, label, border }) => (
-            <div
-              className={cx(styles.item, styles[`border${capitalize(border)}`])}
-              key={label}
-              data-testid={`cluster-details-item-${label}`}
+        <Content data-testid="cluster-details-content">
+          {metrics.map(({ id, value, label, border }) => (
+            <Item
+              key={id}
+              $borderLeft={border === 'left'}
+              data-testid={`cluster-details-item-${id}`}
             >
-              <Text color="subdued" className={styles.value}>
-                {value}
-              </Text>
-              <Text className={styles.label}>{label}</Text>
-            </div>
+              <Text color="subdued">{value}</Text>
+              <Text>{label}</Text>
+            </Item>
           ))}
-        </div>
+        </Content>
       )}
-    </div>
+    </Container>
   )
 }
 

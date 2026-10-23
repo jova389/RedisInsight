@@ -1,7 +1,7 @@
 import React from 'react'
-import { LinkProps } from '@redis-ui/components'
-import { StyledLink } from 'uiSrc/components/base/link/link.styles'
+import * as S from 'uiSrc/components/base/link/link.styles'
+import { type RiLinkProps } from './link.types'
 
-export const Link = ({ color, ...props }: LinkProps) => (
-  <StyledLink {...props} $color={color} />
+export const Link = ({ color, underline, ...props }: RiLinkProps) => (
+  <S.StyledLink {...props} $color={color} $underline={underline} />
 )

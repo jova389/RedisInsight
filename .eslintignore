@@ -1,4 +1,5 @@
 tests/e2e
+tests/e2e-playwright
 
 # Logs
 logs
@@ -62,3 +63,9 @@ redisinsight/ui/src/packages/redistimeseries-app
 
 /report
 __mocks__
+
+# Auto-generated API client (output of `npm run generate:api-client`)
+redisinsight/api-client
+
+# Storybook build output
+storybook-static

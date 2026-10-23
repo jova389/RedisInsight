@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
+import { useTranslation } from 'uiSrc/i18n'
 import cx from 'classnames'
 import { orderBy } from 'lodash'
 
@@ -8,13 +9,12 @@ import VirtualTable from 'uiSrc/components/virtual-table/VirtualTable'
 import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
 import { selectedKeyDataSelector } from 'uiSrc/slices/browser/keys'
 import { SortOrder } from 'uiSrc/constants'
-import { ConsumerGroupDto } from 'apiSrc/modules/browser/stream/dto'
+import { ConsumerGroupDto } from 'apiClient'
 
 import styles from './styles.module.scss'
 
 const headerHeight = 60
 const rowHeight = 54
-const noItemsMessageString = 'Your Key has no Consumer Groups available.'
 
 export interface IConsumerGroup extends ConsumerGroupDto {
   editing: boolean
@@ -29,9 +29,10 @@ export interface Props {
 
 const ConsumerGroups = (props: Props) => {
   const { data = [], columns = [], onClosePopover, onSelectGroup } = props
+  const { t } = useTranslation()
 
-  const { loading } = useSelector(streamGroupsSelector)
-  const { name: key = '' } = useSelector(selectedKeyDataSelector) ?? {}
+  const { loading } = useAppSelector(streamGroupsSelector)
+  const { name: key = '' } = useAppSelector(selectedKeyDataSelector) ?? {}
 
   const [groups, setGroups] = useState<IConsumerGroup[]>([])
   const [sortedColumnName, setSortedColumnName] = useState<string>('name')
@@ -85,7 +86,7 @@ const ConsumerGroups = (props: Props) => {
           tableWidth={columns.reduce((a, b) => a + (b.minWidth ?? 0), 0)}
           onWheel={onClosePopover}
           onChangeSorting={onChangeSorting}
-          noItemsMessage={noItemsMessageString}
+          noItemsMessage={t('browser.stream.groups.empty')}
           sortedColumn={
             groups?.length
               ? {

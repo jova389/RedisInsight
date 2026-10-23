@@ -1,5 +1,6 @@
 export * from './redis-string';
 export * from './zset-score';
+export * from './array-index';
 export * from './default';
 export * from './data-as-json-string.decorator';
 export * from './session';
@@ -10,3 +11,4 @@ export * from './is-bigger-than.decorator';
 export * from './is-github-link.decorator';
 export * from './database-management.decorator';
 export * from './no-duplicates.decorator';
+export * from './redis-string-schema.decorator';

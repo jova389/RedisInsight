@@ -1,5 +1,5 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { mock } from 'ts-mockito'
 import { cloneDeep } from 'lodash'
 
@@ -38,15 +38,15 @@ jest.mock('uiSrc/slices/browser/bulkActions', () => ({
   }),
 }))
 
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useSelector: jest.fn(),
+jest.mock('uiSrc/slices/hooks', () => ({
+  ...jest.requireActual('uiSrc/slices/hooks'),
+  useAppSelector: jest.fn(),
 }))
 
 beforeEach(() => {
   const state: any = store.getState()
 
-  ;(useSelector as jest.Mock).mockImplementation(
+  ;(useAppSelector as jest.Mock).mockImplementation(
     (callback: (arg0: RootState) => RootState) =>
       callback({
         ...state,
@@ -75,7 +75,7 @@ describe('BulkActions', () => {
   it('bulk actions summary should render with any search', () => {
     const state: any = store.getState()
 
-    ;(useSelector as jest.Mock).mockImplementation(
+    ;(useAppSelector as jest.Mock).mockImplementation(
       (callback: (arg0: any) => any) =>
         callback({
           ...state,
@@ -85,6 +85,13 @@ describe('BulkActions', () => {
               ...state.browser.keys,
               search: '1',
               isSearched: true,
+            },
+            bulkActions: {
+              ...state.browser.bulkActions,
+              bulkDelete: {
+                ...state.browser.bulkActions.bulkDelete,
+                search: '1',
+              },
             },
           },
         }),
@@ -101,7 +108,7 @@ describe('BulkActions', () => {
   it('bulk actions summary should render with any filter', () => {
     const state: any = store.getState()
 
-    ;(useSelector as jest.Mock).mockImplementation(
+    ;(useAppSelector as jest.Mock).mockImplementation(
       (callback: (arg0: any) => any) =>
         callback({
           ...state,
@@ -111,6 +118,13 @@ describe('BulkActions', () => {
               ...state.browser.keys,
               filter: KeyTypes.Hash,
               isFiltered: true,
+            },
+            bulkActions: {
+              ...state.browser.bulkActions,
+              bulkDelete: {
+                ...state.browser.bulkActions.bulkDelete,
+                filter: KeyTypes.Hash,
+              },
             },
           },
         }),
@@ -136,7 +150,7 @@ describe('BulkActions', () => {
   describe('Telemetry', () => {
     it('should call proper telemetry events', async () => {
       const state: any = store.getState()
-      ;(useSelector as jest.Mock).mockImplementation(
+      ;(useAppSelector as jest.Mock).mockImplementation(
         (callback: (arg0: any) => any) =>
           callback({
             ...state,
@@ -146,6 +160,13 @@ describe('BulkActions', () => {
                 ...state.browser.keys,
                 filter: KeyTypes.Hash,
                 isFiltered: true,
+              },
+              bulkActions: {
+                ...state.browser.bulkActions,
+                bulkDelete: {
+                  ...state.browser.bulkActions.bulkDelete,
+                  filter: KeyTypes.Hash,
+                },
               },
             },
           }),

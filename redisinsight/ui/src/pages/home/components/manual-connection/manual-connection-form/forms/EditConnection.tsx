@@ -2,23 +2,27 @@ import React from 'react'
 import { FormikProps } from 'formik'
 import {
   DatabaseForm,
+  EnvironmentSelect,
   DbIndex,
   ForceStandalone,
   SSHDetails,
   TlsDetails,
 } from 'uiSrc/pages/home/components/form'
+import { Spacer } from 'uiSrc/components/base/layout'
 import Divider from 'uiSrc/components/divider/Divider'
 import { BuildType } from 'uiSrc/constants/env'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
 import DecompressionAndFormatters from './DecompressionAndFormatters'
 
-import { ManualFormTab } from '../constants'
+import { AZURE_READONLY_FIELDS, ManualFormTab } from '../constants'
 
 export interface Props {
   activeTab: ManualFormTab
   isEditMode: boolean
   isCloneMode: boolean
   isFromCloud: boolean
+  isFromAzure?: boolean
+  isManaged?: boolean
   formik: FormikProps<DbConnectionInfo>
   onKeyDown: (event: React.KeyboardEvent<HTMLFormElement>) => void
   onHostNamePaste: (content: string) => boolean
@@ -33,6 +37,8 @@ const EditConnection = (props: Props) => {
     isCloneMode,
     isEditMode,
     isFromCloud,
+    isFromAzure = false,
+    isManaged = false,
     formik,
     onKeyDown,
     onHostNamePaste,
@@ -40,6 +46,15 @@ const EditConnection = (props: Props) => {
     caCertificates,
     buildType,
   } = props
+
+  // For Azure databases in edit/clone mode, disable connection fields
+  const readOnlyFields = isFromAzure && isEditMode ? AZURE_READONLY_FIELDS : []
+
+  // The endpoint (host/port) is editable when adding, cloning, or editing a
+  // non-managed database. For cloud-managed databases it stays read-only since
+  // the endpoint is tied to provider metadata (see isManagedDatabase).
+  const showEndpointFields =
+    (!isEditMode || isCloneMode || !isManaged) && !isFromCloud
 
   return (
     <form
@@ -54,26 +69,27 @@ const EditConnection = (props: Props) => {
             formik={formik}
             showFields={{
               alias: true,
-              host: (!isEditMode || isCloneMode) && !isFromCloud,
-              port: !isFromCloud,
+              host: showEndpointFields,
+              port: showEndpointFields,
               timeout: true,
             }}
             autoFocus={!isCloneMode && isEditMode}
             onHostNamePaste={onHostNamePaste}
+            readyOnlyFields={readOnlyFields}
           />
-          <Divider
-            colorVariable="separatorColor"
-            variant="fullWidth"
-            className="form__divider"
-          />
+          <Spacer size="l" />
+          <Divider />
+          <Spacer size="m" />
           <ForceStandalone formik={formik} />
+          <Spacer size="m" />
+          <Divider />
+          <Spacer size="m" />
+          <EnvironmentSelect formik={formik} />
           {isCloneMode && (
             <>
-              <Divider
-                colorVariable="separatorColor"
-                variant="fullWidth"
-                className="form__divider"
-              />
+              <Spacer size="m" />
+              <Divider />
+              <Spacer size="m" />
               <DbIndex formik={formik} />
             </>
           )}
@@ -88,11 +104,9 @@ const EditConnection = (props: Props) => {
           />
           {buildType !== BuildType.RedisStack && (
             <>
-              <Divider
-                colorVariable="separatorColor"
-                variant="fullWidth"
-                className="form__divider"
-              />
+              <Spacer size="m" />
+              <Divider />
+              <Spacer size="m" />
               <SSHDetails formik={formik} />
             </>
           )}

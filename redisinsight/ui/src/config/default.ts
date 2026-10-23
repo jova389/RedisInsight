@@ -48,6 +48,10 @@ export const defaultConfig = {
   app: {
     version: packageJson.version,
     sha: process.env.GITHUB_SHA,
+    showBuildCommitSha: booleanEnv(
+      'RI_SHOW_BUILD_COMMIT_SHA',
+      process.env.NODE_ENV !== 'production',
+    ),
     env: process.env.NODE_ENV,
     type: process.env.RI_APP_TYPE,
     resourcesBaseUrl: process.env.RI_RESOURCES_BASE_URL ?? apiUrl, // todo: no usage found
@@ -69,6 +73,11 @@ export const defaultConfig = {
     localResourcesBaseUrl: process.env.RI_LOCAL_RESOURCES_BASE_URL,
     useLocalResources: booleanEnv('RI_USE_LOCAL_RESOURCES', false),
     indexedDbName: process.env.RI_INDEXED_DB_NAME || 'RI_LOCAL_STORAGE',
+    vectorSearchIndexedDbName:
+      process.env.RI_VECTOR_SEARCH_INDEXED_DB_NAME ||
+      'RI_VECTOR_SEARCH_STORAGE',
+    queryLibraryIndexedDbName:
+      process.env.RI_QUERY_LIBRARY_INDEXED_DB_NAME || 'RI_QUERY_LIBRARY',
     truncatedStringPrefix:
       process.env.RI_CLIENTS_TRUNCATED_STRING_PREFIX ||
       '[Truncated due to length]',
@@ -100,6 +109,15 @@ export const defaultConfig = {
     cloudAds: {
       defaultFlag: booleanEnv('RI_FEATURES_CLOUD_ADS_DEFAULT_FLAG', true),
     },
+    rdiUi: {
+      minSupportedVersion:
+        process.env.RI_FEATURES_RDI_UI_MIN_SUPPORTED_VERSION ?? '1.16.0',
+    },
+  },
+  sentry: {
+    dsn: process.env.RI_SENTRY_DSN ?? '',
+    environment: process.env.RI_SENTRY_ENVIRONMENT ?? 'development',
+    enabled: booleanEnv('RI_SENTRY_ENABLED', false),
   },
 }
 

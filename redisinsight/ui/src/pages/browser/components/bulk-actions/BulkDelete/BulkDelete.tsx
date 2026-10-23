@@ -1,52 +1,44 @@
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { isUndefined } from 'lodash'
 import { Text } from 'uiSrc/components/base/text'
 import {
   bulkActionsDeleteOverviewSelector,
   bulkActionsDeleteSelector,
-  bulkActionsDeleteSummarySelector,
 } from 'uiSrc/slices/browser/bulkActions'
-import { keysSelector } from 'uiSrc/slices/browser/keys'
-import { getGroupTypeDisplay, NO_TYPE_NAME } from 'uiSrc/utils'
+import { Col } from 'uiSrc/components/base/layout/flex'
 
+import { useTranslation } from 'uiSrc/i18n'
 import BulkDeleteFooter from './BulkDeleteFooter'
 import BulkDeleteSummary from './BulkDeleteSummary'
-import BulkDeleteSummaryButton from './BulkDeleteSummaryButton'
 import BulkActionsInfo from '../BulkActionsInfo'
-
-import styles from './styles.module.scss'
 
 export interface Props {
   onCancel: () => void
 }
 
-const REPORTED_NO_TYPE_NAME = 'Any'
-
 const BulkDelete = (props: Props) => {
   const { onCancel } = props
-  const { filter, search, isSearched, isFiltered } = useSelector(keysSelector)
-  const { loading } = useSelector(bulkActionsDeleteSelector)
-  const { keys: deletedKeys } =
-    useSelector(bulkActionsDeleteSummarySelector) || {}
+  const { t } = useTranslation()
+  const { filter, search, loading } = useAppSelector(bulkActionsDeleteSelector)
   const {
     status,
     filter: { match, type: filterType },
     progress,
-  } = useSelector(bulkActionsDeleteOverviewSelector) ?? { filter: {} }
+    error,
+  } = useAppSelector(bulkActionsDeleteOverviewSelector) ?? { filter: {} }
 
-  const [showPlaceholder, setShowPlaceholder] = useState<boolean>(
-    !isSearched && !isFiltered,
-  )
+  const hasSearchOrFilter = !!search || filter !== null
+
+  const [showPlaceholder, setShowPlaceholder] =
+    useState<boolean>(!hasSearchOrFilter)
 
   useEffect(() => {
-    setShowPlaceholder(!status && !isSearched && !isFiltered)
-  }, [status, isSearched, isFiltered])
+    setShowPlaceholder(!status && !hasSearchOrFilter)
+  }, [status, hasSearchOrFilter])
 
-  const isCompleted = !isUndefined(status)
   const searchPattern = match || search || '*'
-  const keysType = getGroupTypeDisplay(filter)
 
   return (
     <>
@@ -58,43 +50,30 @@ const BulkDelete = (props: Props) => {
             filter={isUndefined(filterType) ? filter : filterType}
             status={status}
             progress={progress}
+            error={error}
           >
-            <BulkDeleteSummary />
-
-            {isCompleted && (
-              <div className={styles.bulkDeleteSummaryButtonWrapper}>
-                <BulkDeleteSummaryButton
-                  deletedKeys={deletedKeys}
-                  pattern={searchPattern}
-                  keysType={
-                    keysType === NO_TYPE_NAME ? REPORTED_NO_TYPE_NAME : keysType
-                  }
-                >
-                  Keys deleted
-                </BulkDeleteSummaryButton>
-              </div>
-            )}
+            <Col gap="l">
+              <BulkDeleteSummary />
+            </Col>
           </BulkActionsInfo>
           <BulkDeleteFooter onCancel={onCancel} />
         </>
       )}
 
       {showPlaceholder && (
-        <div
-          className={styles.placeholder}
+        <Col
+          gap="l"
+          justify="center"
+          align="center"
           data-testid="bulk-actions-placeholder"
         >
-          <Text color="subdued" className={styles.placeholderTitle}>
-            No pattern or key type set
+          <Text size="XL" color="primary" variant="semiBold">
+            {t('browser.bulkActions.placeholder.title')}
           </Text>
-          <Text
-            color="subdued"
-            className={styles.placeholderSummary}
-            style={{ textAlign: 'center' }}
-          >
-            To perform a bulk action, set the pattern or select the key type
+          <Text color="secondary">
+            {t('browser.bulkActions.placeholder.description')}
           </Text>
-        </div>
+        </Col>
       )}
     </>
   )

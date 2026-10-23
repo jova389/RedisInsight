@@ -1,9 +1,7 @@
 import React from 'react'
-import cx from 'classnames'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
-
-import styled from 'styled-components'
+import { useTranslation } from 'uiSrc/i18n'
 import { CaretRightIcon } from 'uiSrc/components/base/icons'
 import { createNewAnalysis } from 'uiSrc/slices/analytics/dbAnalysis'
 import { numberWithSpaces } from 'uiSrc/utils/numbers'
@@ -11,29 +9,20 @@ import { getApproximatePercentage } from 'uiSrc/utils/validations'
 import { appContextDbConfig } from 'uiSrc/slices/app/context'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { ConnectionType } from 'uiSrc/slices/interfaces'
-import AnalyticsTabs from 'uiSrc/components/analytics-tabs'
 import { comboBoxToArray, getDbIndex, Nullable } from 'uiSrc/utils'
+import { AnalyticsPageHeader } from 'uiSrc/pages/database-analysis/components/analytics-page-header'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
-import {
-  ANALYZE_CLUSTER_TOOLTIP_MESSAGE,
-  ANALYZE_TOOLTIP_MESSAGE,
-} from 'uiSrc/constants/recommendations'
 import { FormatedDate, RiTooltip } from 'uiSrc/components'
 import { DEFAULT_DELIMITER } from 'uiSrc/constants'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { HideFor } from 'uiSrc/components/base/utils/ShowHide'
 import { PrimaryButton } from 'uiSrc/components/base/forms/buttons'
 import { Text } from 'uiSrc/components/base/text'
-import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { ShortDatabaseAnalysis } from 'apiSrc/modules/database-analysis/models'
-import { AnalysisProgress } from 'apiSrc/modules/database-analysis/models/analysis-progress'
 
 import styles from './styles.module.scss'
+import { Container, HeaderSelect, InfoIcon } from './Header.styles'
+import { ShortDatabaseAnalysis, AnalysisProgress } from 'apiClient'
 
-const HeaderSelect = styled(RiSelect)`
-  border: 0 none;
-`
 export interface Props {
   items: ShortDatabaseAnalysis[]
   selectedValue: Nullable<string>
@@ -51,12 +40,13 @@ const Header = (props: Props) => {
     analysisLoading,
   } = props
 
-  const { connectionType, provider } = useSelector(connectedInstanceSelector)
+  const { t } = useTranslation()
+  const { connectionType, provider } = useAppSelector(connectedInstanceSelector)
   const { instanceId } = useParams<{ instanceId: string }>()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const { treeViewDelimiter = [DEFAULT_DELIMITER] } =
-    useSelector(appContextDbConfig)
+    useAppSelector(appContextDbConfig)
 
   const analysisOptions = items.map((item) => {
     const { createdAt, id, db } = item
@@ -87,108 +77,104 @@ const Header = (props: Props) => {
 
   return (
     <div data-testid="db-analysis-header">
-      <AnalyticsTabs />
-      <Row
-        className={styles.container}
-        align="center"
-        justify={items.length ? 'between' : 'end'}
-      >
-        {!!items.length && (
-          <FlexItem>
-            <Row align="center" wrap>
-              <HideFor sizes={['xs', 's']}>
-                <FlexItem>
-                  <Text className={styles.text} size="s">
-                    Report generated on:
-                  </Text>
-                </FlexItem>
-              </HideFor>
-              <FlexItem grow>
-                <HeaderSelect
-                  options={analysisOptions}
-                  valueRender={({ option }) =>
-                    option.inputDisplay as JSX.Element
-                  }
-                  value={selectedValue ?? ''}
-                  onChange={(value: string) => onChangeSelectedAnalysis(value)}
-                  data-testid="select-report"
-                />
-              </FlexItem>
-              {!!progress && (
-                <FlexItem>
-                  <Text
-                    className={cx(
-                      styles.progress,
-                      styles.text,
-                      styles.progressContainer,
-                    )}
-                    size="s"
-                    data-testid="bulk-delete-summary"
-                  >
-                    <Text
-                      component="span"
-                      color={
-                        progress.total === progress.processed
-                          ? undefined
-                          : 'warning'
+      <AnalyticsPageHeader
+        actions={
+          <Container justify={items.length ? 'between' : 'end'} gap="l">
+            {!!items.length && (
+              <FlexItem>
+                <Row align="center" wrap>
+                  <HideFor sizes={['xs', 's']}>
+                    <FlexItem>
+                      <Text size="s">
+                        {t(
+                          'analytics.databaseAnalysis.header.reportGeneratedOn',
+                        )}
+                      </Text>
+                    </FlexItem>
+                  </HideFor>
+                  <FlexItem grow>
+                    <HeaderSelect
+                      options={analysisOptions}
+                      valueRender={({ option }) =>
+                        option.inputDisplay as JSX.Element
                       }
-                      className={cx(styles.progress, styles.text)}
-                      size="s"
-                      data-testid="analysis-progress"
-                    >
-                      {'Scanned '}
-                      {getApproximatePercentage(
-                        progress.total,
-                        progress.processed,
-                      )}
-                    </Text>
-                    {` (${numberWithSpaces(progress.processed)}`}/
-                    {numberWithSpaces(progress.total)}
-                    {' keys) '}
-                  </Text>
-                </FlexItem>
-              )}
-            </Row>
-          </FlexItem>
-        )}
-        <FlexItem>
-          <Row align="center">
-            <FlexItem grow>
-              <PrimaryButton
-                aria-label="New reports"
-                data-testid="start-database-analysis-btn"
-                icon={CaretRightIcon}
-                iconSide="left"
-                disabled={analysisLoading}
-                onClick={handleClick}
-              >
-                New Report
-              </PrimaryButton>
+                      value={selectedValue ?? ''}
+                      onChange={(value: string) =>
+                        onChangeSelectedAnalysis(value)
+                      }
+                      data-testid="select-report"
+                    />
+                  </FlexItem>
+                  {!!progress && (
+                    <FlexItem>
+                      <Text
+                        className={styles.progress}
+                        size="s"
+                        data-testid="bulk-delete-summary"
+                      >
+                        <Text
+                          component="span"
+                          color={
+                            progress.total === progress.processed
+                              ? undefined
+                              : 'warning'
+                          }
+                          className={styles.progress}
+                          size="s"
+                          data-testid="analysis-progress"
+                        >
+                          {t('analytics.databaseAnalysis.header.scanned', {
+                            percentage: getApproximatePercentage(
+                              progress.total,
+                              progress.processed,
+                            ),
+                          })}
+                        </Text>{' '}
+                        {t('analytics.databaseAnalysis.header.scannedKeys', {
+                          processed: numberWithSpaces(progress.processed),
+                          total: numberWithSpaces(progress.total),
+                        })}
+                      </Text>
+                    </FlexItem>
+                  )}
+                </Row>
+              </FlexItem>
+            )}
+            <FlexItem>
+              <Row justify="end" align="center" gap="s">
+                <PrimaryButton
+                  aria-label={t(
+                    'analytics.databaseAnalysis.header.newReportAria',
+                  )}
+                  data-testid="start-database-analysis-btn"
+                  icon={CaretRightIcon}
+                  iconSide="left"
+                  size="small"
+                  disabled={analysisLoading}
+                  onClick={handleClick}
+                >
+                  {t('analytics.databaseAnalysis.header.newReport')}
+                </PrimaryButton>
+                <RiTooltip
+                  position="bottom"
+                  anchorClassName={styles.tooltipAnchor}
+                  title={t('analytics.databaseAnalysis.header.tooltipTitle')}
+                  data-testid="db-new-reports-tooltip"
+                  content={
+                    connectionType === ConnectionType.Cluster
+                      ? t(
+                          'analytics.databaseAnalysis.header.tooltipContentCluster',
+                        )
+                      : t('analytics.databaseAnalysis.header.tooltipContent')
+                  }
+                >
+                  <InfoIcon data-testid="db-new-reports-icon" />
+                </RiTooltip>
+              </Row>
             </FlexItem>
-            <FlexItem style={{ paddingLeft: 6 }}>
-              <RiTooltip
-                position="bottom"
-                anchorClassName={styles.tooltipAnchor}
-                className={styles.tooltip}
-                title="Database Analysis"
-                data-testid="db-new-reports-tooltip"
-                content={
-                  connectionType === ConnectionType.Cluster
-                    ? ANALYZE_CLUSTER_TOOLTIP_MESSAGE
-                    : ANALYZE_TOOLTIP_MESSAGE
-                }
-              >
-                <RiIcon
-                  className={styles.infoIcon}
-                  type="InfoIcon"
-                  size="l"
-                  data-testid="db-new-reports-icon"
-                />
-              </RiTooltip>
-            </FlexItem>
-          </Row>
-        </FlexItem>
-      </Row>
+          </Container>
+        }
+      />
     </div>
   )
 }

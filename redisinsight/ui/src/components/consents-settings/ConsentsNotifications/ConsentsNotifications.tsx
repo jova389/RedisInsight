@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useFormik } from 'formik'
 import { has } from 'lodash'
 
@@ -10,6 +10,7 @@ import {
 } from 'uiSrc/slices/user/user-settings'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { Title } from 'uiSrc/components/base/text/Title'
+import { useTranslation } from 'uiSrc/i18n'
 import ConsentOption from '../ConsentOption'
 import { IConsent, ConsentCategories } from '../ConsentsSettings'
 
@@ -20,15 +21,16 @@ export interface Props {
 }
 
 const ConsentsNotifications = () => {
+  const { t } = useTranslation()
   const [consents, setConsents] = useState<IConsent[]>([])
   const [notificationConsents, setNotificationConsents] = useState<IConsent[]>(
     [],
   )
   const [initialValues, setInitialValues] = useState<any>({})
 
-  const { config, spec } = useSelector(userSettingsSelector)
+  const { config, spec } = useAppSelector(userSettingsSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const formik = useFormik({
     initialValues,
@@ -90,7 +92,7 @@ const ConsentsNotifications = () => {
   return (
     <form onSubmit={formik.handleSubmit} data-testid="consents-settings-form">
       <div className={styles.consentsWrapper}>
-        <Title size="XS">Notifications</Title>
+        <Title size="XS">{t('settings.general.notifications.title')}</Title>
         {notificationConsents.map((consent: IConsent) => (
           <ConsentOption
             consent={consent}

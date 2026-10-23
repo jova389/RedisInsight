@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
 
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 import { AxiosError } from 'axios'
 import { isTruncatedString } from 'uiSrc/utils'
 import { addErrorNotification } from 'uiSrc/slices/app/notifications'
-import { AXIOS_ERROR_DISABLED_ACTION_WITH_TRUNCATED_DATA } from 'uiSrc/constants'
+import { useTranslation } from 'uiSrc/i18n'
 import { Loader } from 'uiSrc/components/base/display'
 import RejsonDynamicTypes from '../rejson-dynamic-types'
 import { JSONObjectProps, ObjectTypes, REJSONResponse } from '../interfaces'
@@ -54,7 +54,8 @@ const RejsonObject = (props: JSONObjectProps) => {
   const [loading, setLoading] = useState<boolean>(false)
   const [isExpanded, setIsExpanded] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (!expandedRows?.has(path)) {
@@ -100,9 +101,13 @@ const RejsonObject = (props: JSONObjectProps) => {
     handleFetchVisualisationResults(path, true).then((data: REJSONResponse) => {
       if (isTruncatedString(data?.data)) {
         return dispatch(
-          addErrorNotification(
-            AXIOS_ERROR_DISABLED_ACTION_WITH_TRUNCATED_DATA as AxiosError,
-          ),
+          addErrorNotification({
+            response: {
+              data: {
+                message: t('browser.keyDetails.truncatedActionDisabled'),
+              },
+            },
+          } as AxiosError),
         )
       }
 
@@ -110,11 +115,11 @@ const RejsonObject = (props: JSONObjectProps) => {
       setValueOfEntireObject(
         typeof data.data === 'object'
           ? JSON.stringify(
-            data.data,
-            (_key, value) =>
-              typeof value === 'bigint' ? value.toString() : value,
-            4,
-          )
+              data.data,
+              (_key, value) =>
+                typeof value === 'bigint' ? value.toString() : value,
+              4,
+            )
           : data.data,
       )
     })

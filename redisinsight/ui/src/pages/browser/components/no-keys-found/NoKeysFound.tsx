@@ -1,7 +1,7 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
-import TelescopeImg from 'uiSrc/assets/img/telescope-dark.svg'
+import NoDataImg from 'uiSrc/assets/img/no-data.svg'
 
 import { findTutorialPath } from 'uiSrc/utils'
 import {
@@ -19,12 +19,13 @@ import { SCAN_TREE_COUNT_DEFAULT } from 'uiSrc/constants/api'
 import { TutorialsIds } from 'uiSrc/constants'
 
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
-import { EmptyButton } from 'uiSrc/components/base/forms/buttons'
 import { Title } from 'uiSrc/components/base/text/Title'
-import { RiImage } from 'uiSrc/components/base/display'
-import LoadSampleData from '../load-sample-data'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import { PlusIcon } from 'uiSrc/components/base/icons'
+import { useTranslation } from 'uiSrc/i18n'
 
-import styles from './styles.module.scss'
+import LoadSampleData from '../load-sample-data'
+import { AddKeysManuallyButton, StyledImage } from './NoKeysFound.styles'
 
 export interface Props {
   onAddKeyPanel: (value: boolean) => void
@@ -32,10 +33,11 @@ export interface Props {
 
 const NoKeysFound = (props: Props) => {
   const { onAddKeyPanel } = props
-  const { openedPanel } = useSelector(sidePanelsSelector)
-  const { viewType } = useSelector(keysSelector)
+  const { t } = useTranslation()
+  const { openedPanel } = useAppSelector(sidePanelsSelector)
+  const { viewType } = useAppSelector(keysSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const history = useHistory()
 
   const onSuccessLoadData = () => {
@@ -60,28 +62,24 @@ const NoKeysFound = (props: Props) => {
   }
 
   return (
-    <div className={styles.container} data-testid="no-result-found-msg">
-      <RiImage
-        className={styles.img}
-        src={TelescopeImg}
-        alt="no results"
-      />
+    <Col align="center" data-testid="no-result-found-msg">
+      <StyledImage src={NoDataImg} alt={t('browser.noKeysFound.imageAlt')} />
       <Spacer />
-      <Title color="primary" className={styles.title} size="S">
-        Let&apos;s start working
+      <Title color="primary" size="XL">
+        {t('browser.noKeysFound.title')}
       </Title>
       <Spacer />
-      <div className={styles.actions}>
+      <Row gap="m" align="center">
         <LoadSampleData onSuccess={onSuccessLoadData} />
-        <EmptyButton
+        <AddKeysManuallyButton
+          icon={PlusIcon}
           onClick={() => onAddKeyPanel(true)}
-          className={styles.addKey}
           data-testid="add-key-msg-btn"
         >
-          + Add key manually
-        </EmptyButton>
-      </div>
-    </div>
+          {t('browser.noKeysFound.addKeyManually')}
+        </AddKeysManuallyButton>
+      </Row>
+    </Col>
   )
 }
 

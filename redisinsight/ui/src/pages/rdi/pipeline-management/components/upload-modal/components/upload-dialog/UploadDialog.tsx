@@ -2,9 +2,7 @@ import React, { useState } from 'react'
 
 import { Text } from 'uiSrc/components/base/text'
 import ImportFileModal from 'uiSrc/components/import-file-modal'
-
-import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import styles from './styles.module.scss'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   onClose: () => void
@@ -16,10 +14,6 @@ export interface Props {
   loading: boolean
 }
 
-const warningMessage =
-  'If a new pipeline is uploaded, existing pipeline configuration and transformation\n' +
-  'jobs will be overwritten. Changes will not be applied until the pipeline is deployed.'
-
 const UploadDialog = ({
   onClose,
   onConfirm,
@@ -29,6 +23,7 @@ const UploadDialog = ({
   error,
   loading,
 }: Props) => {
+  const { t } = useTranslation()
   const [isSubmitDisabled, setIsSubmitDisabled] = useState<boolean>(true)
 
   const handleFileChange = (files: FileList | null) => {
@@ -47,40 +42,29 @@ const UploadDialog = ({
       onSubmit={onConfirm}
       title={
         showWarning
-          ? 'Upload a new pipeline'
-          : 'Upload an archive with an RDI pipeline'
+          ? t('rdi.pipeline.upload.titleNew')
+          : t('rdi.pipeline.upload.titleArchive')
       }
       resultsTitle={
-        !error ? 'Pipeline has been uploaded' : 'Failed to upload pipeline'
+        !error
+          ? t('rdi.pipeline.upload.resultSuccess')
+          : t('rdi.pipeline.upload.resultFail')
       }
-      submitResults={
-        <div className={styles.result} data-testid="result-succeeded">
-          <Text color="subdued">
-            A new pipeline has been successfully uploaded.
-          </Text>
-        </div>
-      }
+      submitResults={<Text>{t('rdi.pipeline.upload.submitResults')}</Text>}
       loading={loading}
       data={isUploaded}
       warning={
         showWarning ? (
-          <div className={styles.warning} data-testid="input-file-warning">
-            <Text size="s" color="subdued">
-              <RiIcon
-                type="ToastDangerIcon"
-                className={styles.alertIcon}
-                size="m"
-              />
-              {warningMessage}
-            </Text>
-          </div>
+          <Text data-testid="input-file-warning">
+            {t('rdi.pipeline.upload.warning')}
+          </Text>
         ) : null
       }
       error={error}
-      errorMessage="There was a problem with the .zip file"
+      errorMessage={t('rdi.pipeline.upload.errorZip')}
       isInvalid={false}
       isSubmitDisabled={isSubmitDisabled}
-      submitBtnText="Upload"
+      submitBtnText={t('rdi.pipeline.upload.submitButton')}
       acceptedFileExtension=".zip"
     />
   )

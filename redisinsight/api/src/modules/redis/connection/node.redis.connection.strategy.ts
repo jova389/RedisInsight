@@ -14,7 +14,7 @@ import { ConnectionOptions } from 'tls';
 import { ClusterNodeRedisClient, RedisClient } from 'src/modules/redis/client';
 import { StandaloneNodeRedisClient } from 'src/modules/redis/client/node-redis/standalone.node-redis.client';
 import { SshTunnel } from 'src/modules/ssh/models/ssh-tunnel';
-import { discoverClusterNodes } from 'src/modules/redis/utils';
+import { discoverClusterNodes, getIpFamily } from 'src/modules/redis/utils';
 
 const REDIS_CLIENTS_CONFIG = serverConfig.get('redis_clients');
 
@@ -43,7 +43,16 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
     database: Database,
     options: IRedisConnectionOptions,
   ): Promise<RedisClientOptions> {
-    const { host, port, password, username, tls, db, timeout } = database;
+    const {
+      host,
+      port,
+      password,
+      username,
+      tls,
+      db,
+      timeout,
+      connectionFamily,
+    } = database;
 
     let tlsOptions = {};
     if (tls) {
@@ -57,6 +66,7 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
       socket: {
         host,
         port,
+        family: getIpFamily(connectionFamily),
         connectTimeout: timeout,
         ...tlsOptions,
         reconnectStrategy: options?.useRetry
@@ -146,7 +156,10 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
   private async getTLSConfig(database: Database): Promise<ConnectionOptions> {
     let config: ConnectionOptions;
     config = {
-      rejectUnauthorized: database.verifyServerCert,
+      // Node treats a missing rejectUnauthorized as true. verifyServerCert is
+      // optional and defaults to false (unchecked "Verify TLS Certificate");
+      // older rows and test-connection payloads leave it null/undefined.
+      rejectUnauthorized: database.verifyServerCert === true,
       checkServerIdentity: this.dummyFn.bind(this),
       servername: database.tlsServername || undefined,
     };
@@ -218,11 +231,16 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
         })
         .connect();
 
-      return new StandaloneNodeRedisClient(clientMetadata, client, {
-        host: database.host,
-        port: database.port,
-        connectTimeout: database.timeout,
-      });
+      return new StandaloneNodeRedisClient(
+        clientMetadata,
+        client,
+        {
+          host: database.host,
+          port: database.port,
+          connectTimeout: database.timeout,
+        },
+        database,
+      );
     } catch (e) {
       tnl?.close?.();
       throw e;
@@ -303,11 +321,16 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
       // connect() doesn't return the client instance
       await client.connect();
 
-      return new ClusterNodeRedisClient(clientMetadata, client, {
-        host: database.host,
-        port: database.port,
-        connectTimeout: database.timeout,
-      });
+      return new ClusterNodeRedisClient(
+        clientMetadata,
+        client,
+        {
+          host: database.host,
+          port: database.port,
+          connectTimeout: database.timeout,
+        },
+        database,
+      );
     } catch (e) {
       tnls?.forEach((tnl) => tnl?.close?.());
       // TODO: node-redis issue
@@ -322,8 +345,6 @@ export class NodeRedisConnectionStrategy extends RedisConnectionStrategy {
    */
   public async createSentinelClient(
     clientMetadata: ClientMetadata,
-    database: Database,
-    options: IRedisConnectionOptions,
   ): Promise<RedisClient> {
     // Additional validation
     ClientMetadata.validate(clientMetadata);

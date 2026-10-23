@@ -1,6 +1,6 @@
 import React from 'react'
 import { mock } from 'ts-mockito'
-import { render, screen } from 'uiSrc/utils/test-utils'
+import { render } from 'uiSrc/utils/test-utils'
 
 import SlowLogTable, { Props } from './SlowLogTable'
 
@@ -31,9 +31,13 @@ describe('SlowLogTable', () => {
   })
 
   it('should render data', () => {
-    expect(
-      render(<SlowLogTable {...mockedProps} items={mockedData} />),
-    ).toBeTruthy()
-    expect(screen.getAllByLabelText(/^row$/)).toHaveLength(mockedData.length)
+    const { container } = render(
+      <SlowLogTable {...mockedProps} items={mockedData} />,
+    )
+
+    expect(container).toBeTruthy()
+
+    const rows = container.querySelectorAll('[data-row-type="regular"]')
+    expect(rows).toHaveLength(mockedData.length)
   })
 })

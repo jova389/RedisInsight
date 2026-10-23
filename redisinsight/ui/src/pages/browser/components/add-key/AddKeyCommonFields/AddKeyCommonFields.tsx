@@ -8,7 +8,8 @@ import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
 import { FormFieldset } from 'uiSrc/components/base/forms/fieldset'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import { AddCommonFieldsFormConfig as config } from '../constants/fields-config'
+import { useTranslation } from 'uiSrc/i18n'
+import { getAddCommonFieldsFormConfig } from '../constants/fields-config'
 
 import styles from './styles.module.scss'
 
@@ -21,6 +22,12 @@ export interface Props {
   setKeyName: React.Dispatch<React.SetStateAction<string>>
   keyTTL: Maybe<number>
   setKeyTTL: React.Dispatch<React.SetStateAction<Maybe<number>>>
+  /**
+   * When true, the key-name input is rendered as disabled in addition to the
+   * existing `loading` gate. Used by the vector-set "Load sample dataset"
+   * flow to lock the key name to the bundled `vec2word` value.
+   */
+  keyNameDisabled?: boolean
 }
 
 const AddKeyCommonFields = (props: Props) => {
@@ -33,7 +40,10 @@ const AddKeyCommonFields = (props: Props) => {
     setKeyName,
     keyTTL,
     setKeyTTL,
+    keyNameDisabled = false,
   } = props
+  const { t } = useTranslation()
+  const config = getAddCommonFieldsFormConfig(t)
 
   const handleTTLChange = (value: string) => {
     const validatedValue = validateTTLNumberForAddKey(value)
@@ -49,9 +59,12 @@ const AddKeyCommonFields = (props: Props) => {
       <Row className={styles.container} gap="m">
         <FlexItem grow>
           <FormFieldset
-            legend={{ children: 'Select key type', display: 'hidden' }}
+            legend={{
+              children: t('browser.addKey.selectKeyType'),
+              display: 'hidden',
+            }}
           >
-            <FormField label="Key Type*">
+            <FormField label={t('browser.addKey.keyType')} required>
               <RiSelect
                 options={options}
                 valueRender={({ option }): JSX.Element =>
@@ -84,14 +97,17 @@ const AddKeyCommonFields = (props: Props) => {
         </FlexItem>
       </Row>
       <Spacer size="m" />
-      <FormField label={config.keyName.label}>
+      <FormField
+        label={config.keyName.label}
+        required={config.keyName.isRequire}
+      >
         <TextInput
           name={config.keyName.name}
           id={config.keyName.name}
           value={keyName}
           placeholder={config.keyName.placeholder}
           onChange={setKeyName}
-          disabled={loading}
+          disabled={loading || keyNameDisabled}
           autoComplete="off"
           data-testid="key"
         />

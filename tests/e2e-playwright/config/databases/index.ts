@@ -1,0 +1,41 @@
+/**
+ * Database configurations - organized by connection type
+ * Add new database configs in separate files and re-export here
+ */
+
+import {
+  standaloneConfig,
+  standaloneV5Config,
+  standaloneV7Config,
+  standaloneV8Config,
+  standaloneV880Config,
+  standaloneEmptyConfig,
+  standaloneBigConfig,
+} from './standalone';
+
+import { clusterConfig, clusterHostnameConfig } from './cluster';
+
+import { sentinelConfig } from './sentinel';
+
+import { sshRedisConfig, sshTunnelConfig } from './ssh';
+
+import { tlsRedisConfig, tlsCaCert, tlsClientCert, createUniqueTlsCerts } from './tls';
+
+export const redisConfig = {
+  standalone: standaloneConfig,
+  standaloneV5: standaloneV5Config,
+  standaloneV7: standaloneV7Config,
+  standaloneV8: standaloneV8Config,
+  standaloneV880: standaloneV880Config,
+  standaloneEmpty: standaloneEmptyConfig,
+  standaloneBig: standaloneBigConfig,
+  cluster: clusterConfig,
+  clusterHostname: clusterHostnameConfig,
+  sentinel: sentinelConfig,
+  sshRedis: sshRedisConfig,
+  sshTunnel: sshTunnelConfig,
+  tlsRedis: tlsRedisConfig,
+  tlsCaCert,
+  tlsClientCert,
+  createUniqueTlsCerts,
+};

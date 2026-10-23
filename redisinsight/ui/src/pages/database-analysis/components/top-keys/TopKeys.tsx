@@ -1,13 +1,18 @@
 import React, { useState } from 'react'
-import cx from 'classnames'
-import { TableView } from 'uiSrc/pages/database-analysis'
+import { useTranslation } from 'uiSrc/i18n'
+import { TableView } from 'uiSrc/pages/database-analysis/constants'
 import { Nullable } from 'uiSrc/utils'
-import { TableLoader } from 'uiSrc/pages/database-analysis/components'
+import TableLoader from 'uiSrc/pages/database-analysis/components/table-loader'
 import { TextBtn } from 'uiSrc/pages/database-analysis/components/base/TextBtn'
-import { Title } from 'uiSrc/components/base/text/Title'
-import { DatabaseAnalysis } from 'apiSrc/modules/database-analysis/models'
+import { DatabaseAnalysis } from 'apiClient'
+import {
+  Section,
+  SectionTitle,
+  SectionTitleWrapper,
+} from 'uiSrc/pages/database-analysis/components/styles'
 
-import Table from './Table'
+import TopKeysTable from './TopKeysTable'
+import { SectionContent } from 'uiSrc/pages/database-analysis/components/top-namespace/TopNamespace.styles'
 
 export interface Props {
   data: Nullable<DatabaseAnalysis>
@@ -16,6 +21,7 @@ export interface Props {
 
 const MAX_TOP_KEYS = 15
 const TopKeys = ({ data, loading }: Props) => {
+  const { t } = useTranslation()
   const { topKeysLength = [], topKeysMemory = [], delimiter } = data || {}
   const [tableView, setTableView] = useState<TableView>(TableView.MEMORY)
 
@@ -28,14 +34,16 @@ const TopKeys = ({ data, loading }: Props) => {
   }
 
   return (
-    <div className={cx('section')}>
-      <div className="section-title-wrapper">
-        <Title size="M" className="section-title" data-testid="top-keys-title">
+    <Section>
+      <SectionTitleWrapper>
+        <SectionTitle size="M" data-testid="top-keys-title">
           {topKeysLength.length < MAX_TOP_KEYS &&
           topKeysMemory?.length < MAX_TOP_KEYS
-            ? 'TOP KEYS'
-            : `TOP ${MAX_TOP_KEYS} KEYS`}
-        </Title>
+            ? t('analytics.databaseAnalysis.topKeys.title')
+            : t('analytics.databaseAnalysis.topKeys.titleMax', {
+                max: MAX_TOP_KEYS,
+              })}
+        </SectionTitle>
         <TextBtn
           $active={tableView === TableView.MEMORY}
           size="small"
@@ -43,7 +51,7 @@ const TopKeys = ({ data, loading }: Props) => {
           disabled={tableView === TableView.MEMORY}
           data-testid="btn-change-table-memory"
         >
-          by Memory
+          {t('analytics.databaseAnalysis.topKeys.byMemory')}
         </TextBtn>
         <TextBtn
           $active={tableView === TableView.KEYS}
@@ -52,12 +60,12 @@ const TopKeys = ({ data, loading }: Props) => {
           disabled={tableView === TableView.KEYS}
           data-testid="btn-change-table-keys"
         >
-          by Length
+          {t('analytics.databaseAnalysis.topKeys.byLength')}
         </TextBtn>
-      </div>
-      <div className="section-content">
+      </SectionTitleWrapper>
+      <SectionContent>
         {tableView === TableView.MEMORY && (
-          <Table
+          <TopKeysTable
             data={topKeysMemory}
             defaultSortField="memory"
             delimiter={delimiter}
@@ -65,15 +73,15 @@ const TopKeys = ({ data, loading }: Props) => {
           />
         )}
         {tableView === TableView.KEYS && (
-          <Table
+          <TopKeysTable
             data={topKeysLength}
             defaultSortField="length"
             delimiter={delimiter}
             dataTestid="top-keys-table-length"
           />
         )}
-      </div>
-    </div>
+      </SectionContent>
+    </Section>
   )
 }
 

@@ -1,22 +1,24 @@
 import React, { useMemo } from 'react'
 import { useHistory, useLocation } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { appFeatureFlagsFeaturesSelector } from 'uiSrc/slices/app/features'
 import Tabs from 'uiSrc/components/base/layout/tabs'
-import { tabs } from './constants'
+import { useTranslation } from 'uiSrc/i18n'
+import { getTabs } from './constants'
 
 const HomeTabs = () => {
+  const { t } = useTranslation()
   const history = useHistory()
   const { pathname } = useLocation()
-  const featureFlags = useSelector(appFeatureFlagsFeaturesSelector)
+  const featureFlags = useAppSelector(appFeatureFlagsFeaturesSelector)
 
   const filteredTabs = useMemo(
     () =>
-      tabs.filter(
+      getTabs(t).filter(
         (tab) => !tab.featureFlag || featureFlags?.[tab.featureFlag]?.flag,
       ),
-    [featureFlags],
+    [featureFlags, t],
   )
 
   const activeTab =
@@ -29,7 +31,7 @@ const HomeTabs = () => {
     sendEventTelemetry({
       event: TelemetryEvent.INSTANCES_TAB_CHANGED,
       eventData: {
-        tab: tab.label,
+        tab: tab.value,
       },
     })
 

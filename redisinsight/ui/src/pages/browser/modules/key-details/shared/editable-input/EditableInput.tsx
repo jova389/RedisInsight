@@ -2,12 +2,18 @@ import React, { useState } from 'react'
 import cx from 'classnames'
 
 import { RiTooltip } from 'uiSrc/components'
+import { useTranslation } from 'uiSrc/i18n'
 import { StopPropagation } from 'uiSrc/components/virtual-table'
 import InlineItemEditor from 'uiSrc/components/inline-item-editor'
+import { Props as InlineItemEditorProps } from 'uiSrc/components/inline-item-editor/InlineItemEditor'
 
 import { Text } from 'uiSrc/components/base/text'
 import { EditIcon } from 'uiSrc/components/base/icons'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -21,8 +27,9 @@ export interface Props {
   validation?: (value: string) => string
   editToolTipContent?: React.ReactNode
   onDecline: (event?: React.MouseEvent<HTMLElement>) => void
-  onApply: (value: string, event: React.MouseEvent) => void
+  onApply: (value: string, event?: React.MouseEvent) => void
   testIdPrefix?: string
+  variant?: InlineItemEditorProps['variant']
 }
 
 const EditableInput = (props: Props) => {
@@ -39,9 +46,12 @@ const EditableInput = (props: Props) => {
     onDecline,
     onApply,
     testIdPrefix = '',
+    variant,
   } = props
 
   const [isHovering, setIsHovering] = useState(false)
+  const { t } = useTranslation()
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   if (!isEditing) {
     return (
@@ -52,8 +62,8 @@ const EditableInput = (props: Props) => {
         data-testid={`${testIdPrefix}_content-value-${field}`}
       >
         <Text
-          color="subdued"
-          size="s"
+          component="div"
+          color="secondary"
           style={{ maxWidth: '100%', whiteSpace: 'break-spaces' }}
         >
           <div style={{ display: 'flex' }}>{children}</div>
@@ -66,7 +76,7 @@ const EditableInput = (props: Props) => {
           >
             <IconButton
               icon={EditIcon}
-              aria-label="Edit field"
+              aria-label={t('browser.keyDetails.editable.editAria')}
               className={cx('editFieldBtn', styles.editBtn)}
               disabled={isEditDisabled}
               onClick={(e: React.MouseEvent) => {
@@ -97,11 +107,23 @@ const EditableInput = (props: Props) => {
             onDecline(event)
             onEdit?.(false)
           }}
-          onApply={(value, event) => {
-            onApply(value, event)
-            onEdit?.(false)
+          onApply={(value) => {
+            requestConfirmation({
+              title: t('browser.keyDetails.editable.confirmTitle'),
+              actionDescription: t(
+                'browser.keyDetails.editable.confirmMessage',
+              ),
+              confirmButtonText: t('browser.keyDetails.editable.confirmButton'),
+              commandId: BrowserConfirmationCommandId.EditValue,
+              disableConfirmationInput: true,
+              onConfirm: () => {
+                onApply(value)
+                onEdit?.(false)
+              },
+            })
           }}
           validation={validation}
+          variant={variant}
         />
       </div>
     </StopPropagation>

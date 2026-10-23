@@ -12,11 +12,11 @@ import {
   TlsDetails,
 } from 'uiSrc/pages/home/components/form'
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { TextInput } from 'uiSrc/components/base/inputs'
+import { useTranslation } from 'uiSrc/i18n'
 import DecompressionAndFormatters from './DecompressionAndFormatters'
 
 import { ManualFormTab } from '../constants'
@@ -33,6 +33,7 @@ export interface Props {
 }
 
 const EditSentinelConnection = (props: Props) => {
+  const { t } = useTranslation()
   const {
     activeTab,
     isCloneMode,
@@ -45,51 +46,46 @@ const EditSentinelConnection = (props: Props) => {
   } = props
 
   const GeneralFormClodeMode = (
-    <>
+    <Col gap="l">
       <PrimaryGroupSentinel formik={formik} />
-      <Divider
-        colorVariable="separatorColor"
-        variant="fullWidth"
-        className="form__divider"
-      />
-      <Title size="XS">Database</Title>
-      <Spacer size="s" />
+      <Divider />
+      <Title color="primary" size="M">
+        {t('home.form.manual.editSentinel.title.database')}
+      </Title>
       <SentinelMasterDatabase
         formik={formik}
         db={db}
         isCloneMode={isCloneMode}
       />
-      <Divider
-        colorVariable="separatorColor"
-        variant="fullWidth"
-        className="form__divider"
-      />
-      <Title size="XS">Sentinel</Title>
-      <Spacer size="s" />
+      <Divider />
+      <Title color="primary" size="M">
+        {t('home.form.manual.editSentinel.title.sentinel')}
+      </Title>
       <DatabaseForm
         formik={formik}
         showFields={{ host: true, port: true, alias: false, timeout: false }}
         onHostNamePaste={onHostNamePaste}
       />
-      <Divider
-        colorVariable="separatorColor"
-        variant="fullWidth"
-        className="form__divider"
-      />
+      <Divider />
       <DbIndex formik={formik} />
-    </>
+    </Col>
   )
 
   const GeneralFormEditMode = (
-    <>
+    <Col gap="l">
       <Row gap="m">
         <FlexItem grow>
-          <FormField label="Database Alias*">
+          <FormField
+            label={t('home.form.manual.editSentinel.field.databaseAlias')}
+            required
+          >
             <TextInput
               name="name"
               id="name"
               data-testid="name"
-              placeholder="Enter Database Alias"
+              placeholder={t(
+                'home.form.manual.editSentinel.placeholder.databaseAlias',
+              )}
               onFocus={selectOnFocus}
               value={formik.values.name ?? ''}
               maxLength={500}
@@ -98,32 +94,25 @@ const EditSentinelConnection = (props: Props) => {
           </FormField>
         </FlexItem>
       </Row>
-      <Spacer size="s" />
-      <Divider
-        colorVariable="separatorColor"
-        variant="fullWidth"
-        className="form__divider"
-      />
-      <Title size="XS">Database</Title>
-      <Spacer size="s" />
+      <Divider />
+      <Title color="primary" size="M">
+        {t('home.form.manual.editSentinel.title.database')}
+      </Title>
       <SentinelMasterDatabase
         formik={formik}
         db={db}
         isCloneMode={isCloneMode}
       />
-      <Divider
-        colorVariable="separatorColor"
-        variant="fullWidth"
-        className="form__divider"
-      />
-      <Title size="XS">Sentinel</Title>
-      <Spacer size="s" />
+      <Divider />
+      <Title color="primary" size="M">
+        {t('home.form.manual.editSentinel.title.sentinel')}
+      </Title>
       <DatabaseForm
         formik={formik}
         showFields={{ host: false, port: true, alias: false, timeout: false }}
         onHostNamePaste={onHostNamePaste}
       />
-    </>
+    </Col>
   )
 
   return (

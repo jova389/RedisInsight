@@ -1,4 +1,3 @@
-import { createBrowserHistory } from 'history'
 import { configureStore, combineReducers } from '@reduxjs/toolkit'
 
 import { getConfig } from 'uiSrc/config'
@@ -8,6 +7,7 @@ import clientCertsReducer from './instances/clientCerts'
 import clusterReducer from './instances/cluster'
 import cloudReducer from './instances/cloud'
 import sentinelReducer from './instances/sentinel'
+import azureReducer from './instances/azure'
 import keysReducer from './browser/keys'
 import stringReducer from './browser/string'
 import zsetReducer from './browser/zset'
@@ -16,6 +16,8 @@ import hashReducer from './browser/hash'
 import listReducer from './browser/list'
 import rejsonReducer from './browser/rejson'
 import streamReducer from './browser/stream'
+import vectorSetReducer from './browser/vectorSet'
+import arrayReducer from './browser/array'
 import bulkActionsReducer from './browser/bulkActions'
 import notificationsReducer from './app/notifications'
 import cliSettingsReducer from './cli/cli-settings'
@@ -32,8 +34,10 @@ import appRedisCommandsReducer from './app/redis-commands'
 import appPluginsReducer from './app/plugins'
 import appsSocketConnectionReducer from './app/socket-connection'
 import appFeaturesReducer from './app/features'
+import appWhatsNewReducer from './app/whatsNew'
 import appUrlHandlingReducer from './app/url-handling'
 import appOauthReducer from './oauth/cloud'
+import azureAuthReducer from './oauth/azure'
 import workbenchResultsReducer from './workbench/wb-results'
 import workbenchTutorialsReducer from './workbench/wb-tutorials'
 import workbenchCustomTutorialsReducer from './workbench/wb-custom-tutorials'
@@ -59,8 +63,6 @@ import tagsReducer from './instances/tags'
 
 const riConfig = getConfig()
 
-export const history = createBrowserHistory()
-
 export const rootReducer = combineReducers({
   app: combineReducers({
     info: appInfoReducer,
@@ -70,6 +72,7 @@ export const rootReducer = combineReducers({
     plugins: appPluginsReducer,
     socketConnection: appsSocketConnectionReducer,
     features: appFeaturesReducer,
+    whatsNew: appWhatsNewReducer,
     urlHandling: appUrlHandlingReducer,
     csrf: appCsrfReducer,
     init: appInitReducer,
@@ -83,6 +86,7 @@ export const rootReducer = combineReducers({
     cluster: clusterReducer,
     cloud: cloudReducer,
     sentinel: sentinelReducer,
+    azure: azureReducer,
     tags: tagsReducer,
   }),
   browser: combineReducers({
@@ -94,6 +98,8 @@ export const rootReducer = combineReducers({
     list: listReducer,
     rejson: rejsonReducer,
     stream: streamReducer,
+    vectorSet: vectorSetReducer,
+    array: arrayReducer,
     bulkActions: bulkActionsReducer,
     redisearch: redisearchReducer,
   }),
@@ -128,6 +134,7 @@ export const rootReducer = combineReducers({
   recommendations: recommendationsReducer,
   oauth: combineReducers({
     cloud: appOauthReducer,
+    azure: azureAuthReducer,
   }),
   panels: combineReducers({
     sidePanels: sidePanelsReducer,
@@ -154,3 +161,5 @@ export { store }
 export type ReduxStore = typeof store
 export type RootState = ReturnType<typeof rootReducer>
 export type AppDispatch = typeof store.dispatch
+
+export const dispatch: AppDispatch = store.dispatch

@@ -9,7 +9,10 @@ import {
   userEvent,
 } from 'uiSrc/utils/test-utils'
 import { ADD_KEY_TYPE_OPTIONS } from 'uiSrc/pages/browser/components/add-key/constants/key-type-options'
-import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
+import {
+  connectedInstanceOverviewSelector,
+  connectedInstanceSelector,
+} from 'uiSrc/slices/instances/instances'
 import {
   OAuthSocialAction,
   OAuthSocialSource,
@@ -29,13 +32,34 @@ jest.mock('uiSrc/slices/instances/instances', () => ({
     id: '1',
     modules: [],
   }),
+  connectedInstanceOverviewSelector: jest.fn().mockReturnValue({
+    version: '8.0.0',
+  }),
 }))
+
+const renderAddKey = () =>
+  render(
+    <AddKey
+      onAddKeyPanel={handleAddKeyPanelMock}
+      onClosePanel={handleCloseKeyMock}
+    />,
+  )
+
+const mockRedisVersion = (version: string) =>
+  (connectedInstanceOverviewSelector as jest.Mock).mockReturnValue({ version })
 
 let store: typeof mockedStore
 beforeEach(() => {
   cleanup()
   store = cloneDeep(mockedStore)
   store.clearActions()
+  // Reset selector mocks to the default version between tests so a stray
+  // override in one test doesn't bleed into the next.
+  mockRedisVersion('8.0.0')
+})
+
+afterEach(() => {
+  jest.restoreAllMocks()
 })
 
 describe('AddKey', () => {
@@ -58,7 +82,12 @@ describe('AddKey', () => {
       />,
     )
 
-    expect(screen.getByText(/Key Type\*/i)).toBeInTheDocument()
+    const keyType = screen.getByText('Key Type').closest('label')
+    expect(keyType).toHaveTextContent('Key Type')
+    expect(keyType?.textContent?.trimStart().startsWith('*')).toBe(true)
+
+    const keyName = screen.getByText('Key Name').closest('label')
+    expect(keyName?.textContent?.trimStart().startsWith('*')).toBe(true)
   })
 
   it('should have key type select with predefined first value from options', () => {
@@ -121,6 +150,26 @@ describe('AddKey', () => {
       ...afterRenderActions,
       ...expectedActions,
     ])
+  })
+
+  it('should show Vector Set option as enabled when redis version >= 8.0', async () => {
+    mockRedisVersion('8.0.0')
+    renderAddKey()
+
+    await userEvent.click(screen.getByTestId('select-key-type'))
+    expect(await screen.findByText('Vector Set')).toBeInTheDocument()
+    // no promotion tag/wrapper when the type is supported
+    expect(screen.queryByTestId('vectorset-disabled')).not.toBeInTheDocument()
+  })
+
+  it('should promote Vector Set as a disabled option with a version tag when redis version < 8.0', async () => {
+    mockRedisVersion('7.4.0')
+    renderAddKey()
+
+    await userEvent.click(screen.getByTestId('select-key-type'))
+    // still visible (promoted), not removed from the list, rendered as disabled
+    expect(await screen.findByText('Vector Set')).toBeInTheDocument()
+    expect(screen.getByTestId('vectorset-disabled')).toBeInTheDocument()
   })
 
   it('should not show text if db contains ReJSON module', async () => {

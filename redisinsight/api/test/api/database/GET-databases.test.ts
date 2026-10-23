@@ -1,13 +1,4 @@
-import {
-  describe,
-  expect,
-  it,
-  deps,
-  validateApiCall,
-  before,
-  _,
-  getMainCheckFn,
-} from '../deps';
+import { describe, expect, deps, before, _, getMainCheckFn } from '../deps';
 import { Joi } from '../../helpers/test';
 const { localDb, request, server, constants, rte } = deps;
 
@@ -64,6 +55,12 @@ const responseSchema = Joi.array()
         )
         .allow(null),
       isPreSetup: Joi.boolean().allow(null),
+      environment: Joi.string().valid(
+        'unspecified',
+        'production',
+        'development',
+      ),
+      connectionFamily: Joi.string().valid('auto', 'ipv4', 'ipv6').allow(null),
     }),
   )
   .required()

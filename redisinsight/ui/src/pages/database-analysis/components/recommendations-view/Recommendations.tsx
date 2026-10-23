@@ -1,10 +1,11 @@
 import React, { useContext } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory, useParams } from 'react-router-dom'
 import { isNull } from 'lodash'
 import cx from 'classnames'
 import styled from 'styled-components'
 
+import { useTranslation } from 'uiSrc/i18n'
 import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import {
   FeatureFlagComponent,
@@ -23,7 +24,10 @@ import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 
 import { EXTERNAL_LINKS } from 'uiSrc/constants/links'
 import { recommendationsSelector } from 'uiSrc/slices/recommendations/recommendations'
-import { sortRecommendations } from 'uiSrc/utils/recommendation'
+import {
+  getTranslatedTipTitle,
+  sortRecommendations,
+} from 'uiSrc/utils/recommendation'
 import { openTutorialByPath } from 'uiSrc/slices/panels/sidePanels'
 import { findTutorialPath } from 'uiSrc/utils'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
@@ -34,6 +38,7 @@ import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { RiAccordion } from 'uiSrc/components/base/display/accordion/RiAccordion'
 import { Link } from 'uiSrc/components/base/link/Link'
 import { Card } from 'uiSrc/components/base/layout'
+import { RediStackMinIcon } from 'uiSrc/components/base/icons'
 
 import styles from './styles.module.scss'
 
@@ -42,16 +47,17 @@ const RecommendationContent = styled(Card)`
 `
 
 const Recommendations = () => {
-  const { data, loading } = useSelector(dbAnalysisSelector)
-  const { provider } = useSelector(connectedInstanceSelector)
-  const { content: recommendationsContent } = useSelector(
+  const { t } = useTranslation()
+  const { data, loading } = useAppSelector(dbAnalysisSelector)
+  const { provider } = useAppSelector(connectedInstanceSelector)
+  const { content: recommendationsContent } = useAppSelector(
     recommendationsSelector,
   )
   const { recommendations = [] } = data ?? {}
 
   const { theme } = useContext(ThemeContext)
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const { instanceId } = useParams<{ instanceId: string }>()
 
   const handleToggle = (isOpen: boolean, id: string) =>
@@ -97,28 +103,29 @@ const Recommendations = () => {
       gap="m"
       data-test-subj={`${id}-label`}
     >
-      <FlexItem onClick={onRedisStackClick}>
-        {redisStack && (
-            <Link
-              target="_blank"
-              href={EXTERNAL_LINKS.redisStack}
-              className={styles.redisStackLink}
-              data-testid={`${id}-redis-stack-link`}
+      {redisStack && (
+        <FlexItem onClick={onRedisStackClick}>
+          <Link
+            target="_blank"
+            href={EXTERNAL_LINKS.redisStack}
+            className={styles.redisStackLink}
+            data-testid={`${id}-redis-stack-link`}
+          >
+            <RiTooltip
+              content={t(
+                'analytics.databaseAnalysis.recommendations.redisStackTooltip',
+              )}
+              position="top"
+              anchorClassName="flex-row"
             >
-              <RiTooltip content="Redis Stack" position="top" anchorClassName="flex-row">
-                <RiIcon
-                  type={
-                    theme === Theme.Dark
-                      ? 'RediStackDarkMinIcon'
-                      : 'RediStackLightMinIcon'
-                  }
-                  className={styles.redisStackIcon}
-                  data-testid={`${id}-redis-stack-icon`}
-                />
-              </RiTooltip>
-            </Link>
-          )}
-      </FlexItem>
+              <RediStackMinIcon
+                className={styles.redisStackIcon}
+                data-testid={`${id}-redis-stack-icon`}
+              />
+            </RiTooltip>
+          </Link>
+        </FlexItem>
+      )}
       <FlexItem>{title}</FlexItem>
     </Row>
   )
@@ -147,10 +154,16 @@ const Recommendations = () => {
           className={styles.noRecommendationsIcon}
           data-testid="no=recommendations-icon"
         />
-        <Text className={styles.bigText}>AMAZING JOB!</Text>
-        <Text size="m">No Tips at the moment,</Text>
+        <Text className={styles.bigText}>
+          {t('analytics.databaseAnalysis.recommendations.empty.title')}
+        </Text>
+        <Text size="m">
+          {t('analytics.databaseAnalysis.recommendations.empty.line1')}
+        </Text>
         <br />
-        <Text size="m">keep up the good work!</Text>
+        <Text size="m">
+          {t('analytics.databaseAnalysis.recommendations.empty.line2')}
+        </Text>
       </div>
     )
   }
@@ -184,7 +197,11 @@ const Recommendations = () => {
                 <RiAccordion
                   id={name}
                   key={`${name}-accordion`}
-                  label={renderLabel(redisStack, title, id)}
+                  label={renderLabel(
+                    redisStack,
+                    getTranslatedTipTitle(name, title),
+                    id,
+                  )}
                   actions={renderButtonContent(badges, id)}
                   className={styles.accordion}
                   defaultOpen
@@ -218,7 +235,7 @@ const Recommendations = () => {
                       onClick={() => goToTutorial(tutorialId, id)}
                       data-testid={`${id}-to-tutorial-btn`}
                     >
-                      Tutorial
+                      {t('analytics.databaseAnalysis.recommendations.tutorial')}
                     </PrimaryButton>
                   )}
                 </div>

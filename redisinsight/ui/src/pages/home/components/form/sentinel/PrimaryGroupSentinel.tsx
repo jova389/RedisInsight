@@ -2,28 +2,28 @@ import React from 'react'
 import { FormikProps } from 'formik'
 
 import { DbConnectionInfo } from 'uiSrc/pages/home/interfaces'
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { TextInput } from 'uiSrc/components/base/inputs'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
-  flexGroupClassName?: string
-  flexItemClassName?: string
   formik: FormikProps<DbConnectionInfo>
 }
 
 const PrimaryGroupSentinel = (props: Props) => {
-  const { flexGroupClassName = '', flexItemClassName = '', formik } = props
+  const { t } = useTranslation()
+  const { formik } = props
   return (
-    <>
-      <Row gap="m" responsive className={flexGroupClassName}>
-        <FlexItem grow className={flexItemClassName}>
-          <FormField label="Database Alias*">
+    <Col gap="l">
+      <Row gap="m" responsive>
+        <FlexItem grow>
+          <FormField label={t('home.form.database.field.alias')} required>
             <TextInput
               name="name"
               id="name"
               data-testid="name"
-              placeholder="Enter Database Alias"
+              placeholder={t('home.form.database.placeholder.alias')}
               value={formik.values.name ?? ''}
               maxLength={500}
               onChange={formik.handleChange}
@@ -31,14 +31,19 @@ const PrimaryGroupSentinel = (props: Props) => {
           </FormField>
         </FlexItem>
       </Row>
-      <Row gap="m" responsive className={flexGroupClassName}>
-        <FlexItem grow className={flexItemClassName}>
-          <FormField label="Primary Group Name*">
+      <Row gap="m" responsive>
+        <FlexItem grow>
+          <FormField
+            label={t('home.form.dbInfoSentinel.field.primaryGroupNameLabel')}
+            required
+          >
             <TextInput
               name="sentinelMasterName"
               id="sentinelMasterName"
               data-testid="primary-group"
-              placeholder="Enter Primary Group Name"
+              placeholder={t(
+                'home.form.dbInfoSentinel.placeholder.primaryGroupName',
+              )}
               value={formik.values.sentinelMasterName ?? ''}
               maxLength={500}
               onChange={formik.handleChange}
@@ -47,7 +52,7 @@ const PrimaryGroupSentinel = (props: Props) => {
           </FormField>
         </FlexItem>
       </Row>
-    </>
+    </Col>
   )
 }
 

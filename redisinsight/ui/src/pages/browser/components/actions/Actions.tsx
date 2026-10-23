@@ -1,31 +1,37 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import {
   getBasedOnViewTypeEvent,
   sendEventTelemetry,
   TelemetryEvent,
 } from 'uiSrc/telemetry'
 import {
-  PrimaryButton,
+  EmptyButton,
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
-import styles from 'uiSrc/pages/browser/components/browser-search-panel/styles.module.scss'
-import { setBulkActionType } from 'uiSrc/slices/browser/bulkActions'
+import {
+  setBulkActionType,
+  setBulkDeleteFilter,
+  setBulkDeleteKeyCount,
+  setBulkDeleteSearch,
+} from 'uiSrc/slices/browser/bulkActions'
 import { BulkActionsType, FeatureFlags } from 'uiSrc/constants'
 import { SubscriptionsIcon } from 'uiSrc/components/base/icons'
 import { FeatureFlagComponent } from 'uiSrc/components'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
 import { keysSelector } from 'uiSrc/slices/browser/keys'
 import { Row } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props {
   handleAddKeyPanel: (value: boolean) => void
   handleBulkActionsPanel: (value: boolean) => void
 }
 const Actions = ({ handleAddKeyPanel, handleBulkActionsPanel }: Props) => {
-  const dispatch = useDispatch()
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { viewType } = useSelector(keysSelector)
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { viewType, search, filter } = useAppSelector(keysSelector)
   const openAddKeyPanel = () => {
     handleAddKeyPanel(true)
     sendEventTelemetry({
@@ -41,33 +47,41 @@ const Actions = ({ handleAddKeyPanel, handleBulkActionsPanel }: Props) => {
   }
 
   const AddKeyBtn = (
-    <PrimaryButton
+    <SecondaryButton
+      inverted
+      size="m"
+      filled
       onClick={openAddKeyPanel}
-      className={styles.addKey}
       data-testid="btn-add-key"
     >
-      + <span className={styles.addKeyText}>Key</span>
-    </PrimaryButton>
+      {t('browser.actions.addKey')}
+    </SecondaryButton>
   )
   const openBulkActions = () => {
+    // Sync current search/filter to bulk delete state
+    dispatch(setBulkDeleteSearch(search))
+    dispatch(setBulkDeleteFilter(filter))
+    dispatch(setBulkDeleteKeyCount(null))
+
     dispatch(setBulkActionType(BulkActionsType.Delete))
     handleBulkActionsPanel(true)
   }
   const BulkActionsBtn = (
-    <SecondaryButton
+    <EmptyButton
       color="secondary"
       icon={SubscriptionsIcon}
       onClick={openBulkActions}
       data-testid="btn-bulk-actions"
-      aria-label="bulk actions"
+      aria-label={t('browser.actions.bulkActionsAria')}
     >
-      Bulk Actions
-    </SecondaryButton>
+      {t('browser.actions.bulkActions')}
+    </EmptyButton>
   )
   return (
     <Row
       grow={false}
       gap="m"
+      align="center"
       style={{
         flexShrink: 0,
         marginLeft: 12,

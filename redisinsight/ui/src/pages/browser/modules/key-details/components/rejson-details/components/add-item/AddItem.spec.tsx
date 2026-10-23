@@ -1,20 +1,21 @@
 import React from 'react'
 import { mock } from 'ts-mockito'
 import { fireEvent, waitFor } from '@testing-library/react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 import { render, screen } from 'uiSrc/utils/test-utils'
 
+import i18n from 'uiSrc/i18n'
 import AddItem, { Props } from './AddItem'
 import { JSONErrors } from '../../constants'
 
 const mockedProps = mock<Props>()
 
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useSelector: jest.fn(),
+jest.mock('uiSrc/slices/hooks', () => ({
+  ...jest.requireActual('uiSrc/slices/hooks'),
+  useAppSelector: jest.fn(),
 }))
 
-const mockUseSelector = useSelector as jest.Mock
+const mockUseSelector = useAppSelector as jest.Mock
 
 describe('AddItem', () => {
   beforeEach(() => {
@@ -40,7 +41,7 @@ describe('AddItem', () => {
     fireEvent.click(screen.getByTestId('apply-btn'))
 
     expect(screen.getByTestId('edit-json-error')).toHaveTextContent(
-      JSONErrors.keyCorrectSyntax,
+      i18n.t(JSONErrors.keyCorrectSyntax),
     )
   })
 
@@ -55,7 +56,7 @@ describe('AddItem', () => {
     fireEvent.click(screen.getByTestId('apply-btn'))
 
     expect(screen.getByTestId('edit-json-error')).toHaveTextContent(
-      JSONErrors.valueJSONFormat,
+      i18n.t(JSONErrors.valueJSONFormat),
     )
   })
 

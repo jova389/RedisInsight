@@ -7,11 +7,10 @@ import {
   cleanup,
   mockedStore,
 } from 'uiSrc/utils/test-utils'
-import { ButtonLang } from 'uiSrc/utils/formatters/markdown/remarkCode'
+import { ButtonLang } from 'uiSrc/utils/formatters/markdown/buttonLang'
 
 import { sendWBCommand } from 'uiSrc/slices/workbench/wb-results'
 import { setDbIndexState } from 'uiSrc/slices/app/context'
-import { CommandExecutionType } from 'uiSrc/slices/interfaces'
 import CodeBlock from './CodeBlock'
 
 let store: typeof mockedStore

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,9 +23,11 @@ import {
   mockDatabaseWithSshPrivateKey,
   mockSentinelDatabaseWithTlsAuth,
   mockDatabaseWithCloudDetails,
+  mockDatabaseWithProviderDetails,
   mockRedisClientFactory,
   mockRedisClientStorage,
   mockSessionMetadata,
+  mockCredentialProvider,
 } from 'src/__mocks__';
 import { DatabaseAnalytics } from 'src/modules/database/database.analytics';
 import { DatabaseService } from 'src/modules/database/database.service';
@@ -33,13 +36,18 @@ import { DatabaseInfoProvider } from 'src/modules/database/providers/database-in
 import { DatabaseFactory } from 'src/modules/database/providers/database.factory';
 import { UpdateDatabaseDto } from 'src/modules/database/dto/update.database.dto';
 import ERROR_MESSAGES from 'src/constants/error-messages';
-import { Compressor } from 'src/modules/database/entities/database.entity';
+import {
+  Compressor,
+  Environment,
+  RedisConnectionFamily,
+} from 'src/modules/database/entities/database.entity';
 import { RedisClientFactory } from 'src/modules/redis/redis.client.factory';
 import { RedisClientStorage } from 'src/modules/redis/redis.client.storage';
 import {
   RedisConnectionSentinelMasterRequiredException,
   RedisConnectionUnavailableException,
 } from 'src/modules/redis/exceptions/connection';
+import { CredentialStrategyProvider } from 'src/modules/database/credentials/credential-strategy.provider';
 import { ExportDatabase } from './models/export-database';
 
 const updateDatabaseTests = [
@@ -54,6 +62,7 @@ const updateDatabaseTests = [
   { input: { sentinelMaster: 'master' }, expected: 1 },
   { input: { caCert: mockCaCertificate }, expected: 1 },
   { input: { clientCert: mockClientCertificate }, expected: 1 },
+  { input: { connectionFamily: RedisConnectionFamily.IPv4 }, expected: 1 },
   { input: { compressor: Compressor.NONE }, expected: 0 },
   { input: { timeout: 45_000 }, expected: 0 },
   { input: { port: 6379, timeout: 45_000 }, expected: 1 },
@@ -104,6 +113,10 @@ describe('DatabaseService', () => {
         {
           provide: DatabaseAnalytics,
           useFactory: mockDatabaseAnalytics,
+        },
+        {
+          provide: CredentialStrategyProvider,
+          useFactory: mockCredentialProvider,
         },
       ],
     }).compile();
@@ -184,6 +197,17 @@ describe('DatabaseService', () => {
       );
       expect(analytics.sendInstanceAddFailedEvent).not.toHaveBeenCalled();
     });
+    it('should create new database with provider details', async () => {
+      databaseRepository.create.mockResolvedValueOnce(
+        mockDatabaseWithProviderDetails,
+      );
+      expect(
+        await service.create(
+          mockSessionMetadata,
+          mockDatabaseWithProviderDetails,
+        ),
+      ).toEqual(mockDatabaseWithProviderDetails);
+    });
     it('should not fail when collecting data for analytics event', async () => {
       redisClientFactory.createClient.mockRejectedValueOnce(new Error());
       expect(await service.create(mockSessionMetadata, mockDatabase)).toEqual(
@@ -247,6 +271,8 @@ describe('DatabaseService', () => {
         {
           timeout: 30000,
           compressor: Compressor.NONE,
+          environment: Environment.Unspecified,
+          connectionFamily: RedisConnectionFamily.Auto,
           id: 'a77b23c1-7816-4ea4-b61f-d37795a0f805-db-id',
           name: 'database-name',
           host: '127.0.100.1',
@@ -293,6 +319,8 @@ describe('DatabaseService', () => {
         {
           timeout: 30000,
           compressor: Compressor.NONE,
+          environment: Environment.Unspecified,
+          connectionFamily: RedisConnectionFamily.Auto,
           name: 'database-name',
           id: 'a77b23c1-7816-4ea4-b61f-d37795a0f805-db-id',
           host: '127.0.100.1',
@@ -337,6 +365,163 @@ describe('DatabaseService', () => {
           true,
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    describe('managed databases endpoint guard', () => {
+      it('should throw BadRequest when changing host of a cloud-managed database', async () => {
+        databaseRepository.get.mockResolvedValueOnce(
+          mockDatabaseWithCloudDetails,
+        );
+
+        await expect(
+          service.update(
+            mockSessionMetadata,
+            mockDatabase.id,
+            classToClass(UpdateDatabaseDto, { host: 'new-host' }),
+            true,
+          ),
+        ).rejects.toThrow(
+          new BadRequestException(
+            ERROR_MESSAGES.HOST_PORT_NOT_EDITABLE_FOR_MANAGED_DATABASE,
+          ),
+        );
+        expect(databaseRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('should throw BadRequest when changing port of an Azure-managed database', async () => {
+        databaseRepository.get.mockResolvedValueOnce(
+          mockDatabaseWithProviderDetails,
+        );
+
+        await expect(
+          service.update(
+            mockSessionMetadata,
+            mockDatabase.id,
+            classToClass(UpdateDatabaseDto, { port: 6380 }),
+            true,
+          ),
+        ).rejects.toThrow(
+          new BadRequestException(
+            ERROR_MESSAGES.HOST_PORT_NOT_EDITABLE_FOR_MANAGED_DATABASE,
+          ),
+        );
+        expect(databaseRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('should allow updating other fields of a managed database when the endpoint is unchanged', async () => {
+        databaseRepository.get.mockResolvedValueOnce(
+          mockDatabaseWithCloudDetails,
+        );
+        databaseRepository.update.mockReturnValue({
+          ...mockDatabaseWithCloudDetails,
+          name: 'new-name',
+        });
+
+        await service.update(
+          mockSessionMetadata,
+          mockDatabase.id,
+          classToClass(UpdateDatabaseDto, {
+            name: 'new-name',
+            host: mockDatabaseWithCloudDetails.host,
+            port: mockDatabaseWithCloudDetails.port,
+          }),
+          true,
+        );
+
+        expect(databaseRepository.update).toHaveBeenCalled();
+      });
+
+      it('should allow changing host of a non-managed database', async () => {
+        databaseRepository.update.mockReturnValue({
+          ...mockDatabase,
+          host: 'new-host',
+        });
+
+        await service.update(
+          mockSessionMetadata,
+          mockDatabase.id,
+          classToClass(UpdateDatabaseDto, { host: 'new-host' }),
+          true,
+        );
+
+        expect(databaseRepository.update).toHaveBeenCalled();
+      });
+    });
+
+    describe('endpoint name sync', () => {
+      const HOST = '127.0.100.1';
+      const PORT = 6379;
+
+      // Fresh object per call: merge mutates the returned database, and the
+      // shared mockDatabase can be mutated by other update tests.
+      const defaultNamedDatabase = () => ({
+        ...mockDatabase,
+        host: HOST,
+        port: PORT,
+        name: `${HOST}:${PORT}`,
+      });
+
+      it('should sync the name to the new endpoint when the name was the default host:port', async () => {
+        databaseRepository.get.mockResolvedValueOnce(defaultNamedDatabase());
+
+        await service.update(
+          mockSessionMetadata,
+          mockDatabase.id,
+          classToClass(UpdateDatabaseDto, { host: 'new-host' }),
+          true,
+        );
+
+        expect(databaseFactory.createDatabaseModel).toHaveBeenCalledWith(
+          mockSessionMetadata,
+          expect.objectContaining({
+            host: 'new-host',
+            name: `new-host:${PORT}`,
+          }),
+        );
+      });
+
+      it('should not override an explicit name provided in the update', async () => {
+        databaseRepository.get.mockResolvedValueOnce(defaultNamedDatabase());
+
+        await service.update(
+          mockSessionMetadata,
+          mockDatabase.id,
+          classToClass(UpdateDatabaseDto, {
+            host: 'new-host',
+            name: 'custom-name',
+          }),
+          true,
+        );
+
+        expect(databaseFactory.createDatabaseModel).toHaveBeenCalledWith(
+          mockSessionMetadata,
+          expect.objectContaining({ host: 'new-host', name: 'custom-name' }),
+        );
+      });
+
+      it('should not change a custom name when the endpoint changes', async () => {
+        databaseRepository.get.mockResolvedValueOnce({
+          ...mockDatabase,
+          host: HOST,
+          port: PORT,
+          name: 'my-custom-alias',
+        });
+
+        await service.update(
+          mockSessionMetadata,
+          mockDatabase.id,
+          classToClass(UpdateDatabaseDto, { host: 'new-host' }),
+          true,
+        );
+
+        expect(databaseFactory.createDatabaseModel).toHaveBeenCalledWith(
+          mockSessionMetadata,
+          expect.objectContaining({
+            host: 'new-host',
+            name: 'my-custom-alias',
+          }),
+        );
+      });
     });
   });
 
@@ -632,6 +817,48 @@ describe('DatabaseService', () => {
           ERROR_MESSAGES.INVALID_DATABASE_INSTANCE_ID,
         );
       }
+    });
+
+    it('should return Azure Entra ID database without credentials and with providerDetails (withSecrets = false)', async () => {
+      databaseRepository.get.mockResolvedValueOnce(
+        mockDatabaseWithProviderDetails,
+      );
+
+      const result = await service.export(
+        mockSessionMetadata,
+        [mockDatabaseWithProviderDetails.id],
+        false,
+      );
+
+      expect(result).toHaveLength(1);
+      // Should strip username and password for Azure Entra ID databases
+      expect(result[0].username).toBeUndefined();
+      expect(result[0].password).toBeUndefined();
+      // Should include providerDetails
+      expect(result[0].providerDetails).toEqual(
+        mockDatabaseWithProviderDetails.providerDetails,
+      );
+    });
+
+    it('should return Azure Entra ID database without credentials even when withSecrets is true', async () => {
+      databaseRepository.get.mockResolvedValueOnce(
+        mockDatabaseWithProviderDetails,
+      );
+
+      const result = await service.export(
+        mockSessionMetadata,
+        [mockDatabaseWithProviderDetails.id],
+        true,
+      );
+
+      expect(result).toHaveLength(1);
+      // Credentials should always be stripped for Azure Entra ID
+      expect(result[0].username).toBeUndefined();
+      expect(result[0].password).toBeUndefined();
+      // Should include providerDetails
+      expect(result[0].providerDetails).toEqual(
+        mockDatabaseWithProviderDetails.providerDetails,
+      );
     });
   });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import cx from 'classnames'
 
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import { setTitle } from 'uiSrc/utils'
 import { FeatureFlags } from 'uiSrc/constants'
@@ -17,7 +17,6 @@ import {
   fetchUserSettingsSpec,
   userSettingsSelector,
 } from 'uiSrc/slices/user/user-settings'
-
 import Divider from 'uiSrc/components/divider/Divider'
 import { Spacer } from 'uiSrc/components/base/layout/spacer'
 import {
@@ -31,22 +30,30 @@ import { Title } from 'uiSrc/components/base/text/Title'
 import { Text } from 'uiSrc/components/base/text'
 import { Loader, RICollapsibleNavGroup } from 'uiSrc/components/base/display'
 import { Col } from 'uiSrc/components/base/layout/flex'
+import { useTranslation } from 'uiSrc/i18n'
+import { isDevLanguageEnabledSelector } from 'uiSrc/slices/app/features'
 import {
   AdvancedSettings,
+  AppVersion,
   CloudSettings,
+  CopyDiagnostics,
+  LanguageSettings,
   ThemeSettings,
+  UpdateSettings,
   WorkbenchSettings,
 } from './components'
 import { DateTimeFormatter } from './components/general-settings'
 import styles from './styles.module.scss'
 
 const SettingsPage = () => {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
-  const { loading: settingsLoading } = useSelector(userSettingsSelector)
+  const { loading: settingsLoading } = useAppSelector(userSettingsSelector)
+  const isLanguageEnabled = useAppSelector(isDevLanguageEnabledSelector)
 
   const initialOpenSection = globalThis.location.hash || ''
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     // componentDidMount
@@ -66,8 +73,12 @@ const SettingsPage = () => {
   const Appearance = () => (
     <>
       <ThemeSettings />
+      {isLanguageEnabled && <LanguageSettings />}
+      <FeatureFlagComponent name={FeatureFlags.appUpdateStrategySettings}>
+        <UpdateSettings />
+      </FeatureFlagComponent>
       <ConsentsNotifications />
-      <Divider colorVariable="separatorColor" />
+      <Divider />
       <Spacer />
       <DateTimeFormatter />
     </>
@@ -115,8 +126,7 @@ const SettingsPage = () => {
       )}
       <CallOut className={styles.warning}>
         <Text size="s" className={styles.smallText}>
-          Advanced settings should only be changed if you understand their
-          impact.
+          {t('settings.advancedWarning')}
         </Text>
       </CallOut>
       <AdvancedSettings />
@@ -128,7 +138,7 @@ const SettingsPage = () => {
       <PageBody component="div">
         <PageHeader>
           <Title size="XXL" className={styles.title}>
-            Settings
+            {t('settings.title')}
           </Title>
         </PageHeader>
 
@@ -137,7 +147,7 @@ const SettingsPage = () => {
             <RICollapsibleNavGroup
               isCollapsible
               className={styles.accordion}
-              title="General"
+              title={t('settings.section.general')}
               initialIsOpen={initialOpenSection === '#general'}
               data-test-subj="accordion-appearance"
             >
@@ -146,7 +156,7 @@ const SettingsPage = () => {
             <RICollapsibleNavGroup
               isCollapsible
               className={styles.accordion}
-              title="Privacy"
+              title={t('settings.section.privacy')}
               initialIsOpen={initialOpenSection === '#privacy'}
               data-test-subj="accordion-privacy-settings"
             >
@@ -155,7 +165,7 @@ const SettingsPage = () => {
             <RICollapsibleNavGroup
               isCollapsible
               className={styles.accordion}
-              title="Workbench"
+              title={t('settings.section.workbench')}
               initialIsOpen={initialOpenSection === '#workbench'}
               data-test-subj="accordion-workbench-settings"
               data-testid="accordion-workbench-settings"
@@ -167,7 +177,7 @@ const SettingsPage = () => {
               <RICollapsibleNavGroup
                 isCollapsible
                 className={cx(styles.accordion, styles.accordionWithSubTitle)}
-                title="Redis Cloud"
+                title={t('settings.section.cloud')}
                 initialIsOpen={initialOpenSection === '#cloud'}
                 data-test-subj="accordion-cloud-settings"
               >
@@ -177,13 +187,15 @@ const SettingsPage = () => {
             <RICollapsibleNavGroup
               isCollapsible
               className={cx(styles.accordion, styles.accordionWithSubTitle)}
-              title="Advanced"
+              title={t('settings.section.advanced')}
               initialIsOpen={initialOpenSection === '#advanced'}
               data-test-subj="accordion-advanced-settings"
             >
               {AdvancedSettingsGroup()}
             </RICollapsibleNavGroup>
           </Col>
+          <AppVersion />
+          <CopyDiagnostics />
         </PageContentBody>
       </PageBody>
     </Page>

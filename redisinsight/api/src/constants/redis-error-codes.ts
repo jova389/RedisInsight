@@ -11,10 +11,29 @@ export enum RedisErrorCodes {
   ConnectionReset = 'ECONNRESET',
   Timeout = 'ETIMEDOUT',
   CommandSyntaxError = 'syntax error',
+  // ARGREP rejects bad RE input with several messages — "invalid regular
+  // expression: …", "regular expression is empty", "… backreferences are not
+  // supported" — all sharing this substring.
+  RegexError = 'regular expression',
   BusyGroup = 'BUSYGROUP',
   NoGroup = 'NOGROUP',
   UnknownCommand = 'unknown command',
   RedisearchLimit = 'LIMIT',
+}
+
+/**
+ * RediSearch client error patterns.
+ * Verified against actual Redis/RediSearch error messages.
+ * These indicate client-side errors and should return 400 Bad Request.
+ */
+export enum RedisearchErrorCodes {
+  Invalid = 'Invalid',
+  BadArguments = 'Bad arguments',
+  Duplicate = 'Duplicate',
+  Missing = 'Missing',
+  WrongNumberOfArguments = 'ERR wrong number of arguments',
+  UnknownIndex = 'Unknown index',
+  NoSuchIndex = 'no such index',
 }
 
 export enum CertificatesErrorCodes {

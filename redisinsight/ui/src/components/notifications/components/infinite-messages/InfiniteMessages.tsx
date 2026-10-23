@@ -1,12 +1,12 @@
 import React from 'react'
 import { find } from 'lodash'
-import cx from 'classnames'
+import i18n, { Trans } from 'uiSrc/i18n'
 import { CloudJobName, CloudJobStep } from 'uiSrc/electron/constants'
-import ExternalLink from 'uiSrc/components/base/external-link'
 import Divider from 'uiSrc/components/divider/Divider'
 import { OAuthProviders } from 'uiSrc/components/oauth/oauth-select-plan/constants'
+import { LoaderLargeIcon, RiStarsIcon } from 'uiSrc/components/base/icons'
 
-import { CloudSuccessResult } from 'uiSrc/slices/interfaces'
+import { CloudSuccessResult, InfiniteMessage } from 'uiSrc/slices/interfaces'
 
 import { Maybe } from 'uiSrc/utils'
 import { getUtmExternalLink } from 'uiSrc/utils/links'
@@ -23,10 +23,16 @@ import {
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { Title } from 'uiSrc/components/base/text/Title'
 import { Link } from 'uiSrc/components/base/link/Link'
-import { Loader } from 'uiSrc/components/base/display'
+
 import styles from './styles.module.scss'
+
+// Bold span reused as the <bold> slot for <Trans> interpolated messages.
+const bold = (
+  <Text variant="semiBold" component="span">
+    {''}
+  </Text>
+)
 
 export enum InfiniteMessagesIds {
   oAuthProgress = 'oAuthProgress',
@@ -36,6 +42,7 @@ export enum InfiniteMessagesIds {
   databaseImportForbidden = 'databaseImportForbidden',
   subscriptionExists = 'subscriptionExists',
   appUpdateAvailable = 'appUpdateAvailable',
+  appUpdateFound = 'appUpdateFound',
   pipelineDeploySuccess = 'pipelineDeploySuccess',
 }
 
@@ -44,59 +51,68 @@ const MANAGE_DB_LINK = getUtmExternalLink(EXTERNAL_LINKS.cloudConsole, {
   medium: UTM_MEDIUMS.Main,
 })
 
-export const INFINITE_MESSAGES = {
+interface InfiniteMessagesType {
+  AUTHENTICATING: () => InfiniteMessage
+  PENDING_CREATE_DB: (step?: CloudJobStep) => InfiniteMessage
+  SUCCESS_CREATE_DB: (
+    details: Omit<CloudSuccessResult, 'resourceId'>,
+    onSuccess: () => void,
+    jobName: Maybe<CloudJobName>,
+  ) => InfiniteMessage
+  DATABASE_EXISTS: (
+    onSuccess?: () => void,
+    onClose?: () => void,
+  ) => InfiniteMessage
+  DATABASE_IMPORT_FORBIDDEN: (onClose?: () => void) => InfiniteMessage
+  SUBSCRIPTION_EXISTS: (
+    onSuccess?: () => void,
+    onClose?: () => void,
+  ) => InfiniteMessage
+  AUTO_CREATING_DATABASE: () => InfiniteMessage
+  APP_UPDATE_AVAILABLE: (
+    version: string,
+    onSuccess?: () => void,
+    onClose?: () => void,
+  ) => InfiniteMessage
+  APP_UPDATE_FOUND: (
+    version: string,
+    onDownload: () => void,
+    onSkip: () => void,
+    onClose: () => void,
+  ) => InfiniteMessage
+  APP_UPDATE_DOWNLOADING: () => InfiniteMessage
+  SUCCESS_DEPLOY_PIPELINE: () => InfiniteMessage
+}
+
+export const INFINITE_MESSAGES: InfiniteMessagesType = {
   AUTHENTICATING: () => ({
     id: InfiniteMessagesIds.oAuthProgress,
-    Inner: (
-      <div role="presentation" data-testid="authenticating-notification">
-        <Row justify="end">
-          <FlexItem>
-            <Loader className={cx('infiniteMessage__icon', styles.loading)} />
-          </FlexItem>
-          <FlexItem grow>
-            <Title className="infiniteMessage__title" size="XS">
-              Authenticating…
-            </Title>
-            <Text size="xs">
-              This may take several seconds, but it is totally worth it!
-            </Text>
-          </FlexItem>
-        </Row>
-      </div>
-    ),
+    message: i18n.t('notification.infinite.authenticating.message'),
+    description: i18n.t('notification.infinite.authenticating.description'),
+    customIcon: LoaderLargeIcon,
   }),
   PENDING_CREATE_DB: (step?: CloudJobStep) => ({
     id: InfiniteMessagesIds.oAuthProgress,
-    Inner: (
-      <div role="presentation" data-testid="pending-create-db-notification">
-        <Row justify="end">
-          <FlexItem grow={false}>
-            <Loader className={cx('infiniteMessage__icon', styles.loading)} />
-          </FlexItem>
-          <FlexItem grow>
-            <Title className="infiniteMessage__title" size="XS">
-              <span>
-                {(step === CloudJobStep.Credentials || !step) &&
-                  'Processing Cloud API keys…'}
-                {step === CloudJobStep.Subscription &&
-                  'Processing Cloud subscriptions…'}
-                {step === CloudJobStep.Database &&
-                  'Creating a free trial Cloud database…'}
-                {step === CloudJobStep.Import &&
-                  'Importing a free trial Cloud database…'}
-              </span>
-            </Title>
-            <Text size="xs">
-              This may take several minutes, but it is totally worth it!
-            </Text>
-            <Spacer size="m" />
-            <Text size="xs">
-              You can continue working in Redis Insight, and we will notify you
-              once done.
-            </Text>
-          </FlexItem>
-        </Row>
-      </div>
+    customIcon: LoaderLargeIcon,
+    variation: step,
+    message: (
+      <>
+        {(step === CloudJobStep.Credentials || !step) &&
+          i18n.t('notification.infinite.pendingCreateDb.credentials')}
+        {step === CloudJobStep.Subscription &&
+          i18n.t('notification.infinite.pendingCreateDb.subscription')}
+        {step === CloudJobStep.Database &&
+          i18n.t('notification.infinite.pendingCreateDb.database')}
+        {step === CloudJobStep.Import &&
+          i18n.t('notification.infinite.pendingCreateDb.import')}
+      </>
+    ),
+    description: (
+      <>
+        {i18n.t('notification.infinite.pendingCreateDb.description')}
+        <Spacer size="m" />
+        {i18n.t('notification.infinite.pendingCreateDb.descriptionContinue')}
+      </>
     ),
   }),
   SUCCESS_CREATE_DB: (
@@ -111,325 +127,273 @@ export const INFINITE_MESSAGES = {
         CloudJobName.CreateFreeDatabase,
         CloudJobName.CreateFreeSubscriptionAndDatabase,
       ].includes(jobName)
-    const text = `You can now use your Redis Cloud database${withFeed ? ' with pre-loaded sample data' : ''}.`
+
     return {
       id: InfiniteMessagesIds.oAuthSuccess,
-      className: 'wide',
-      Inner: (
-        <div
-          role="presentation"
-          onMouseDown={(e) => {
-            e.preventDefault()
-          }}
-          onMouseUp={(e) => {
-            e.preventDefault()
-          }}
-          data-testid="success-create-db-notification"
-        >
-          <Row justify="end">
-            <FlexItem className="infiniteMessage__icon">
-              <RiIcon type="ChampagneIcon" size="original" />
-            </FlexItem>
-            <FlexItem grow>
-              <Title className="infiniteMessage__title" size="XS">
-                Congratulations!
-              </Title>
-              <Text size="xs">
-                {text}
-                <Spacer size="s" />
-                <b>Notice:</b> the database will be deleted after 15 days of
-                inactivity.
-              </Text>
-              {!!details && (
-                <>
-                  <Spacer size="m" />
-                  <Divider variant="fullWidth" />
-                  <Spacer size="m" />
-                  <Row className={styles.detailsRow} justify="between">
-                    <FlexItem>
-                      <Text size="xs">Plan</Text>
-                    </FlexItem>
-                    <FlexItem data-testid="notification-details-plan">
-                      <Text size="xs">Free</Text>
-                    </FlexItem>
-                  </Row>
-                  <Row className={styles.detailsRow} justify="between">
-                    <FlexItem>
-                      <Text size="xs">Cloud Vendor</Text>
-                    </FlexItem>
-                    <FlexItem
-                      className={styles.vendorLabel}
-                      data-testid="notification-details-vendor"
-                    >
-                      {!!vendor?.icon && <RiIcon type={vendor?.icon} />}
-                      <Text size="xs">{vendor?.label}</Text>
-                    </FlexItem>
-                  </Row>
-                  <Row className={styles.detailsRow} justify="between">
-                    <FlexItem>
-                      <Text size="xs">Region</Text>
-                    </FlexItem>
-                    <FlexItem data-testid="notification-details-region">
-                      <Text size="xs">{details.region}</Text>
-                    </FlexItem>
-                  </Row>
-                </>
-              )}
+      message: i18n.t('notification.infinite.successCreateDb.message'),
+      variant: 'success',
+      description: (
+        <>
+          {withFeed
+            ? i18n.t(
+                'notification.infinite.successCreateDb.descriptionWithData',
+              )
+            : i18n.t('notification.infinite.successCreateDb.description')}
+          <Spacer size="m" />
+          <Trans
+            i18nKey="notification.infinite.successCreateDb.notice"
+            components={{ bold }}
+          />
+          {!!details && (
+            <>
               <Spacer size="m" />
-              <Row justify="between" align="center">
+              <Divider />
+              <Spacer size="m" />
+              <Row className={styles.detailsRow} justify="between">
                 <FlexItem>
-                  <ExternalLink href={MANAGE_DB_LINK}>Manage DB</ExternalLink>
+                  <Text size="xs">
+                    {i18n.t('notification.infinite.successCreateDb.plan')}
+                  </Text>
                 </FlexItem>
-                <FlexItem>
-                  <PrimaryButton
-                    size="s"
-                    onClick={() => onSuccess()}
-                    data-testid="notification-connect-db"
-                  >
-                    Connect
-                  </PrimaryButton>
+                <FlexItem data-testid="notification-details-plan">
+                  <Text size="xs">
+                    {i18n.t('notification.infinite.successCreateDb.planFree')}
+                  </Text>
                 </FlexItem>
               </Row>
+              <Row
+                className={styles.detailsRow}
+                justify="between"
+                align="center"
+              >
+                <FlexItem>
+                  <Text size="xs">
+                    {i18n.t(
+                      'notification.infinite.successCreateDb.cloudVendor',
+                    )}
+                  </Text>
+                </FlexItem>
+                <FlexItem
+                  className={styles.vendorLabel}
+                  data-testid="notification-details-vendor"
+                  $gap="s"
+                >
+                  {!!vendor?.icon && <RiIcon type={vendor?.icon} />}
+                  <Text size="xs">{vendor?.label}</Text>
+                </FlexItem>
+              </Row>
+              <Row className={styles.detailsRow} justify="between">
+                <FlexItem>
+                  <Text size="xs">
+                    {i18n.t('notification.infinite.successCreateDb.region')}
+                  </Text>
+                </FlexItem>
+                <FlexItem data-testid="notification-details-region">
+                  <Text size="xs">{details.region}</Text>
+                </FlexItem>
+              </Row>
+            </>
+          )}
+          <Spacer size="m" />
+          <Row justify="between" align="center">
+            <FlexItem>
+              <Link
+                external
+                target="_blank"
+                href={MANAGE_DB_LINK}
+                variant="inline"
+              >
+                {i18n.t(
+                  'notification.infinite.successCreateDb.button.manageDb',
+                )}
+              </Link>
+            </FlexItem>
+            <FlexItem>
+              <PrimaryButton
+                size="small"
+                onClick={() => onSuccess()}
+                data-testid="notification-connect-db"
+              >
+                {i18n.t('notification.infinite.successCreateDb.button.connect')}
+              </PrimaryButton>
             </FlexItem>
           </Row>
-        </div>
+        </>
       ),
     }
   },
   DATABASE_EXISTS: (onSuccess?: () => void, onClose?: () => void) => ({
     id: InfiniteMessagesIds.databaseExists,
-    Inner: (
-      <div
-        role="presentation"
-        onMouseDown={(e) => {
-          e.preventDefault()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-        }}
-        data-testid="database-exists-notification"
-      >
-        <Title className="infiniteMessage__title" size="XS">
-          You already have a free trial Redis Cloud subscription.
-        </Title>
-        <Text size="xs">
-          Do you want to import your existing database into Redis Insight?
-        </Text>
-        <Spacer size="m" />
-        <Row justify="between">
-          <FlexItem>
-            <PrimaryButton
-              size="s"
-              onClick={() => onSuccess?.()}
-              data-testid="import-db-sso-btn"
-            >
-              Import
-            </PrimaryButton>
-          </FlexItem>
-          <FlexItem>
-            <SecondaryButton
-              size="s"
-              className="infiniteMessage__btn"
-              onClick={() => onClose?.()}
-              data-testid="cancel-import-db-sso-btn"
-            >
-              Cancel
-            </SecondaryButton>
-          </FlexItem>
-        </Row>
-      </div>
-    ),
+    message: i18n.t('notification.infinite.databaseExists.message'),
+    description: i18n.t('notification.infinite.databaseExists.description'),
+    actions: {
+      primary: {
+        label: i18n.t('notification.infinite.databaseExists.button.import'),
+        onClick: () => onSuccess?.(),
+      },
+    },
+    onClose,
   }),
   DATABASE_IMPORT_FORBIDDEN: (onClose?: () => void) => ({
     id: InfiniteMessagesIds.databaseImportForbidden,
-    Inner: (
-      <div
-        role="presentation"
-        onMouseDown={(e) => {
-          e.preventDefault()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-        }}
-        data-testid="database-import-forbidden-notification"
-      >
-        <Title className="infiniteMessage__title" size="XS">
-          Unable to import Cloud database.
-        </Title>
-        <Text size="xs">
-          Adding your Redis Cloud database to Redis Insight is disabled due to a
-          setting restricting database connection management.
-          <Spacer size="m" />
-          Log in to{' '}
-          <Link
-            target="_blank"
-            color="text"
-            tabIndex={-1}
-            href="https://cloud.redis.io/#/databases?utm_source=redisinsight&utm_medium=main&utm_campaign=disabled_db_management"
-          >
-            Redis Cloud
-          </Link>{' '}
-          to check your database.
-        </Text>
+    message: i18n.t('notification.infinite.databaseImportForbidden.message'),
+    description: (
+      <>
+        {i18n.t('notification.infinite.databaseImportForbidden.description')}
         <Spacer size="m" />
-        <Row justify="end">
-          <FlexItem>
-            <PrimaryButton
-              size="s"
-              onClick={() => onClose?.()}
-              data-testid="database-import-forbidden-notification-ok-btn"
-            >
-              Ok
-            </PrimaryButton>
-          </FlexItem>
-        </Row>
-      </div>
+        <Trans
+          i18nKey="notification.infinite.databaseImportForbidden.logIn"
+          components={{
+            cloudLink: (
+              <Link
+                external
+                target="_blank"
+                variant="inline"
+                tabIndex={-1}
+                href={getUtmExternalLink(EXTERNAL_LINKS.cloudConsole, {
+                  medium: UTM_MEDIUMS.Main,
+                  campaign: 'disabled_db_management',
+                })}
+              />
+            ),
+          }}
+        />
+      </>
     ),
+    actions: {
+      primary: {
+        label: i18n.t(
+          'notification.infinite.databaseImportForbidden.button.ok',
+        ),
+        onClick: () => onClose?.(),
+      },
+    },
+    showCloseButton: false,
   }),
   SUBSCRIPTION_EXISTS: (onSuccess?: () => void, onClose?: () => void) => ({
     id: InfiniteMessagesIds.subscriptionExists,
-    Inner: (
-      <div
-        role="presentation"
-        onMouseDown={(e) => {
-          e.preventDefault()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-        }}
-        data-testid="subscription-exists-notification"
-      >
-        <Title className="infiniteMessage__title" size="XS">
-          Your subscription does not have a free trial Redis Cloud database.
-        </Title>
-        <Text size="xs">
-          Do you want to create a free trial database in your existing
-          subscription?
-        </Text>
-        <Spacer size="m" />
-        <Row justify="between">
-          <FlexItem>
-            <PrimaryButton
-              size="s"
-              onClick={() => onSuccess?.()}
-              data-testid="create-subscription-sso-btn"
-            >
-              Create
-            </PrimaryButton>
-          </FlexItem>
-          <FlexItem>
-            <SecondaryButton
-              size="s"
-              className="infiniteMessage__btn"
-              onClick={() => onClose?.()}
-              data-testid="cancel-create-subscription-sso-btn"
-            >
-              Cancel
-            </SecondaryButton>
-          </FlexItem>
-        </Row>
-      </div>
-    ),
+    message: i18n.t('notification.infinite.subscriptionExists.message'),
+    description: i18n.t('notification.infinite.subscriptionExists.description'),
+    actions: {
+      primary: {
+        label: i18n.t('notification.infinite.subscriptionExists.button.create'),
+        onClick: () => onSuccess?.(),
+      },
+    },
+    onClose,
   }),
   AUTO_CREATING_DATABASE: () => ({
     id: InfiniteMessagesIds.autoCreateDb,
-    Inner: (
-      <div role="presentation" data-testid="pending-create-db-notification">
-        <Row justify="end">
+    message: i18n.t('notification.infinite.autoCreatingDatabase.message'),
+    description: i18n.t(
+      'notification.infinite.autoCreatingDatabase.description',
+    ),
+    customIcon: LoaderLargeIcon,
+  }),
+  APP_UPDATE_AVAILABLE: (
+    version: string,
+    onSuccess?: () => void,
+    onClose?: () => void,
+  ) => ({
+    id: InfiniteMessagesIds.appUpdateAvailable,
+    variation: version,
+    customIcon: RiStarsIcon,
+    onClose,
+    message: i18n.t('notification.infinite.appUpdateAvailable.message'),
+    description: (
+      <>
+        <Trans
+          i18nKey="notification.infinite.appUpdateAvailable.description"
+          values={{ version }}
+          components={{
+            releaseNotesLink: (
+              <Link
+                external
+                target="_blank"
+                variant="inline"
+                href={EXTERNAL_LINKS.releaseNotes}
+              />
+            ),
+          }}
+        />
+        <Spacer size="m" />
+        <Row justify="start">
           <FlexItem>
-            <Loader className={cx('infiniteMessage__icon', styles.loading)} />
-          </FlexItem>
-          <FlexItem grow>
-            <Title className="infiniteMessage__title" size="XS">
-              Connecting to your database
-            </Title>
-            <Text size="xs">
-              This may take several minutes, but it is totally worth it!
-            </Text>
+            <PrimaryButton size="small" onClick={() => onSuccess?.()}>
+              {i18n.t(
+                'notification.infinite.appUpdateAvailable.button.restart',
+              )}
+            </PrimaryButton>
           </FlexItem>
         </Row>
-      </div>
+      </>
     ),
   }),
-  APP_UPDATE_AVAILABLE: (version: string, onSuccess?: () => void) => ({
-    id: InfiniteMessagesIds.appUpdateAvailable,
-    Inner: (
-      <div
-        role="presentation"
-        onMouseDown={(e) => {
-          e.preventDefault()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-        }}
-        data-testid="app-update-available-notification"
-      >
-        <Title className="infiniteMessage__title" size="XS">
-          New version is now available
-        </Title>
-        <Text size="s">
-          <>
-            With Redis Insight
-            {` ${version} `}
-            you have access to new useful features and optimizations.
-            <br />
-            Restart Redis Insight to install updates.
-          </>
-        </Text>
-        <br />
-        <PrimaryButton
-          size="s"
-          onClick={() => onSuccess?.()}
-          data-testid="app-restart-btn"
-        >
-          Restart
-        </PrimaryButton>
-      </div>
+  APP_UPDATE_FOUND: (
+    version: string,
+    onDownload: () => void,
+    onSkip: () => void,
+    onClose: () => void,
+  ) => ({
+    id: InfiniteMessagesIds.appUpdateFound,
+    variation: version,
+    customIcon: RiStarsIcon,
+    onClose,
+    message: i18n.t('notification.infinite.appUpdateFound.message'),
+    description: (
+      <>
+        <Trans
+          i18nKey="notification.infinite.appUpdateFound.description"
+          values={{ version }}
+          components={{
+            releaseNotesLink: (
+              <Link
+                external
+                target="_blank"
+                variant="inline"
+                href={EXTERNAL_LINKS.releaseNotes}
+              />
+            ),
+          }}
+        />
+        <Spacer size="m" />
+        <Row justify="start" gap="s">
+          <FlexItem>
+            <PrimaryButton size="small" onClick={() => onDownload()}>
+              {i18n.t('notification.infinite.appUpdateFound.button.update')}
+            </PrimaryButton>
+          </FlexItem>
+          <FlexItem>
+            <SecondaryButton size="small" onClick={() => onSkip()}>
+              {i18n.t('notification.infinite.appUpdateFound.button.skip')}
+            </SecondaryButton>
+          </FlexItem>
+        </Row>
+      </>
     ),
+  }),
+  APP_UPDATE_DOWNLOADING: () => ({
+    id: InfiniteMessagesIds.appUpdateFound,
+    customIcon: LoaderLargeIcon,
+    message: i18n.t('notification.infinite.appUpdateDownloading.message'),
+    showCloseButton: false,
   }),
   SUCCESS_DEPLOY_PIPELINE: () => ({
     id: InfiniteMessagesIds.pipelineDeploySuccess,
-    className: 'wide',
-    Inner: (
-      <div
-        role="presentation"
-        onMouseDown={(e) => {
-          e.preventDefault()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-        }}
-        data-testid="success-deploy-pipeline-notification"
-      >
-        <Row justify="end">
-          <FlexItem className="infiniteMessage__icon">
-            <RiIcon type="ChampagneIcon" size="original" />
-          </FlexItem>
-          <FlexItem grow>
-            <Title className="infiniteMessage__title" size="XS">
-              Congratulations!
-            </Title>
-            <Text size="xs">
-              Deployment completed successfully!
-              <br />
-              Check out the pipeline statistics page.
-            </Text>
-            <Spacer size="m" />
-            {/* // TODO remove display none when statistics page will be available */}
-            <Row style={{ display: 'none' }} justify="end" align="center">
-              <FlexItem>
-                <PrimaryButton
-                  size="s"
-                  onClick={() => {}}
-                  data-testid="notification-connect-db"
-                >
-                  Statistics
-                </PrimaryButton>
-              </FlexItem>
-            </Row>
-          </FlexItem>
-        </Row>
-      </div>
+    message: i18n.t('notification.infinite.successDeployPipeline.message'),
+    description: (
+      <>
+        {i18n.t('notification.infinite.successDeployPipeline.description')}
+        <br />
+        {i18n.t('notification.infinite.successDeployPipeline.descriptionCheck')}
+      </>
     ),
+    // TODO enable when statistics page will be available
+    // actions: {
+    //   primary: {
+    //     label: 'Statistics',
+    //     onClick: () => {},
+    //   }
+    // }
   }),
 }

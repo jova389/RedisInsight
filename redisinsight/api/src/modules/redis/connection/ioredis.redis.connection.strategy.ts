@@ -15,7 +15,7 @@ import {
   SentinelIoredisClient,
   ClusterIoredisClient,
 } from 'src/modules/redis/client';
-import { discoverClusterNodes } from 'src/modules/redis/utils';
+import { discoverClusterNodes, getIpFamily } from 'src/modules/redis/utils';
 import { SshTunnel } from 'src/modules/ssh/models/ssh-tunnel';
 import { getRedisConnectionException } from 'src/utils';
 import { ReplyError } from 'src/models';
@@ -46,12 +46,22 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
     database: Database,
     options: IRedisConnectionOptions,
   ): Promise<RedisOptions> {
-    const { host, port, password, username, tls, db, timeout } = database;
+    const {
+      host,
+      port,
+      password,
+      username,
+      tls,
+      db,
+      timeout,
+      connectionFamily,
+    } = database;
     const redisOptions: RedisOptions = {
       host,
       port,
       username,
       password,
+      family: getIpFamily(connectionFamily),
       connectTimeout: timeout,
       db: isNumber(clientMetadata.db) ? clientMetadata.db : db,
       connectionName:
@@ -146,7 +156,10 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
   private async getTLSConfig(database: Database): Promise<ConnectionOptions> {
     let config: ConnectionOptions;
     config = {
-      rejectUnauthorized: database.verifyServerCert,
+      // Node treats a missing rejectUnauthorized as true. verifyServerCert is
+      // optional and defaults to false (unchecked "Verify TLS Certificate");
+      // older rows and test-connection payloads leave it null/undefined.
+      rejectUnauthorized: database.verifyServerCert === true,
       checkServerIdentity: this.dummyFn,
       servername: database.tlsServername || undefined,
     };
@@ -229,11 +242,17 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
               'Successfully connected to the redis database',
               clientMetadata,
             );
+
             resolve(
-              new StandaloneIoredisClient(clientMetadata, connection, {
-                host: database.host,
-                port: database.port,
-              }),
+              new StandaloneIoredisClient(
+                clientMetadata,
+                connection,
+                {
+                  host: database.host,
+                  port: database.port,
+                },
+                database,
+              ),
             );
           });
           connection.on('reconnecting', (): void => {
@@ -321,10 +340,12 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
               e,
               clientMetadata,
             );
-            reject(getRedisConnectionException(
-              !isEmpty(e.lastNodeError) ? e.lastNodeError : e as ReplyError,
-              database,
-            ));
+            reject(
+              getRedisConnectionException(
+                !isEmpty(e.lastNodeError) ? e.lastNodeError : (e as ReplyError),
+                database,
+              ),
+            );
           });
           cluster.on('end', (): void => {
             this.logger.warn(
@@ -342,11 +363,17 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
               'Successfully connected to the redis oss cluster.',
               clientMetadata,
             );
+
             resolve(
-              new ClusterIoredisClient(clientMetadata, cluster, {
-                host: database.host,
-                port: database.port,
-              }),
+              new ClusterIoredisClient(
+                clientMetadata,
+                cluster,
+                {
+                  host: database.host,
+                  port: database.port,
+                },
+                database,
+              ),
             );
           });
         } catch (e) {
@@ -406,11 +433,17 @@ export class IoredisRedisConnectionStrategy extends RedisConnectionStrategy {
             'Successfully connected to the redis oss sentinel.',
             clientMetadata,
           );
+
           resolve(
-            new SentinelIoredisClient(clientMetadata, client, {
-              host: database.host,
-              port: database.port,
-            }),
+            new SentinelIoredisClient(
+              clientMetadata,
+              client,
+              {
+                host: database.host,
+                port: database.port,
+              },
+              database,
+            ),
           );
         });
       } catch (e) {

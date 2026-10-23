@@ -1,0 +1,108 @@
+name: Start Redis test environment
+description: >
+  Log in to Docker Hub (to avoid anonymous pull rate limits), pull the test
+  environment images with retry, bring the compose project up, and wait for
+  the Redis clusters to be ready.
+
+inputs:
+  dockerhub-username:
+    description: Docker Hub username. When empty, login is skipped.
+    required: false
+    default: ''
+  dockerhub-token:
+    description: Docker Hub access token. Paired with dockerhub-username.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Login to Docker Hub (avoid pull rate limits)
+      if: ${{ inputs.dockerhub-username != '' }}
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+
+    - name: Pull Redis test environment images (with retry)
+      shell: bash
+      run: |
+        DC="docker compose -p e2e-rte -f tests/e2e/rte.docker-compose.yml"
+        for i in 1 2 3 4 5; do
+          if $DC pull; then
+            echo "✅ Image pull succeeded on attempt $i"
+            exit 0
+          fi
+          BACKOFF=$((i * 30))
+          echo "⚠️  Image pull failed on attempt $i; sleeping ${BACKOFF}s before retry..."
+          sleep "$BACKOFF"
+        done
+        echo "::error::Image pull failed after 5 attempts"
+        exit 1
+
+    - name: Start Redis test environment
+      shell: bash
+      run: |
+        docker compose -p e2e-rte -f tests/e2e/rte.docker-compose.yml up --detach --force-recreate
+
+    - name: Wait for Redis clusters to be ready
+      shell: bash
+      run: |
+        DC="docker compose -p e2e-rte -f tests/e2e/rte.docker-compose.yml"
+
+        wait_for_cluster() {
+          local svc=$1 label=$2
+          echo "Waiting for $label to form..."
+          for i in $(seq 1 60); do
+            if $DC exec -T "$svc" redis-cli CLUSTER INFO 2>/dev/null | grep -q "cluster_state:ok"; then
+              echo "✅ $label ready after ~$((i*2))s"; return 0
+            fi
+            sleep 2
+          done
+          echo "::error::$label did NOT become ready within 120 s"
+          $DC exec -T "$svc" redis-cli CLUSTER INFO 2>/dev/null || true
+          return 1
+        }
+
+        wait_for_cluster master-plain-7-1    "IP-based cluster (8200)"
+        wait_for_cluster master-hostname-7-1  "Hostname-based cluster (8210)"
+
+    - name: Wait for published Redis ports to serve
+      shell: bash
+      run: |
+        # Any RESP reply (+PONG, or -NOAUTH/-ERR) proves the server is serving.
+        redis_responds() {
+          local port=$1 reply=''
+          exec 3<>"/dev/tcp/127.0.0.1/$port" 2>/dev/null || return 1
+          printf 'PING\r\n' >&3 || { exec 3<&- 3>&-; return 1; }
+          read -r -t 5 reply <&3 || { exec 3<&- 3>&-; return 1; }
+          exec 3<&- 3>&-
+          case "$reply" in +*|-*) return 0 ;; *) return 1 ;; esac
+        }
+
+        # TLS (8104) needs a handshake before it speaks RESP, so only its socket
+        # is checked.
+        port_open() {
+          (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+        }
+
+        wait_for_port() {
+          local port=$1 kind=$2
+          for i in $(seq 1 60); do
+            # stderr is dropped at the call site: bash reports a refused
+            # /dev/tcp redirection itself, past the redirection in the function.
+            if [ "$kind" = tls ]; then
+              port_open "$port" 2>/dev/null && { echo "✅ $port accepting connections after ~$((i*2))s"; return 0; }
+            else
+              redis_responds "$port" 2>/dev/null && { echo "✅ $port serving after ~$((i*2))s"; return 0; }
+            fi
+            sleep 2
+          done
+          echo "::error::Redis on port $port did not become ready within 120s"
+          return 1
+        }
+
+        for port in 8100 8101 8103 8105 8108 8109 8110 8200 8210 28100; do
+          wait_for_port "$port" resp
+        done
+        wait_for_port 8104 tls

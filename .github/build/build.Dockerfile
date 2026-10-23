@@ -1,10 +1,12 @@
-FROM node:20.14-alpine
+FROM node:22.22.0-alpine
 
 # runtime args and environment variables
 ARG DIST=Redis-Insight.tar.gz
 ARG NODE_ENV=production
 ARG RI_SEGMENT_WRITE_KEY
 ENV RI_SEGMENT_WRITE_KEY=${RI_SEGMENT_WRITE_KEY}
+ARG RI_APP_BUILD_COMMIT_SHA=""
+ENV RI_APP_BUILD_COMMIT_SHA=${RI_APP_BUILD_COMMIT_SHA}
 ENV NODE_ENV=${NODE_ENV}
 ENV RI_SERVE_STATICS=true
 ENV RI_BUILD_TYPE='DOCKER_ON_PREMISE'
@@ -20,6 +22,12 @@ WORKDIR /usr/src/app
 # copy artifacts built in previous stage to this one
 ADD $DIST /usr/src/app/redisinsight
 RUN ls -la /usr/src/app/redisinsight
+
+# Rebuild better-sqlite3 for Alpine (musl) since the pre-built binary was
+# compiled on Ubuntu (glibc) and is not compatible with musl libc.
+RUN apk add --no-cache --virtual .build-deps python3 make g++ \
+    && cd /usr/src/app/redisinsight/api && npm rebuild better-sqlite3 \
+    && apk del .build-deps
 
 # folder to store local database, plugins, logs and all other files
 RUN mkdir -p /data && chown -R node:node /data

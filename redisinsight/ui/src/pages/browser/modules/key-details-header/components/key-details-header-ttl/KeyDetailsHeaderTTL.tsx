@@ -1,6 +1,6 @@
 import cx from 'classnames'
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import InlineItemEditor from 'uiSrc/components/inline-item-editor/InlineItemEditor'
 import {
@@ -10,11 +10,16 @@ import {
 } from 'uiSrc/slices/browser/keys'
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
 import { MAX_TTL_NUMBER, validateTTLNumber } from 'uiSrc/utils'
+import { Trans, useTranslation, escapeTrans } from 'uiSrc/i18n'
 
 import { FlexItem, Grid } from 'uiSrc/components/base/layout/flex'
 import { Text } from 'uiSrc/components/base/text'
 import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
 import { TextInput } from 'uiSrc/components/base/inputs'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -22,16 +27,18 @@ export interface Props {
 }
 
 const KeyDetailsHeaderTTL = ({ onEditTTL }: Props) => {
-  const { loading } = useSelector(selectedKeySelector)
+  const { t } = useTranslation()
+  const { loading } = useAppSelector(selectedKeySelector)
   const {
     ttl: ttlProp,
     nameString: keyProp,
     name: keyBuffer,
-  } = useSelector(selectedKeyDataSelector) ?? initialKeyInfo
+  } = useAppSelector(selectedKeyDataSelector) ?? initialKeyInfo
 
   const [ttl, setTTL] = useState(`${ttlProp}`)
   const [ttlIsEditing, setTTLIsEditing] = useState(false)
   const [ttlIsHovering, setTTLIsHovering] = useState(false)
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   useEffect(() => {
     setTTL(`${ttlProp}`)
@@ -60,7 +67,28 @@ const KeyDetailsHeaderTTL = ({ onEditTTL }: Props) => {
     setTTLIsHovering(false)
 
     if (`${ttlProp}` !== ttlValue && keyBuffer) {
-      onEditTTL(keyBuffer, +ttlValue)
+      requestConfirmation({
+        title: t('browser.keyDetails.ttl.changeConfirm.title'),
+        actionDescription: (
+          <Trans
+            i18nKey="browser.keyDetails.ttl.changeConfirm.description"
+            values={{
+              name: escapeTrans(keyProp ?? ''),
+              ttl: escapeTrans(
+                ttlValue === '-1'
+                  ? t('browser.keyDetails.ttl.noLimit')
+                  : `${ttlValue} s`,
+              ),
+            }}
+            components={{ bold: <strong /> }}
+          />
+        ),
+        confirmButtonText: t('browser.keyDetails.ttl.changeConfirm.button'),
+        commandId: BrowserConfirmationCommandId.ChangeTtl,
+        disableConfirmationInput: true,
+        onConfirm: () => onEditTTL(keyBuffer, +ttlValue),
+        onCancel: () => setTTL(`${ttlProp}`),
+      })
     }
   }
 
@@ -96,12 +124,15 @@ const KeyDetailsHeaderTTL = ({ onEditTTL }: Props) => {
           <Grid
             columns={2}
             responsive={false}
-            gap="none"
+            gap="s"
             className={styles.ttlGridComponent}
             data-testid="edit-ttl-grid"
           >
             <FlexItem>
-              <Text color="subdued" size="s" className={styles.subtitleText}>
+              <Text
+                size="s"
+                className={cx(styles.subtitleText, styles.subtitleTextTTL)}
+              >
                 TTL:
               </Text>
             </FlexItem>
@@ -121,7 +152,7 @@ const KeyDetailsHeaderTTL = ({ onEditTTL }: Props) => {
                     ttlIsEditing && styles.editing,
                   )}
                   maxLength={200}
-                  placeholder="No limit"
+                  placeholder={t('browser.keyDetails.ttl.placeholder')}
                   value={ttl === '-1' ? '' : ttl}
                   fullWidth={false}
                   compressed
@@ -138,16 +169,15 @@ const KeyDetailsHeaderTTL = ({ onEditTTL }: Props) => {
           </Grid>
         )}
         <Text
-          color="subdued"
           size="s"
-          className={cx(styles.subtitleText, {
+          className={cx(styles.subtitleTextTTL, {
             [styles.hidden]: ttlIsEditing || ttlIsHovering,
           })}
           data-testid="key-ttl-text"
         >
           TTL:
           <span className={styles.ttlTextValue}>
-            {ttl === '-1' ? 'No limit' : ttl}
+            {ttl === '-1' ? t('browser.keyDetails.ttl.noLimit') : ttl}
           </span>
         </Text>
       </>

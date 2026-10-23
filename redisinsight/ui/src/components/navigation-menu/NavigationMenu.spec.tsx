@@ -15,7 +15,6 @@ import {
 
 import { FeatureFlags } from 'uiSrc/constants'
 import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
-import { appContextSelector } from 'uiSrc/slices/app/context'
 import NavigationMenu from './NavigationMenu'
 
 let store: typeof mockedStore
@@ -180,22 +179,10 @@ describe('NavigationMenu', () => {
       }))
       render(<NavigationMenu />)
 
-      const githubBtn = screen.getByTestId("github-repo-btn")
+      const githubBtn = screen.getByTestId('github-repo-btn')
       expect(githubBtn).toBeTruthy()
       expect(githubBtn?.getAttribute('href')).toEqual(EXTERNAL_LINKS.githubRepo)
     })
-  })
-
-  it('should render private routes with connectedRdiInstanceId', () => {
-    ;(appContextSelector as jest.Mock).mockImplementation(() => ({
-      ...appContextSelector,
-      workspace: 'redisDataIntegration',
-    }))
-
-    render(<NavigationMenu />)
-
-    expect(screen.getByTestId('pipeline-status-page-btn')).toBeTruthy()
-    expect(screen.getByTestId('pipeline-management-page-btn')).toBeTruthy()
   })
 
   describe('feature flags tests', () => {

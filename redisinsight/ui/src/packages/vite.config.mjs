@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
 import { ViteEjsPlugin } from 'vite-plugin-ejs';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import path, { resolve } from 'path'
-import { fileURLToPath } from 'url'
+import path, { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { defaultConfig } from '../config/default';
 
 const riPlugins = [
   { name: 'redisearch', entry: 'src/main.tsx' },
@@ -13,6 +14,7 @@ const riPlugins = [
   { name: 'redisgraph', entry: 'src/main.tsx' },
   { name: 'redistimeseries-app', entry: 'src/main.tsx' },
   { name: 'ri-explain', entry: 'src/main.tsx' },
+  { name: 'geodata', entry: 'src/main.tsx' },
 ];
 
 /**
@@ -42,8 +44,9 @@ export default defineConfig({
       '@redislabsdev/redis-ui-icons': '@redis-ui/icons',
       '@redislabsdev/redis-ui-table': '@redis-ui/table',
       uiSrc: fileURLToPath(new URL('../../src', import.meta.url)),
-      apiSrc: fileURLToPath(new URL('../../../api/src', import.meta.url)),
+      apiClient: fileURLToPath(new URL('../../../api-client', import.meta.url)),
     },
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     port: 8081,
@@ -86,6 +89,11 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
+        // Pin the Sass API to the legacy compiler. Vite 6 silently switched the
+        // default to 'modern-compiler' when sass-embedded is installed, which
+        // changes how @import and additionalData are resolved and breaks the
+        // existing stylesheets that still rely on @import.
+        api: 'legacy',
         // add @layer app for css ordering. Styles without layer have the highest priority
         // https://github.com/vitejs/vite/issues/3924
         additionalData: (source, filename) => {
@@ -94,7 +102,8 @@ export default defineConfig({
               '/main.scss',
               '/App.scss',
               '/packages/clients-list/src/styles/styles.scss',
-              '/packages/redisearch/src/styles/styles.scss'
+              '/packages/redisearch/src/styles/styles.scss',
+              '/packages/geodata/src/styles/styles.scss',
             ];
             if (skipFiles.every((file) => !filename.endsWith(file))) {
               return `
@@ -112,6 +121,8 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
+    // setup default riConfig since it might be used in constants
+    riConfig: defaultConfig,
   },
 });
 

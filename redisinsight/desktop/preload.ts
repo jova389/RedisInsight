@@ -1,6 +1,14 @@
+// Sets up the @sentry/electron IPC bridge so the renderer SDK can forward
+// events to the main process. Without it the renderer falls back to the
+// unsupported `sentry-ipc://` protocol and renderer crashes are never reported.
+import '@sentry/electron/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 import { configRenderer as config } from 'desktopSrc/config/configRenderer'
-import { IpcInvokeEvent, IpcOnEvent } from 'uiSrc/electron/constants'
+import {
+  AppUpdateState,
+  IpcInvokeEvent,
+  IpcOnEvent,
+} from 'uiSrc/electron/constants'
 import { WindowApp } from 'uiSrc/types'
 
 const ipcHandler = {
@@ -22,11 +30,17 @@ contextBridge.exposeInMainWorld('app', {
   cloudOauthCallback: (connected: any) => {
     ipcRenderer.on(IpcOnEvent.cloudOauthCallback, connected)
   },
+  azureOauthCallback: (callback: any) => {
+    ipcRenderer.on(IpcOnEvent.azureOauthCallback, callback)
+  },
   deepLinkAction: (parsedDeepLink: any) => {
     ipcRenderer.on(IpcOnEvent.deepLinkAction, parsedDeepLink)
   },
   updateAvailable: (updateInfo: any) => {
     ipcRenderer.on(IpcOnEvent.appUpdateAvailable, updateInfo)
+  },
+  updateState: (callback: (event: unknown, state: AppUpdateState) => void) => {
+    ipcRenderer.on(IpcOnEvent.appUpdateState, callback)
   },
   ipc: ipcHandler,
   config: {

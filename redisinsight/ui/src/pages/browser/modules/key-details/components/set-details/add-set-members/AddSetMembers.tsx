@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { ColorText } from 'uiSrc/components/base/text'
 
 import {
@@ -16,7 +16,7 @@ import {
 } from 'uiSrc/telemetry'
 
 import { stringToBuffer } from 'uiSrc/utils'
-import { AddZsetFormConfig as config } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
+import { getAddSetFormConfig } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
 import {
   INITIAL_SET_MEMBER_STATE,
   ISetMemberState,
@@ -30,7 +30,13 @@ import {
 import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { TextInput } from 'uiSrc/components/base/inputs'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
-import styles from './styles.module.scss'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { EntryContent } from '../../common/AddKeysContainer.styled'
 
 export interface Props {
   closePanel: (isCancelled?: boolean) => void
@@ -38,17 +44,22 @@ export interface Props {
 
 const AddSetMembers = (props: Props) => {
   const { closePanel } = props
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const config = getAddSetFormConfig(t)
+  const dispatch = useAppDispatch()
   const [members, setMembers] = useState<ISetMemberState[]>([
     { ...INITIAL_SET_MEMBER_STATE },
   ])
-  const { loading } = useSelector(setSelector)
-  const { name: selectedKey = '' } = useSelector(selectedKeyDataSelector) ?? {
+  const { loading } = useAppSelector(setSelector)
+  const { name: selectedKey = '' } = useAppSelector(
+    selectedKeyDataSelector,
+  ) ?? {
     name: undefined,
   }
-  const { viewType } = useSelector(keysSelector)
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
+  const { viewType } = useAppSelector(keysSelector)
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
   const lastAddedMemberName = useRef<HTMLInputElement>(null)
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   useEffect(() => {
     lastAddedMemberName.current?.focus()
@@ -130,12 +141,25 @@ const AddSetMembers = (props: Props) => {
     dispatch(addSetMembersAction(data, onSuccessAdded))
   }
 
+  const handleSubmit = () => {
+    requestConfirmation({
+      title: t('browser.set.add.confirmTitle'),
+      actionDescription: t('browser.set.add.confirmMessage', {
+        count: members.length,
+      }),
+      confirmButtonText: t('browser.set.add.confirmButton'),
+      commandId: BrowserConfirmationCommandId.AddSetMembers,
+      disableConfirmationInput: true,
+      onConfirm: submitData,
+    })
+  }
+
   const isClearDisabled = (item: ISetMemberState): boolean =>
     members.length === 1 && !item.name.length
 
   return (
     <Col gap="m">
-      <div className={styles.container}>
+      <EntryContent>
         <AddMultipleFields
           items={members}
           isClearDisabled={isClearDisabled}
@@ -165,24 +189,24 @@ const AddSetMembers = (props: Props) => {
             </Row>
           )}
         </AddMultipleFields>
-      </div>
+      </EntryContent>
       <Row justify="end" gap="xl">
         <FlexItem>
           <SecondaryButton
             onClick={() => closePanel(true)}
             data-testid="cancel-members-btn"
           >
-            <ColorText color="default">Cancel</ColorText>
+            <ColorText color="default">{t('browser.set.add.cancel')}</ColorText>
           </SecondaryButton>
         </FlexItem>
         <FlexItem>
           <PrimaryButton
             disabled={loading}
             loading={loading}
-            onClick={submitData}
+            onClick={handleSubmit}
             data-testid="save-members-btn"
           >
-            Save
+            {t('browser.set.add.save')}
           </PrimaryButton>
         </FlexItem>
       </Row>

@@ -1,78 +1,57 @@
 import React from 'react'
-import { PipelineState } from 'uiSrc/slices/interfaces'
-import { formatLongName, Maybe } from 'uiSrc/utils'
-import { AllIconsType, RiIcon } from 'uiSrc/components/base/icons/RiIcon'
-import { IconProps } from 'uiSrc/components/base/icons'
+import { PipelineState, PipelineStatus } from 'uiSrc/slices/interfaces'
+import { formatLongName } from 'uiSrc/utils'
+import { Icon } from 'uiSrc/components/base/icons'
 import { Title } from 'uiSrc/components/base/text/Title'
 import { Loader } from 'uiSrc/components/base/display'
 import { RiTooltip } from 'uiSrc/components'
-import styles from './styles.module.scss'
+import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
+import { Text } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
+import { getStatusToShowFromState, getStatusToShowFromStatus } from './utils'
 
 export interface Props {
   pipelineState?: PipelineState
+  pipelineStatus?: PipelineStatus
   statusError?: string
   headerLoading: boolean
 }
 
 const CurrentPipelineStatus = ({
   pipelineState,
+  pipelineStatus,
   statusError,
   headerLoading,
 }: Props) => {
-  const getPipelineStateIconAndLabel = (
-    pipelineState: Maybe<PipelineState>,
-  ): {
-    label: string
-    icon: AllIconsType
-    iconColor: IconProps['color']
-  } => {
-    switch (pipelineState) {
-      case PipelineState.InitialSync:
-        return {
-          icon: 'IndicatorSyncingIcon',
-          iconColor: 'success300',
-          label: 'Initial sync',
-        }
-      case PipelineState.CDC:
-        return {
-          icon: 'IndicatorSyncedIcon',
-          iconColor: 'success300',
-          label: 'Streaming',
-        }
-      case PipelineState.NotRunning:
-        return {
-          icon: 'IndicatorXIcon',
-          iconColor: 'attention500',
-          label: 'Not running',
-        }
-      default:
-        return {
-          icon: 'IndicatorErrorIcon',
-          iconColor: 'danger500',
-          label: 'Error',
-        }
-    }
-  }
-  const stateInfo = getPipelineStateIconAndLabel(pipelineState)
+  const { t } = useTranslation()
+  const stateInfo = pipelineState
+    ? getStatusToShowFromState(pipelineState)
+    : getStatusToShowFromStatus(pipelineStatus)
   const errorTooltipContent = statusError && formatLongName(statusError)
 
   return (
-    <div className={styles.stateWrapper}>
-      <Title size="XS">Pipeline State:</Title>
-      {headerLoading ? (
-        <Loader size="m" style={{ marginLeft: '8px' }} />
-      ) : (
-        <RiTooltip
-          content={errorTooltipContent}
-          anchorClassName={statusError && styles.tooltip}
-        >
-          <div className={styles.stateBadge} data-testid="pipeline-state-badge">
-            <RiIcon type={stateInfo.icon} color={stateInfo.iconColor} />
-            <span>{stateInfo.label}</span>
-          </div>
-        </RiTooltip>
-      )}
-    </div>
+    <Row align="center" gap="m">
+      <FlexItem>
+        <Title size="XS" color="primary">
+          {t('rdi.instance.status.title')}
+        </Title>
+      </FlexItem>
+      <FlexItem>
+        {headerLoading ? (
+          <Loader size="m" style={{ marginLeft: '8px' }} />
+        ) : (
+          <RiTooltip
+            content={errorTooltipContent}
+            anchorClassName={statusError}
+          >
+            <Row data-testid="pipeline-status-badge" gap="s" align="center">
+              <Icon icon={stateInfo.icon} color={stateInfo.iconColor} />
+              <Text>{stateInfo.label}</Text>
+            </Row>
+          </RiTooltip>
+        )}
+      </FlexItem>
+    </Row>
   )
 }
 

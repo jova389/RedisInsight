@@ -3,11 +3,14 @@ import { instance, mock } from 'ts-mockito'
 import { act } from '@testing-library/react'
 import { fireEvent, render, screen } from 'uiSrc/utils/test-utils'
 import { SubmitBtnText } from 'uiSrc/pages/home/constants'
+import i18n from 'uiSrc/i18n'
 import ManualConnectionFrom, {
   Props as ManualConnectionFromProps,
 } from 'uiSrc/pages/home/components/manual-connection/manual-connection-form/ManualConnectionForm'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
+import { createInstanceStandaloneAction } from 'uiSrc/slices/instances/instances'
 import ManualConnectionWrapper, { Props } from './ManualConnectionWrapper'
+import { DbConnectionInfo } from '../../interfaces'
 
 const mockedProps = mock<Props>()
 
@@ -20,6 +23,11 @@ jest.mock('./manual-connection-form/ManualConnectionForm', () => ({
 jest.mock('uiSrc/telemetry', () => ({
   ...jest.requireActual('uiSrc/telemetry'),
   sendEventTelemetry: jest.fn(),
+}))
+
+jest.mock('uiSrc/slices/instances/instances', () => ({
+  ...jest.requireActual('uiSrc/slices/instances/instances'),
+  createInstanceStandaloneAction: jest.fn(() => ({ type: 'noop' })),
 }))
 
 const mockManualConnectionFrom = (props: ManualConnectionFromProps) => (
@@ -41,9 +49,23 @@ const mockManualConnectionFrom = (props: ManualConnectionFromProps) => (
     <button
       type="submit"
       data-testid="btn-submit"
-      onClick={() => props.onSubmit({})}
+      onClick={() => props.onSubmit({} as DbConnectionInfo)}
     >
-      {props.submitButtonText}
+      {props.submitButtonText && i18n.t(props.submitButtonText)}
+    </button>
+    <button
+      type="button"
+      data-testid="btn-submit-prod"
+      onClick={() =>
+        props.onSubmit({
+          name: 'db',
+          host: 'localhost',
+          port: '6379',
+          environment: 'production',
+        } as DbConnectionInfo)
+      }
+    >
+      submit with environment
     </button>
     <button
       type="button"
@@ -85,14 +107,14 @@ describe('ManualConnectionWrapper', () => {
   it('should have add database submit button', () => {
     render(<ManualConnectionWrapper {...instance(mockedProps)} />)
     expect(screen.getByTestId('btn-submit')).toHaveTextContent(
-      SubmitBtnText.AddDatabase,
+      i18n.t(SubmitBtnText.AddDatabase),
     )
   })
 
   it('should have edit database submit button', () => {
     render(<ManualConnectionWrapper {...instance(mockedProps)} editMode />)
     expect(screen.getByTestId('btn-submit')).toHaveTextContent(
-      SubmitBtnText.EditDatabase,
+      i18n.t(SubmitBtnText.EditDatabase),
     )
   })
 
@@ -102,7 +124,7 @@ describe('ManualConnectionWrapper', () => {
       fireEvent.click(screen.getByTestId('onClone-btn'))
     })
     expect(screen.getByTestId('btn-submit')).toHaveTextContent(
-      SubmitBtnText.CloneDatabase,
+      i18n.t(SubmitBtnText.CloneDatabase),
     )
   })
 
@@ -120,6 +142,19 @@ describe('ManualConnectionWrapper', () => {
     expect(sendEventTelemetry).toBeCalledWith({
       event: TelemetryEvent.CONFIG_DATABASES_MANUALLY_SUBMITTED,
     })
+  })
+
+  it('should pass environment through preparePayload to the create action', () => {
+    ;(createInstanceStandaloneAction as jest.Mock).mockClear()
+    render(<ManualConnectionWrapper {...instance(mockedProps)} />)
+    act(() => {
+      fireEvent.click(screen.getByTestId('btn-submit-prod'))
+    })
+
+    expect(createInstanceStandaloneAction).toHaveBeenCalledWith(
+      expect.objectContaining({ environment: 'production' }),
+      expect.anything(),
+    )
   })
 
   it('should call proper telemetry event on Clone database', () => {

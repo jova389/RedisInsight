@@ -1,0 +1,23 @@
+import React from 'react'
+import i18n from 'uiSrc/i18n'
+
+import { type ColumnDef } from 'uiSrc/components/base/layout/table'
+import { type InstanceRedisCloud } from 'uiSrc/slices/interfaces'
+
+import { SubscriptionCell } from '../components/SubscriptionCell/SubscriptionCell'
+import { AutoDiscoverCloudIds } from 'uiSrc/pages/autodiscover-cloud/constants/constants'
+
+export const subscriptionDbResultColumn = (): ColumnDef<InstanceRedisCloud> => {
+  return {
+    header: i18n.t('autodiscover.cloud.column.subscription'),
+    id: AutoDiscoverCloudIds.SubscriptionName,
+    accessorKey: AutoDiscoverCloudIds.SubscriptionName,
+    enableSorting: true,
+    maxSize: 270,
+    cell: ({
+      row: {
+        original: { subscriptionName: name },
+      },
+    }) => <SubscriptionCell name={name} />,
+  }
+}

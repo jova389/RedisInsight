@@ -1,6 +1,32 @@
 {
-  "version": 2.66,
+  "version": 12,
   "features": {
+    "dev-rdiUi": {
+      "flag": true,
+      "perc": [[0, 0]],
+      "filters": []
+    },
+    "appUpdateStrategySettings": {
+      "flag": true,
+      "perc": [[0, 100]],
+      "filters": [
+        {
+          "name": "config.server.buildType",
+          "value": "ELECTRON",
+          "cond": "eq"
+        }
+      ]
+    },
+    "vectorSearchEnhancements": {
+      "flag": true,
+      "perc": [[0, 100]],
+      "filters": []
+    },
+    "dev-language": {
+      "flag": true,
+      "perc": [[0, 0]],
+      "filters": []
+    },
     "redisDataIntegration": {
       "flag": true,
       "perc": [[0, 100]],
@@ -116,6 +142,47 @@
     },
     "enhancedCloudUI": {
       "flag": true,
+      "perc": [[0, 100]]
+    },
+    "vectorSearchV2": {
+      "flag": true,
+      "perc": [[0, 100]],
+      "filters": []
+    },
+    "databasesListV2": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "azureEntraId": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "dev-azureEntraId": {
+      "flag": false,
+      "perc": [[0, 100]]
+    },
+    "dev-browser": {
+      "flag": false,
+      "perc": [[0, 100]]
+    },
+    "vectorSet": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "array": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "prodMode": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "whatsNew": {
+      "flag": true,
+      "perc": [[0, 100]]
+    },
+    "valueDecoder": {
+      "flag": false,
       "perc": [[0, 100]]
     }
   }

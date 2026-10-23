@@ -57,6 +57,7 @@ export class DatabaseImportService {
     ['type', ['type']],
     ['connectionType', ['connectionType']],
     ['tls', ['tls', 'ssl']],
+    ['verifyServerCert', ['verifyServerCert', 'sslOptions.rejectUnauthorized']],
     ['tlsServername', ['tlsServername']],
     ['tlsCaName', ['caCert.name']],
     [
@@ -113,6 +114,9 @@ export class DatabaseImportService {
     ['modules', ['modules']],
     ['forceStandalone', ['forceStandalone']],
     ['tags', ['tags']],
+    ['providerDetails', ['providerDetails']],
+    ['environment', ['environment']],
+    ['connectionFamily', ['connectionFamily']],
   ];
 
   constructor(
@@ -151,9 +155,7 @@ export class DatabaseImportService {
         if (filename.length > 50) {
           filename = `${filename.slice(0, 50)}...`;
         }
-        throw new UnableToParseDatabaseImportFileException(
-          `Unable to parse ${filename}`,
-        );
+        throw new UnableToParseDatabaseImportFileException(filename);
       }
 
       let response = {
@@ -294,6 +296,17 @@ export class DatabaseImportService {
         } catch (e) {
           status = DatabaseImportStatus.Partial;
           errors.push(e);
+        }
+      }
+
+      // Absent now means "do not verify". Default only when the field is
+      // missing; exported null stays unchecked. Leave other values alone so
+      // @IsBoolean can reject junk (e.g. rejectUnauthorized: "true").
+      if (data?.tls) {
+        if (data.verifyServerCert === undefined) {
+          data.verifyServerCert = true;
+        } else if (data.verifyServerCert === null) {
+          data.verifyServerCert = false;
         }
       }
 

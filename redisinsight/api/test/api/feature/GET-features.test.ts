@@ -34,8 +34,12 @@ const waitForFlags = async (flags: any, action?: Function) => {
     }
 
     client.once('features', (data) => {
-      expect(flags.features).to.deep.eq(data.features);
-      res(true);
+      try {
+        expect(data.features).to.deep.eq(flags.features);
+        res(true);
+      } catch (e) {
+        rej(e);
+      }
     });
     setTimeout(() => {
       rej(new Error('no flags received in 10s'));
@@ -78,8 +82,8 @@ describe('GET /features', () => {
           .catch(console.error);
 
         // remove all configs
-        await featureConfigRepository.delete({});
-        await featureRepository.delete({});
+        await featureConfigRepository.deleteAll();
+        await featureRepository.deleteAll();
         await waitForFlags(
           {
             features: {
@@ -94,6 +98,10 @@ describe('GET /features', () => {
               databaseManagement: {
                 flag: true,
                 name: 'databaseManagement',
+              },
+              customTutorials: {
+                flag: false,
+                name: 'customTutorials',
               },
             },
           },
@@ -116,6 +124,10 @@ describe('GET /features', () => {
           databaseManagement: {
             flag: true,
             name: 'databaseManagement',
+          },
+          customTutorials: {
+            flag: false,
+            name: 'customTutorials',
           },
         });
         expect(body.controlNumber).to.eq(config.controlNumber);
@@ -164,6 +176,10 @@ describe('GET /features', () => {
                 flag: true,
                 name: 'databaseManagement',
               },
+              customTutorials: {
+                flag: false,
+                name: 'customTutorials',
+              },
             },
           },
           syncEndpoint,
@@ -183,6 +199,10 @@ describe('GET /features', () => {
           databaseManagement: {
             flag: true,
             name: 'databaseManagement',
+          },
+          customTutorials: {
+            flag: false,
+            name: 'customTutorials',
           },
         },
       },
@@ -234,6 +254,10 @@ describe('GET /features', () => {
                 flag: true,
                 name: 'databaseManagement',
               },
+              customTutorials: {
+                flag: false,
+                name: 'customTutorials',
+              },
             },
           },
           syncEndpoint,
@@ -254,14 +278,18 @@ describe('GET /features', () => {
             flag: true,
             name: 'databaseManagement',
           },
+          customTutorials: {
+            flag: false,
+            name: 'customTutorials',
+          },
         },
       },
     },
     {
       name: 'Should return false since analytics disabled (triggered by settings change)',
       before: async () => {
-        await new Promise((res, rej) => {
-          waitForFlags({
+        await waitForFlags(
+          {
             features: {
               insightsRecommendations: {
                 flag: false,
@@ -275,17 +303,19 @@ describe('GET /features', () => {
                 flag: true,
                 name: 'databaseManagement',
               },
+              customTutorials: {
+                flag: false,
+                name: 'customTutorials',
+              },
             },
-          })
-            .then(res)
-            .catch(rej);
-
-          updateSettings({
-            agreements: {
-              analytics: false,
-            },
-          }).catch(rej);
-        });
+          },
+          () =>
+            updateSettings({
+              agreements: {
+                analytics: false,
+              },
+            }),
+        );
       },
       statusCode: 200,
       responseBody: {
@@ -301,6 +331,10 @@ describe('GET /features', () => {
           databaseManagement: {
             flag: true,
             name: 'databaseManagement',
+          },
+          customTutorials: {
+            flag: false,
+            name: 'customTutorials',
           },
         },
       },

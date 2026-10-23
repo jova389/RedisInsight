@@ -3,7 +3,7 @@ import AppNavigation from './navigation-menu/app-navigation/AppNavigation'
 import PageHeader from './page-header/PageHeader'
 import GroupBadge from './group-badge/GroupBadge'
 import Notifications from './notifications/Notifications'
-import DatabaseListModules from './database-list-modules/DatabaseListModules'
+import { DatabaseListModules } from './database-list-modules/DatabaseListModules'
 import DatabaseListOptions from './database-list-options/DatabaseListOptions'
 import DatabaseOverview from './database-overview/DatabaseOverview'
 import InputFieldSentinel from './input-field-sentinel/InputFieldSentinel'
@@ -26,10 +26,10 @@ import PagePlaceholder from './page-placeholder'
 import BulkActionsConfig from './bulk-actions-config'
 import OnboardingTour from './onboarding-tour'
 import CodeBlock from './code-block'
-import ShowChildByCondition from './show-child-by-condition'
 import FeatureFlagComponent from './feature-flag-component'
 import AutoRefresh from './auto-refresh'
-import { ModuleNotLoaded, FilterNotAvailable } from './messages'
+import ConfirmationPopover from './confirmation-popover'
+import { ModuleNotLoaded, FeatureNotAvailable } from './messages'
 import RdiInstanceHeader from './rdi-instance-header'
 import {
   RecommendationBody,
@@ -41,6 +41,7 @@ import {
 import { FormatedDate } from './formated-date'
 import { UploadWarning } from './upload-warning'
 import FormDialog from './form-dialog'
+import TypeToConfirmModal from './type-to-confirm-modal'
 
 export { FullScreen } from './full-screen'
 
@@ -74,13 +75,13 @@ export {
   BulkActionsConfig,
   OnboardingTour,
   CodeBlock,
-  ShowChildByCondition,
   RecommendationVoting,
   RecommendationCopyComponent,
   FeatureFlagComponent,
   ModuleNotLoaded,
-  FilterNotAvailable,
+  FeatureNotAvailable,
   AutoRefresh,
+  ConfirmationPopover,
   RdiInstanceHeader,
   RecommendationBody,
   RecommendationBadges,
@@ -88,4 +89,5 @@ export {
   FormatedDate,
   UploadWarning,
   FormDialog,
+  TypeToConfirmModal,
 }

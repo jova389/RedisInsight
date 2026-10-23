@@ -1,14 +1,9 @@
 import React from 'react'
-import { render } from 'uiSrc/utils/test-utils'
+import { render, screen } from 'uiSrc/utils/test-utils'
 
 import AddMultipleFields from './AddMultipleFields'
 
 const testItems1 = [{ id: '0', field: '' }]
-const testItems2 = [{ id: '0', field: '', value: '' }]
-const testItems3 = [
-  { id: '0', field: 'field', value: 'val' },
-  { id: '1', field: '', value: '' },
-]
 
 describe('AddMultipleFields', () => {
   it('should render', () => {
@@ -24,5 +19,25 @@ describe('AddMultipleFields', () => {
         </AddMultipleFields>,
       ),
     ).toBeTruthy()
+  })
+
+  it('renders column headers once, with the required asterisk in front', () => {
+    render(
+      <AddMultipleFields
+        items={testItems1}
+        isClearDisabled={() => true}
+        onClickAdd={jest.fn()}
+        onClickRemove={jest.fn()}
+        columnLabels={[{ label: 'Member' }, { label: 'Score', required: true }]}
+      >
+        {() => <div />}
+      </AddMultipleFields>,
+    )
+
+    const score = screen.getByText('Score').closest('label')
+    expect(score?.textContent?.trimStart().startsWith('*')).toBe(true)
+
+    const member = screen.getByText('Member').closest('label')
+    expect(member?.textContent?.trimStart().startsWith('*')).toBe(false)
   })
 })

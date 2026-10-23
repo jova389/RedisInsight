@@ -68,9 +68,9 @@ jest.mock('uiSrc/telemetry', () => ({
   sendEventTelemetry: jest.fn(),
 }))
 
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useDispatch: () => jest.fn().mockReturnValue(() => jest.fn()),
+jest.mock('uiSrc/slices/hooks', () => ({
+  ...jest.requireActual('uiSrc/slices/hooks'),
+  useAppDispatch: () => jest.fn().mockReturnValue(() => jest.fn()),
 }))
 
 beforeEach(async () => {
@@ -216,6 +216,24 @@ describe('StringDetailsValue', () => {
     expect(screen.getByTestId(STRING_VALUE)).not.toHaveTextContent(
       '[object Object]',
     )
+  })
+
+  it('Should render the markdown viewer when viewFormat is Markdown', () => {
+    const stringDataSelectorMock = jest.fn().mockReturnValue({
+      value: fullValue,
+    })
+    const selectedKeySelectorMock = jest.fn().mockReturnValue({
+      viewFormat: KeyValueFormat.Markdown,
+    })
+    ;(selectedKeySelector as jest.Mock).mockImplementation(
+      selectedKeySelectorMock,
+    )
+    ;(stringDataSelector as jest.Mock).mockImplementation(
+      stringDataSelectorMock,
+    )
+
+    render(<StringDetailsValue {...instance(mockedProps)} />)
+    expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument()
   })
 
   it('Should not add "..." in the end of the full value', async () => {

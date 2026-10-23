@@ -1,9 +1,9 @@
 import React from 'react'
-import { Table, ColumnDefinition } from 'uiSrc/components/base/layout/table'
 
+import { Table, ColumnDef } from 'uiSrc/components/base/layout/table'
+import { ImportTableResultColumn } from 'uiSrc/constants'
 import { ErrorImportResult } from 'uiSrc/slices/interfaces'
-
-import styles from './styles.module.scss'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface DataImportResult {
   index: number
@@ -12,11 +12,13 @@ export interface DataImportResult {
   host?: string
   port?: number
 }
+
 export interface Props {
   data: Array<DataImportResult>
 }
 
 const TableResult = (props: Props) => {
+  const { t } = useTranslation()
   const { data } = props
 
   const ErrorResult = ({ errors }: { errors: string[] }) => (
@@ -27,21 +29,22 @@ const TableResult = (props: Props) => {
     </ul>
   )
 
-  const columns: ColumnDefinition<DataImportResult>[] = [
+  const columns: ColumnDef<DataImportResult>[] = [
     {
       header: '#',
-      id: 'index',
-      accessorKey: 'index',
+      id: ImportTableResultColumn.Index,
+      accessorKey: ImportTableResultColumn.Index,
       cell: ({
         row: {
           original: { index },
         },
       }) => <span data-testid={`table-index-${index}`}>({index})</span>,
+      size: 50,
     },
     {
-      header: 'Host:Port',
-      id: 'host',
-      accessorKey: 'host',
+      header: t('home.importDatabase.result.column.host'),
+      id: ImportTableResultColumn.Host,
+      accessorKey: ImportTableResultColumn.Host,
       cell: ({
         row: {
           original: { host, port, index },
@@ -53,8 +56,8 @@ const TableResult = (props: Props) => {
       ),
     },
     {
-      header: 'Result',
-      id: 'errors',
+      header: t('home.importDatabase.result.column.result'),
+      id: ImportTableResultColumn.Errors,
       accessorKey: 'errors',
       cell: ({
         row: {
@@ -65,7 +68,7 @@ const TableResult = (props: Props) => {
           {errors ? (
             <ErrorResult errors={errors.map((e) => e.message)} />
           ) : (
-            'Successful'
+            t('home.importDatabase.table.successful')
           )}
         </div>
       ),
@@ -75,9 +78,12 @@ const TableResult = (props: Props) => {
   if (data?.length === 0) return null
 
   return (
-    <div className={styles.tableWrapper}>
-      <Table columns={columns} data={data} defaultSorting={[]} />
-    </div>
+    <Table
+      columns={columns}
+      data={data}
+      defaultSorting={[]}
+      maxHeight="20rem"
+    />
   )
 }
 

@@ -1,5 +1,5 @@
 import React, { Ref, useCallback, useEffect, useRef } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import cx from 'classnames'
 import { isEmpty } from 'lodash'
 import { useParams } from 'react-router-dom'
@@ -16,7 +16,6 @@ import {
 } from 'uiSrc/slices/app/context'
 import { CommandExecutionUI } from 'uiSrc/slices/interfaces'
 import { RunQueryMode, ResultsMode } from 'uiSrc/slices/interfaces/workbench'
-
 import { TelemetryEvent, sendEventTelemetry } from 'uiSrc/telemetry'
 import { appRedisCommandsSelector } from 'uiSrc/slices/app/redis-commands'
 import { userSettingsConfigSelector } from 'uiSrc/slices/user/user-settings'
@@ -28,8 +27,12 @@ import {
   ResizablePanel,
   ResizablePanelHandle,
 } from 'uiSrc/components/base/layout'
+import { QueryResultsProvider } from 'uiSrc/components/query/context/query-results.context'
+import { QueryResults } from 'uiSrc/components/query/query-results'
+import { toggleOpenWBResult } from 'uiSrc/slices/workbench/wb-results'
 import QueryWrapper from '../../query'
-import WBResultsWrapper from '../../wb-results'
+import { workbenchResultsTelemetry } from '../../../telemetry.constants'
+import WbNoResultsMessage from '../../wb-no-results-message'
 
 import styles from './styles.module.scss'
 
@@ -71,6 +74,7 @@ let state: IState = {
   resultsMode: ResultsMode.Default,
 }
 
+/** @deprecated Use PageContent from 'pages/vector-search/pages/VectorSearchQueryPage/components/page-content' instead. */
 const WBView = (props: Props) => {
   const {
     script = '',
@@ -97,16 +101,15 @@ const WBView = (props: Props) => {
   }
 
   const { instanceId = '' } = useParams<{ instanceId: string }>()
-  const { panelSizes } = useSelector(appContextWorkbench)
-  const { commandsArray: REDIS_COMMANDS_ARRAY } = useSelector(
+  const { panelSizes } = useAppSelector(appContextWorkbench)
+  const { commandsArray: REDIS_COMMANDS_ARRAY } = useAppSelector(
     appRedisCommandsSelector,
   )
   const { batchSize = PIPELINE_COUNT_DEFAULT } =
-    useSelector(userSettingsConfigSelector) ?? {}
-
+    useAppSelector(userSettingsConfigSelector) ?? {}
   const verticalPanelSizesRef = useRef(panelSizes)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(
     () => () => {
@@ -118,6 +121,15 @@ const WBView = (props: Props) => {
   const onVerticalPanelWidthChange = useCallback((newSizes: any) => {
     verticalPanelSizesRef.current = newSizes
   }, [])
+
+  const handleToggleOpen = (id: string, isOpen: boolean) => {
+    dispatch(toggleOpenWBResult(id))
+
+    const item = items.find((i) => i.id === id)
+    if (isOpen && !item?.result) {
+      onQueryOpen(id)
+    }
+  }
 
   const handleSubmit = (value?: string) => {
     sendEventSubmitTelemetry(TelemetryEvent.WORKBENCH_COMMAND_SUBMITTED, value)
@@ -232,20 +244,23 @@ const WBView = (props: Props) => {
               defaultSize={panelSizes && panelSizes[1] ? panelSizes[1] : 80}
               className={cx(styles.queryResults, styles.queryResultsPanel)}
             >
-              <WBResultsWrapper
-                items={items}
-                clearing={clearing}
-                processing={processing}
-                isResultsLoaded={isResultsLoaded}
-                activeMode={activeMode}
-                activeResultsMode={resultsMode}
-                scrollDivRef={scrollDivRef}
-                onQueryReRun={handleReRun}
-                onQueryProfile={handleProfile}
-                onQueryOpen={onQueryOpen}
-                onQueryDelete={onQueryDelete}
-                onAllQueriesDelete={onAllQueriesDelete}
-              />
+              <QueryResultsProvider telemetry={workbenchResultsTelemetry}>
+                <QueryResults
+                  items={items}
+                  clearing={clearing}
+                  processing={processing}
+                  isResultsLoaded={isResultsLoaded}
+                  activeMode={activeMode}
+                  activeResultsMode={resultsMode}
+                  scrollDivRef={scrollDivRef}
+                  onToggleOpen={handleToggleOpen}
+                  onQueryReRun={handleReRun}
+                  onQueryProfile={handleProfile}
+                  onQueryDelete={onQueryDelete}
+                  onAllQueriesDelete={onAllQueriesDelete}
+                  noResultsPlaceholder={<WbNoResultsMessage />}
+                />
+              </QueryResultsProvider>
             </ResizablePanel>
           </ResizableContainer>
         </div>

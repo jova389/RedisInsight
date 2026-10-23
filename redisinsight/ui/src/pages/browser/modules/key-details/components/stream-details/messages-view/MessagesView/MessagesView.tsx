@@ -1,12 +1,13 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
+import { useTranslation } from 'uiSrc/i18n'
 import cx from 'classnames'
 
 import { streamGroupsSelector } from 'uiSrc/slices/browser/stream'
 import VirtualTable from 'uiSrc/components/virtual-table/VirtualTable'
 import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
 import { selectedKeyDataSelector } from 'uiSrc/slices/browser/keys'
-import { PendingEntryDto } from 'apiSrc/modules/browser/stream/dto'
+import { PendingEntryDto } from 'apiClient'
 
 import styles from './styles.module.scss'
 
@@ -29,11 +30,12 @@ const MessagesView = (props: Props) => {
     total,
     onClosePopover,
     loadMoreItems,
-    noItemsMessageString = 'Your Consumer has no pending messages.',
+    noItemsMessageString,
   } = props
+  const { t } = useTranslation()
 
-  const { loading } = useSelector(streamGroupsSelector)
-  const { name: key = '' } = useSelector(selectedKeyDataSelector) ?? {}
+  const { loading } = useAppSelector(streamGroupsSelector)
+  const { name: key = '' } = useAppSelector(selectedKeyDataSelector) ?? {}
 
   return (
     <>
@@ -60,7 +62,9 @@ const MessagesView = (props: Props) => {
           tableWidth={columns.reduce((a, b) => a + (b.minWidth ?? 0), 0)}
           onWheel={onClosePopover}
           loadMoreItems={loadMoreItems}
-          noItemsMessage={noItemsMessageString}
+          noItemsMessage={
+            noItemsMessageString ?? t('browser.stream.messages.empty')
+          }
         />
       </div>
     </>

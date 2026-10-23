@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from 'uiSrc/slices/hooks'
+import { useTranslation } from 'uiSrc/i18n'
 import cx from 'classnames'
 import { orderBy } from 'lodash'
 
@@ -8,7 +9,7 @@ import VirtualTable from 'uiSrc/components/virtual-table/VirtualTable'
 import { ITableColumn } from 'uiSrc/components/virtual-table/interfaces'
 import { selectedKeyDataSelector } from 'uiSrc/slices/browser/keys'
 import { SortOrder } from 'uiSrc/constants'
-import { ConsumerDto } from 'apiSrc/modules/browser/stream/dto'
+import { ConsumerDto } from 'apiClient'
 
 import styles from './styles.module.scss'
 
@@ -29,11 +30,12 @@ const ConsumersView = (props: Props) => {
     columns = [],
     onClosePopover,
     onSelectConsumer,
-    noItemsMessageString = 'Your Consumer Group has no Consumers available.',
+    noItemsMessageString,
   } = props
+  const { t } = useTranslation()
 
-  const { loading } = useSelector(streamGroupsSelector)
-  const { name: key = '' } = useSelector(selectedKeyDataSelector) ?? {}
+  const { loading } = useAppSelector(streamGroupsSelector)
+  const { name: key = '' } = useAppSelector(selectedKeyDataSelector) ?? {}
 
   const [consumers, setConsumers] = useState(data)
   const [sortedColumnName, setSortedColumnName] = useState<string>('name')
@@ -79,7 +81,9 @@ const ConsumersView = (props: Props) => {
           items={consumers}
           onWheel={onClosePopover}
           onChangeSorting={onChangeSorting}
-          noItemsMessage={noItemsMessageString}
+          noItemsMessage={
+            noItemsMessageString ?? t('browser.stream.consumers.empty')
+          }
           sortedColumn={
             consumers?.length
               ? {

@@ -17,6 +17,7 @@ export enum PageNames {
   workbench = 'workbench',
   vectorSearch = 'vector-search',
   vectorSearchCreateIndex = 'create-index',
+  vectorSearchQuery = 'query',
   browser = 'browser',
   search = 'search',
   slowLog = 'slowlog',
@@ -27,6 +28,7 @@ export enum PageNames {
   settings = 'settings',
   // rdi pages
   rdiPipelineManagement = 'pipeline-management',
+  rdiPipelineManagementV2 = 'pipeline-management-v2',
   rdiPipelineConfig = 'config',
   rdiPipelineJobs = 'jobs',
   rdiStatistics = 'statistics',
@@ -34,12 +36,19 @@ export enum PageNames {
 
 const redisCloud = '/redis-cloud'
 const sentinel = '/sentinel'
+const azure = '/azure'
 const rdi = '/integrate'
+
+// Query-param keys used to deep-link into the home page's edit-database dialog
+// and (optionally) reveal one of its fields.
+export const EDIT_INSTANCE_QUERY_PARAM = 'editInstance'
+export const FOCUS_FIELD_QUERY_PARAM = 'focusField'
 
 export type PageValues = (typeof Pages)[keyof typeof Pages]
 export const Pages = {
   home: '/',
-  homeEditInstance: (instanceId: string) => `/?editInstance=${instanceId}`,
+  homeEditInstance: (instanceId: string, focusField?: string) =>
+    `/?${EDIT_INSTANCE_QUERY_PARAM}=${instanceId}${focusField ? `&${FOCUS_FIELD_QUERY_PARAM}=${focusField}` : ''}`,
   notFound: '/not-found',
   redisEnterpriseAutodiscovery: '/redis-enterprise-autodiscovery',
   settings: `/${PageNames.settings}`,
@@ -50,11 +59,17 @@ export const Pages = {
   sentinel,
   sentinelDatabases: `${sentinel}/databases`,
   sentinelDatabasesResult: `${sentinel}/databases-result`,
+  azure,
+  azureSubscriptions: `${azure}/subscriptions`,
+  azureDatabases: `${azure}/databases`,
+  azureManualConnection: `${azure}/manual-connection`,
   browser: (instanceId: string) => `/${instanceId}/${PageNames.browser}`,
   vectorSearch: (instanceId: string) =>
     `/${instanceId}/${PageNames.vectorSearch}`,
   vectorSearchCreateIndex: (instanceId: string) =>
     `/${instanceId}/${PageNames.vectorSearch}/${PageNames.vectorSearchCreateIndex}`,
+  vectorSearchQuery: (instanceId: string, indexName: string) =>
+    `/${instanceId}/${PageNames.vectorSearch}/${indexName}/${PageNames.vectorSearchQuery}`,
   workbench: (instanceId: string) => `/${instanceId}/${PageNames.workbench}`,
   search: (instanceId: string) => `/${instanceId}/${PageNames.search}`,
   pubSub: (instanceId: string) => `/${instanceId}/${PageNames.pubSub}`,
@@ -70,6 +85,8 @@ export const Pages = {
   rdiPipeline: (rdiInstance: string) => `${rdi}/${rdiInstance}`,
   rdiPipelineManagement: (rdiInstance: string) =>
     `${rdi}/${rdiInstance}/${PageNames.rdiPipelineManagement}`,
+  rdiPipelineManagementV2: (rdiInstance: string) =>
+    `${rdi}/${rdiInstance}/${PageNames.rdiPipelineManagementV2}`,
   rdiPipelineConfig: (rdiInstance: string) =>
     `${rdi}/${rdiInstance}/${PageNames.rdiPipelineManagement}/${PageNames.rdiPipelineConfig}`,
   rdiPipelineJobs: (rdiInstance: string, jobName: string) =>

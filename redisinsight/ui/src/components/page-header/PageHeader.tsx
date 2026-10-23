@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useHistory } from 'react-router-dom'
 
 import cx from 'classnames'
@@ -18,9 +18,10 @@ import { Title } from 'uiSrc/components/base/text/Title'
 import { EmptyButton } from 'uiSrc/components/base/forms/buttons'
 import { RedisLogoFullIcon } from 'uiSrc/components/base/icons'
 import styles from './PageHeader.module.scss'
+import { ColorText } from 'uiSrc/components/base/text'
 
 interface Props {
-  title: string
+  title?: string
   subtitle?: string
   children?: React.ReactNode
   showInsights?: boolean
@@ -33,14 +34,14 @@ const PageHeader = (props: Props) => {
   const {
     [FeatureFlags.databaseChat]: databaseChatFeature,
     [FeatureFlags.documentationChat]: documentationChatFeature,
-  } = useSelector(appFeatureFlagsFeaturesSelector)
+  } = useAppSelector(appFeatureFlagsFeaturesSelector)
   const isAnyChatAvailable = isAnyFeatureEnabled([
     databaseChatFeature,
     documentationChatFeature,
   ])
 
   const history = useHistory()
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const resetConnections = () => {
     dispatch(resetDataRedisCluster())
@@ -57,9 +58,13 @@ const PageHeader = (props: Props) => {
     <div className={cx(styles.pageHeader, className)}>
       <div className={styles.pageHeaderTop}>
         <div>
-          <Title size="L" data-testid="page-title">
-            <b data-testid="page-header-title">{title}</b>
-          </Title>
+          {title && (
+            <Title size="L" data-testid="page-title">
+              <ColorText variant="semiBold" data-testid="page-header-title">
+                {title}
+              </ColorText>
+            </Title>
+          )}
           {subtitle ? <span data-testid="page-subtitle">{subtitle}</span> : ''}
         </div>
         {children ? <>{children}</> : ''}
@@ -70,7 +75,7 @@ const PageHeader = (props: Props) => {
                 <CopilotTrigger />
               </FlexItem>
             )}
-            <FlexItem grow>
+            <FlexItem>
               <InsightsTrigger source="home page" />
             </FlexItem>
             <FeatureFlagComponent

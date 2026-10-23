@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 
 import {
   bufferToSerializedFormat,
@@ -29,7 +29,7 @@ import {
   updateStringValueAction,
 } from 'uiSrc/slices/browser/string'
 import InlineItemEditor from 'uiSrc/components/inline-item-editor/InlineItemEditor'
-import { AddStringFormConfig as config } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
+import { getAddStringFormConfig } from 'uiSrc/pages/browser/components/add-key/constants/fields-config'
 import {
   selectedKeyDataSelector,
   selectedKeySelector,
@@ -39,11 +39,8 @@ import {
   KeyValueFormat,
   ModulesKeyTypes,
   STRING_MAX_LENGTH,
-  TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA,
-  TEXT_DISABLED_COMPRESSED_VALUE,
-  TEXT_FAILED_CONVENT_FORMATTER,
-  TEXT_INVALID_VALUE,
-  TEXT_UNPRINTABLE_CHARACTERS,
+  getTextInvalidValue,
+  getTextUnprintableCharacters,
 } from 'uiSrc/constants'
 import { calculateTextareaLines } from 'uiSrc/utils/calculateTextareaLines'
 import { decompressingBuffer } from 'uiSrc/utils/decompressors'
@@ -60,10 +57,21 @@ import { Text } from 'uiSrc/components/base/text'
 import { TextArea } from 'uiSrc/components/base/inputs'
 import { RiTooltip } from 'uiSrc/components'
 import { ProgressBarLoader } from 'uiSrc/components/base/display'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import {
+  NonUnicodeEditConfirmation,
+  useNonUnicodeEditGuard,
+} from 'uiSrc/pages/browser/modules/key-details/shared/non-unicode-edit-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 const MIN_ROWS = 8
 const APPROXIMATE_WIDTH_OF_SIGN = 8.6
+const APPROXIMATE_ROW_HEIGHT = 17
+const TEXTAREA_PADDING = 80
 const MAX_LENGTH = STRING_MAX_LENGTH + 1
 
 export interface Props {
@@ -78,18 +86,20 @@ export interface Props {
 
 const StringDetailsValue = (props: Props) => {
   const { isEditItem, setIsEdit, onRefresh } = props
+  const { t } = useTranslation()
+  const config = getAddStringFormConfig(t)
 
-  const { compressor = null } = useSelector(connectedInstanceSelector)
-  const { loading } = useSelector(stringSelector)
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
-  const { value: initialValue } = useSelector(stringDataSelector)
+  const { compressor = null } = useAppSelector(connectedInstanceSelector)
+  const { loading } = useAppSelector(stringSelector)
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
+  const { value: initialValue } = useAppSelector(stringDataSelector)
   const {
     name: key,
     type: keyType,
     length,
-  } = useSelector(selectedKeyDataSelector) ?? { name: '' }
+  } = useAppSelector(selectedKeyDataSelector) ?? { name: '' }
   const keyString = typeof key === 'string' ? key : bufferToString(key)
-  const { viewFormat: viewFormatProp } = useSelector(selectedKeySelector)
+  const { viewFormat: viewFormatProp } = useAppSelector(selectedKeySelector)
   const isTruncatedValue = isTruncatedString(initialValue)
 
   const [rows, setRows] = useState<number>(MIN_ROWS)
@@ -100,14 +110,15 @@ const StringDetailsValue = (props: Props) => {
   const [isDisabled, setIsDisabled] = useState(false)
   const [isEditable, setIsEditable] = useState(true)
   const [noEditableText, setNoEditableText] = useState<string>(
-    TEXT_DISABLED_COMPRESSED_VALUE,
+    t('browser.keyDetails.compressedValueDisabled'),
   )
 
   const textAreaRef: Ref<HTMLTextAreaElement> = useRef(null)
-  const viewValueRef: Ref<HTMLPreElement> = useRef(null)
   const containerRef: Ref<HTMLDivElement> = useRef(null)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
+  const { requestConfirmation } = useProductionWriteConfirmation()
+  const editGuard = useNonUnicodeEditGuard()
 
   useEffect(
     () => () => {
@@ -152,10 +163,12 @@ const StringDetailsValue = (props: Props) => {
     )
     setNoEditableText(
       isCompressed
-        ? TEXT_DISABLED_COMPRESSED_VALUE
+        ? t('browser.keyDetails.compressedValueDisabled')
         : isTruncatedValue
-          ? TEXT_DISABLED_ACTION_WITH_TRUNCATED_DATA
-          : TEXT_FAILED_CONVENT_FORMATTER(viewFormatProp),
+          ? t('browser.keyDetails.truncatedActionDisabled')
+          : t('browser.keyDetails.failedConvertFormatter', {
+              format: viewFormatProp,
+            }),
     )
 
     dispatch(setIsStringCompressed(isCompressed))
@@ -163,10 +176,10 @@ const StringDetailsValue = (props: Props) => {
     if (viewFormat !== viewFormatProp) {
       setViewFormat(viewFormatProp)
     }
-  }, [initialValue, viewFormatProp, compressor, length])
+  }, [initialValue, viewFormatProp, compressor, length, t])
 
   useEffect(() => {
-    // Approximate calculation of textarea rows by initialValue
+    // Approximate calculation of textarea rows by areaValue
     if (!isEditItem || !textAreaRef.current || value === null) {
       return
     }
@@ -175,10 +188,16 @@ const StringDetailsValue = (props: Props) => {
       textAreaRef.current.clientWidth,
       APPROXIMATE_WIDTH_OF_SIGN,
     )
-    if (calculatedRows > MIN_ROWS) {
-      setRows(calculatedRows)
-    }
-  }, [viewValueRef, isEditItem])
+
+    // Calculate max rows based on container height
+    const containerHeight = containerRef.current?.clientHeight || 0
+    const availableHeight = containerHeight - TEXTAREA_PADDING
+    const maxRows = Math.floor(availableHeight / APPROXIMATE_ROW_HEIGHT)
+
+    // Clamp rows between MIN_ROWS and maxRows
+    const newRows = Math.max(MIN_ROWS, Math.min(calculatedRows, maxRows))
+    setRows(newRows)
+  }, [areaValue, isEditItem])
 
   useMemo(() => {
     if (isEditItem && initialValue) {
@@ -188,12 +207,21 @@ const StringDetailsValue = (props: Props) => {
   }, [isEditItem])
 
   const onApplyChanges = () => {
-    const data = stringToSerializedBufferFormat(viewFormat, areaValue)
-    const onSuccess = () => {
-      setIsEdit(false)
-      setValue(formattingBuffer(data, viewFormat, { expanded: true }, keyString)?.value)
-    }
-    dispatch(updateStringValueAction(key, data, onSuccess))
+    requestConfirmation({
+      title: t('browser.keyDetails.editable.confirmTitle'),
+      actionDescription: t('browser.keyDetails.editable.confirmMessage'),
+      confirmButtonText: t('browser.keyDetails.editable.confirmButton'),
+      commandId: BrowserConfirmationCommandId.EditValue,
+      disableConfirmationInput: true,
+      onConfirm: () => {
+        const data = stringToSerializedBufferFormat(viewFormat, areaValue)
+        const onSuccess = () => {
+          setIsEdit(false)
+          setValue(formattingBuffer(data, viewFormat, { expanded: true }, keyString)?.value)
+        }
+        dispatch(updateStringValueAction(key, data, onSuccess))
+      },
+    })
   }
 
   const onDeclineChanges = useCallback(() => {
@@ -235,27 +263,44 @@ const StringDetailsValue = (props: Props) => {
   const renderValue = (value: string) => {
     const textEl = (
       <Text
+        component="div"
+        color="secondary"
         className={styles.stringValue}
-        onClick={() => isEditable && setIsEdit(true)}
+        onClick={() =>
+          isEditable && editGuard.requestEdit(() => setIsEdit(true))
+        }
         style={{ whiteSpace: 'break-spaces' }}
         data-testid="string-value"
       >
         {areaValue !== ''
           ? value
-          : !isLoading && <span style={{ fontStyle: 'italic' }}>Empty</span>}
+          : !isLoading && (
+              <span style={{ fontStyle: 'italic' }}>
+                {t('browser.string.empty')}
+              </span>
+            )}
       </Text>
     )
 
     return (
-      <RiTooltip
-        title={!isValid ? noEditableText : undefined}
-        anchorClassName={styles.tooltipAnchor}
-        className={styles.tooltip}
-        position="left"
-        data-testid="string-value-tooltip"
-      >
-        {textEl}
-      </RiTooltip>
+      <NonUnicodeEditConfirmation
+        isOpen={editGuard.isOpen}
+        format={editGuard.format}
+        onCancel={editGuard.cancel}
+        onChangeToUnicode={editGuard.changeToUnicode}
+        onEditAnyway={editGuard.editAnyway}
+        button={
+          <RiTooltip
+            title={!isValid ? noEditableText : undefined}
+            anchorClassName={styles.tooltipAnchor}
+            className={styles.tooltip}
+            position="left"
+            data-testid="string-value-tooltip"
+          >
+            {textEl}
+          </RiTooltip>
+        }
+      />
     )
   }
 
@@ -276,16 +321,16 @@ const StringDetailsValue = (props: Props) => {
         {isEditItem && (
           <InlineItemEditor
             controlsPosition="bottom"
-            placeholder="Enter Value"
+            placeholder={t('browser.keyDetails.editable.valuePlaceholder')}
             fieldName="value"
             expandable
             isLoading={false}
             isDisabled={isDisabled}
-            disabledTooltipText={TEXT_UNPRINTABLE_CHARACTERS}
+            disabledTooltipText={getTextUnprintableCharacters(t)}
             onDecline={onDeclineChanges}
             onApply={onApplyChanges}
             declineOnUnmount={false}
-            approveText={TEXT_INVALID_VALUE}
+            approveText={getTextInvalidValue(t)}
             approveByValidation={() =>
               formattingBuffer(
                 stringToSerializedBufferFormat(viewFormat, areaValue),
@@ -302,11 +347,7 @@ const StringDetailsValue = (props: Props) => {
               onChange={setAreaValue}
               disabled={loading}
               ref={textAreaRef}
-              style={{
-                maxHeight: containerRef.current
-                  ? containerRef.current?.clientHeight - 80
-                  : '100%',
-              }}
+              height="100%"
               data-testid="string-value"
             />
           </InlineItemEditor>
@@ -324,7 +365,7 @@ const StringDetailsValue = (props: Props) => {
                   data-testid="load-all-value-btn"
                   onClick={() => handleLoadAll(key, keyType)}
                 >
-                  Load all
+                  {t('browser.string.loadAll')}
                 </SecondaryButton>
               )}
             </FlexItem>
@@ -339,7 +380,7 @@ const StringDetailsValue = (props: Props) => {
                   onClick={handleDownloadString}
                   disabled={isTruncatedValue}
                 >
-                  Download
+                  {t('browser.string.download')}
                 </SecondaryButton>
               </FlexItem>
             )}

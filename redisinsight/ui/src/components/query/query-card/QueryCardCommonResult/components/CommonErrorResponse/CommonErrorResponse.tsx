@@ -1,5 +1,5 @@
 import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
 import {
   checkUnsupportedCommand,
@@ -28,9 +28,9 @@ import { showMonitor } from 'uiSrc/slices/cli/monitor'
 const CommonErrorResponse = (id: string, command = '', result?: any) => {
   const { instanceId = '' } = useParams<{ instanceId: string }>()
   const { unsupportedCommands: cliUnsupportedCommands, blockingCommands } =
-    useSelector(cliSettingsSelector)
-  const { modules } = useSelector(connectedInstanceSelector)
-  const dispatch = useDispatch()
+    useAppSelector(cliSettingsSelector)
+  const { modules } = useAppSelector(connectedInstanceSelector)
+  const dispatch = useAppDispatch()
   const unsupportedCommands = [
     SelectCommand.toLowerCase(),
     ...cliUnsupportedCommands,
@@ -91,7 +91,17 @@ const CommonErrorResponse = (id: string, command = '', result?: any) => {
       CommandExecutionStatus.Fail,
     )
   }
-  const unsupportedModule = checkUnsupportedModuleCommand(modules, commandLine)
+
+  const isSuccessfulResult = Array.isArray(result)
+    ? result.some((item) => item?.status === CommandExecutionStatus.Success)
+    : result?.status === CommandExecutionStatus.Success
+
+  // Skip ModuleNotLoaded when any reply already succeeded; under ACL, modules
+  // may be unknown even when the command ran. Callers must pass
+  // CommandExecutionResult[] (including group mode), not the raw Redis reply.
+  const unsupportedModule = !isSuccessfulResult
+    ? checkUnsupportedModuleCommand(modules, commandLine)
+    : undefined
 
   if (unsupportedModule) {
     return <ModuleNotLoaded moduleName={unsupportedModule} id={id} />

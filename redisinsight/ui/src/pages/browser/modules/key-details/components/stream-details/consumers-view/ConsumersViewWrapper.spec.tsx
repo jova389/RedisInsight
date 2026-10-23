@@ -16,12 +16,12 @@ import {
 } from 'uiSrc/slices/browser/stream'
 import VirtualTable from 'uiSrc/components/virtual-table/VirtualTable'
 import { bufferToString } from 'uiSrc/utils'
-import { TEXT_CONSUMER_GROUP_NAME_TOO_LONG } from 'uiSrc/constants'
+
 import {
   MOCK_TRUNCATED_BUFFER_VALUE,
   MOCK_TRUNCATED_STRING_VALUE,
 } from 'uiSrc/mocks/data/bigString'
-import { ConsumerDto } from 'apiSrc/modules/browser/stream/dto'
+import { ConsumerDto } from 'apiClient'
 import ConsumersViewWrapper, { Props } from './ConsumersViewWrapper'
 import ConsumersView, { Props as ConsumersViewProps } from './ConsumersView'
 
@@ -146,7 +146,8 @@ describe('ConsumersViewWrapper', () => {
 
       expect(mockConsumersView).toHaveBeenCalledWith(
         expect.objectContaining({
-          noItemsMessageString: TEXT_CONSUMER_GROUP_NAME_TOO_LONG,
+          noItemsMessageString:
+            'The consumer group name is too long, details cannot be displayed.',
           data: [],
         }),
         expect.anything(),

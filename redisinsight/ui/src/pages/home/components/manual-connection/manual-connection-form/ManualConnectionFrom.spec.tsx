@@ -44,6 +44,11 @@ jest.mock('uiSrc/slices/app/url-handling', () => ({
   appRedirectionSelector: jest.fn().mockReturnValue(() => ({ action: null })),
 }))
 
+jest.mock('uiSrc/slices/app/features', () => ({
+  ...jest.requireActual('uiSrc/slices/app/features'),
+  appFeatureFlagsFeaturesSelector: jest.fn().mockReturnValue({}),
+}))
+
 describe('InstanceForm', () => {
   it('should render', () => {
     expect(
@@ -97,6 +102,32 @@ describe('InstanceForm', () => {
         />,
       ),
     ).toBeTruthy()
+  })
+
+  it('should show the host input when editing a non-managed database', () => {
+    render(
+      <ManualConnectionForm
+        {...instance(mockedProps)}
+        isEditMode
+        isManaged={false}
+        formFields={formFields}
+      />,
+    )
+
+    expect(screen.getByTestId('host')).toBeInTheDocument()
+  })
+
+  it('should hide the host input when editing a managed database', () => {
+    render(
+      <ManualConnectionForm
+        {...instance(mockedProps)}
+        isEditMode
+        isManaged
+        formFields={formFields}
+      />,
+    )
+
+    expect(screen.queryByTestId('host')).not.toBeInTheDocument()
   })
 
   it('should render DatabaseForm', () => {
@@ -1313,6 +1344,77 @@ describe('InstanceForm', () => {
     })
   })
 
+  describe('Azure databases', () => {
+    beforeEach(() => {
+      // Reset appRedirectionSelector mock to ensure isFromCloud = false
+      ;(appRedirectionSelector as jest.Mock).mockImplementation(() => ({
+        action: null,
+      }))
+    })
+
+    it('should hide the endpoint and disable credentials when editing Azure database', () => {
+      render(
+        <ManualConnectionForm
+          {...instance(mockedProps)}
+          isEditMode
+          isFromAzure
+          isManaged
+          formFields={{
+            ...formFields,
+            connectionType: ConnectionType.Standalone,
+          }}
+        />,
+      )
+
+      // Endpoint (host/port) is hidden for managed databases and shown as
+      // read-only info above the form
+      expect(screen.queryByTestId('host')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('port')).not.toBeInTheDocument()
+      // Username and password remain visible but disabled for Azure
+      expect(screen.getByTestId('username')).toBeDisabled()
+      expect(screen.getByTestId('password')).toBeDisabled()
+    })
+
+    it('should disable connection fields when cloning Azure database', () => {
+      render(
+        <ManualConnectionForm
+          {...instance(mockedProps)}
+          isEditMode
+          isCloneMode
+          isFromAzure
+          formFields={{
+            ...formFields,
+            connectionType: ConnectionType.Standalone,
+          }}
+        />,
+      )
+
+      expect(screen.getByTestId('host')).toBeDisabled()
+      expect(screen.getByTestId('port')).toBeDisabled()
+      expect(screen.getByTestId('username')).toBeDisabled()
+      expect(screen.getByTestId('password')).toBeDisabled()
+    })
+
+    it('should show and enable the endpoint for a non-managed database in edit mode', () => {
+      render(
+        <ManualConnectionForm
+          {...instance(mockedProps)}
+          isEditMode
+          formFields={{
+            ...formFields,
+            connectionType: ConnectionType.Standalone,
+          }}
+        />,
+      )
+
+      // Host and port are editable for non-managed databases in edit mode
+      expect(screen.getByTestId('host')).not.toBeDisabled()
+      expect(screen.getByTestId('port')).not.toBeDisabled()
+      expect(screen.getByTestId('username')).not.toBeDisabled()
+      expect(screen.getByTestId('password')).not.toBeDisabled()
+    })
+  })
+
   it('should call submit on press Enter', async () => {
     const handleSubmit = jest.fn()
     render(
@@ -1333,5 +1435,19 @@ describe('InstanceForm', () => {
       })
     })
     expect(handleSubmit).toHaveBeenCalled()
+  })
+
+  describe('Database mode select', () => {
+    it('should render the dropdown', () => {
+      render(
+        <ManualConnectionForm
+          {...instance(mockedProps)}
+          isEditMode={false}
+          formFields={formFields}
+        />,
+      )
+
+      expect(screen.getByTestId('select-environment')).toBeInTheDocument()
+    })
   })
 })

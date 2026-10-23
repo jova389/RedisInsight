@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-import { useDispatch } from 'react-redux'
+import { useAppDispatch } from 'uiSrc/slices/hooks'
 
 import cx from 'classnames'
 import { PlusIcon } from 'uiSrc/components/base/icons'
@@ -13,13 +13,21 @@ import {
 import { RedisResponseBuffer } from 'uiSrc/slices/interfaces'
 
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
-import { getBrackets, isRealArray, isRealObject, wrapPath } from '../utils'
+import { useTranslation } from 'uiSrc/i18n'
+import {
+  getBrackets,
+  isRealArray,
+  isRealObject,
+  isScalar,
+  wrapPath,
+} from '../utils'
 import { BaseProps, ObjectTypes } from '../interfaces'
 import RejsonDynamicTypes from '../rejson-dynamic-types'
-import { AddItem } from '../components'
+import { AddItem, JsonValueActions } from '../components'
 import ChangeEditorTypeButton from '../../change-editor-type-button'
 
 import styles from '../styles.module.scss'
+import { TopRowActions } from './RejsonDetails.styles'
 
 const RejsonDetails = (props: BaseProps) => {
   const {
@@ -35,7 +43,8 @@ const RejsonDetails = (props: BaseProps) => {
 
   const [addRootKVPair, setAddRootKVPair] = useState<boolean>(false)
 
-  const dispatch = useDispatch()
+  const { t } = useTranslation()
+  const dispatch = useAppDispatch()
 
   const handleFetchVisualisationResults = (
     path: string,
@@ -87,21 +96,32 @@ const RejsonDetails = (props: BaseProps) => {
 
   const isObject = isRealObject(data, dataType)
   const isArray = isRealArray(data, dataType)
+  // Scalar roots (e.g. a bare null/string/number/boolean document) have no
+  // inline edit affordance, so expose the text editor as the way to edit them.
+  const isScalarRoot = !isObject && !isArray && isScalar(data)
 
   return (
     <div className={styles.jsonData} id="jsonData" data-testid="json-data">
       <>
-        {(isObject || isArray) && (
-          <div className={cx(styles.row, styles.topRow)}>
-            <span>
-              {getBrackets(
+        <div className={cx(styles.row, styles.topRow)}>
+          <span>
+            {(isObject || isArray) &&
+              getBrackets(
                 isObject ? ObjectTypes.Object : ObjectTypes.Array,
                 'start',
               )}
-            </span>
-            <ChangeEditorTypeButton />
-          </div>
-        )}
+          </span>
+          <TopRowActions align="center" justify="end" grow={false}>
+            {(isObject || isArray || isScalarRoot) && (
+              <ChangeEditorTypeButton />
+            )}
+            <JsonValueActions
+              data={data}
+              selectedKey={selectedKey}
+              isDownloaded={isDownloaded}
+            />
+          </TopRowActions>
+        </div>
         <RejsonDynamicTypes
           data={data}
           parentPath={parentPath}
@@ -136,7 +156,7 @@ const RejsonDetails = (props: BaseProps) => {
                 size="S"
                 className={styles.buttonStyle}
                 onClick={onClickSetRootKVPair}
-                aria-label="Add field"
+                aria-label={t('browser.rejson.addFieldAria')}
                 data-testid={isObject ? 'add-object-btn' : 'add-array-btn'}
               />
             )}

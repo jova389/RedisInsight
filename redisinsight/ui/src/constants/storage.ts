@@ -17,6 +17,7 @@ enum BrowserStorageItem {
   wbCommandsHistory = 'command_execution',
   treeViewDelimiter = 'treeViewDelimiter',
   treeViewSort = 'treeViewSort',
+  treeViewPrefixLength = 'treeViewDelimiterPrefixLength',
   autoRefreshRate = 'autoRefreshRate',
   bulkActionDeleteId = 'bulkActionDeleteId',
   dbConfig = 'dbConfig_',
@@ -39,6 +40,16 @@ enum BrowserStorageItem {
   aiChatSession = 'aiChatSession',
   selectedAiChat = 'selectedAiChat',
   generalChatAgreements = 'generalChatAgreements',
+  vectorSearchOnboarding = 'vectorSearchOnboarding',
+  tablePaginationState = 'tablePaginationState',
+  queryLibrary = 'query_library',
+  vectorSearchQueryOnboarding = 'vectorSearchQueryOnboarding',
+  vectorSearchSelectKeyOnboarding = 'vectorSearchSelectKeyOnboarding',
+  vectorSearchCreateIndexOnboarding = 'vectorSearchCreateIndexOnboarding',
+  wbTsResultPreferences = 'wbTsResultPreferences_',
+  prodModeCtaActioned = 'prodModeCtaActioned',
+  whatsNewLastVersionSeen = 'whatsNewLastVersionSeen',
+  valueDecoderRules = 'valueDecoderRules_',
 }
 
 export default BrowserStorageItem
@@ -55,4 +66,10 @@ export enum CapabilityStorageItem {
 
 export enum AppStorageItem {
   returnUrl = 'returnUrl',
+}
+
+export enum TableStorageKey {
+  dbList = 'dbList',
+  rdiList = 'rdiList',
+  pubSubList = 'pubSubList',
 }

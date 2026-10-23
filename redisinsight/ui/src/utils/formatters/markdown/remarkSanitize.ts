@@ -1,5 +1,6 @@
 import { visit } from 'unist-util-visit'
 import DOMPurify from 'dompurify'
+import type { Root } from 'mdast'
 import { IS_ABSOLUTE_PATH } from 'uiSrc/constants/regex'
 
 const isOpeningTag = (value: string) =>
@@ -16,10 +17,11 @@ DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
     }
 
     node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
   }
 })
 
-export const remarkSanitize = (): ((tree: Node) => void) => (tree: any) => {
+export const remarkSanitize = (): ((tree: Root) => void) => (tree: any) => {
   visit(tree, 'html', (node) => {
     const inputTag = node.value.toLowerCase()
 

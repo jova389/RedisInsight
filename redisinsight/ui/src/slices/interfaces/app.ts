@@ -11,8 +11,9 @@ import {
   SortOrder,
 } from 'uiSrc/constants'
 import { ConfigDBStorageItem } from 'uiSrc/constants/storage'
-import { GetServerInfoResponse } from 'apiSrc/modules/server/dto/server.dto'
-import { RedisString as RedisStringAPI } from 'apiSrc/common/constants/redis-string'
+import { GetServerInfoResponse } from 'apiClient'
+import { RiToastType } from 'uiSrc/components/base/display/toast/RiToast'
+import { ToastVariant } from '@redis-ui/components'
 
 export interface CustomError {
   details?: any[]
@@ -21,6 +22,7 @@ export interface CustomError {
   statusCode: number
   errorCode?: number
   resourceId?: string
+  resource?: Record<string, unknown>
 }
 
 export interface ErrorOptions {
@@ -38,14 +40,19 @@ export interface IError extends AxiosError {
   instanceId?: string
   title?: string
   additionalInfo?: Record<string, any>
+  /** If true, the error toast won't auto-dismiss and requires manual close */
+  persistent?: boolean
 }
 
 export interface IMessage {
   id: string
   title: string
   message: string | JSX.Element
+  variant?: ToastVariant
   group?: string
   className?: string
+  showCloseButton?: boolean
+  actions?: RiToastType['actions']
 }
 
 export enum AppWorkspace {
@@ -82,6 +89,7 @@ export interface StateAppContext {
     slowLogDurationUnit: DurationUnits
     showHiddenRecommendations: boolean
     shownColumns: BrowserColumns[]
+    treeViewDelimiterPrefixLength: number
   }
   dbIndex: {
     disabled: boolean
@@ -171,6 +179,10 @@ export interface IPluginVisualization {
   plugin: any
   activationMethod: string
   matchCommands: string[]
+  matchQuery?: {
+    anyRegex?: string[]
+    noneRegex?: string[]
+  }
   default?: boolean
   iconDark?: string
   iconLight?: string
@@ -205,6 +217,12 @@ export interface FeatureFlagComponent {
   flag: boolean
   variant?: string
   data?: any
+}
+
+export interface StateWhatsNew {
+  isOpen: boolean
+  selectedVersion: string | null
+  lastVersionSeen: string | null
 }
 
 export interface StateAppFeatures {
@@ -243,8 +261,15 @@ export interface IGlobalNotification {
 
 export interface InfiniteMessage {
   id: string
-  Inner: string | JSX.Element
+  variation?: string
+  variant?: ToastVariant
   className?: string
+  message?: RiToastType['message']
+  description?: RiToastType['description']
+  actions?: RiToastType['actions']
+  customIcon?: RiToastType['customIcon']
+  showCloseButton?: boolean
+  onClose?: () => void
 }
 
 export interface StateAppNotifications {
@@ -282,7 +307,7 @@ export enum RedisResponseBufferType {
 export type RedisResponseBuffer = {
   type: RedisResponseBufferType
   data: UintArray
-} & Exclude<RedisStringAPI, string>
+} & Buffer
 
 export type RedisString = string | RedisResponseBuffer
 

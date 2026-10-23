@@ -1,0 +1,92 @@
+import { useEffect, useRef } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+import { useHistory } from 'react-router-dom'
+
+import {
+  azureAuthSourceSelector,
+  handleAzureOAuthSuccess,
+  handleAzureOAuthFailure,
+  setAzureLoginSource,
+} from 'uiSrc/slices/oauth/azure'
+import { AzureLoginSource } from 'uiSrc/slices/interfaces'
+import {
+  addErrorNotification,
+  addMessageNotification,
+} from 'uiSrc/slices/app/notifications'
+import { AzureAuthStatus, Pages } from 'uiSrc/constants'
+
+interface MsalAccountInfo {
+  homeAccountId: string
+  username: string
+  name?: string
+  tenantId?: string
+}
+
+interface AzureAuthCallbackResponse {
+  status: string
+  account?: MsalAccountInfo
+  error?: string
+}
+
+const ConfigAzureAuth = () => {
+  const dispatch = useAppDispatch()
+  const history = useHistory()
+  const source = useAppSelector(azureAuthSourceSelector)
+  const sourceRef = useRef(source)
+  sourceRef.current = source
+
+  useEffect(() => {
+    window.app?.azureOauthCallback?.(azureOauthCallback)
+  }, [])
+
+  const azureOauthCallback = (
+    _e: unknown,
+    { status, account, error }: AzureAuthCallbackResponse,
+  ) => {
+    if (status === AzureAuthStatus.Succeed && account) {
+      const azureAccount = {
+        id: account.homeAccountId,
+        username: account.username,
+        name: account.name,
+        tenantId: account.tenantId,
+      }
+      const currentSource = sourceRef.current
+      dispatch(handleAzureOAuthSuccess(azureAccount))
+      dispatch(setAzureLoginSource(null))
+
+      // Only redirect to autodiscovery flow if login was initiated from there
+      if (currentSource === AzureLoginSource.Autodiscovery) {
+        history.push(Pages.azureSubscriptions)
+      }
+
+      // Show success notification only for token refresh (login from error notification)
+      if (currentSource === AzureLoginSource.TokenRefresh) {
+        dispatch(
+          addMessageNotification({
+            title: 'Signed in to Azure',
+            message: 'You can now connect to your Azure database.',
+          }),
+        )
+      }
+      return
+    }
+
+    // Handle failure or success without account (edge case)
+    const errorMessage = error || 'Azure authentication failed'
+    dispatch(handleAzureOAuthFailure(errorMessage))
+    dispatch(
+      addErrorNotification({
+        response: {
+          data: {
+            message: errorMessage,
+          },
+        },
+        persistent: true,
+      } as any),
+    )
+  }
+
+  return null
+}
+
+export default ConfigAzureAuth

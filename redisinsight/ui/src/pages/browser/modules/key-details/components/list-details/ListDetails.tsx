@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
-import cx from 'classnames'
+import { useAppSelector } from 'uiSrc/slices/hooks'
 
 import { selectedKeySelector } from 'uiSrc/slices/browser/keys'
 import { KeyTypes } from 'uiSrc/constants'
@@ -18,6 +17,7 @@ import { AddItemsAction, RemoveItemsAction } from '../key-details-actions'
 import { KeyDetailsSubheader } from '../key-details-subheader/KeyDetailsSubheader'
 import styles from './styles.module.scss'
 import { AddKeysContainer } from '../common/AddKeysContainer.styled'
+import { useTranslation } from 'uiSrc/i18n'
 
 export interface Props extends KeyDetailsHeaderProps {
   onRemoveKey: () => void
@@ -28,7 +28,8 @@ export interface Props extends KeyDetailsHeaderProps {
 const ListDetails = (props: Props) => {
   const keyType = KeyTypes.List
   const { onRemoveKey, onOpenAddItemPanel, onCloseAddItemPanel } = props
-  const { loading } = useSelector(selectedKeySelector)
+  const { t } = useTranslation()
+  const { loading } = useAppSelector(selectedKeySelector)
 
   const [isRemoveItemPanelOpen, setIsRemoveItemPanelOpen] =
     useState<boolean>(false)
@@ -59,13 +60,13 @@ const ListDetails = (props: Props) => {
   const Actions = ({ width }: { width: number }) => (
     <>
       <AddItemsAction
-        title="Add Elements"
+        title={t('browser.list.addElements')}
         width={width}
         openAddItemPanel={openAddItemPanel}
       />
       <div className={styles.removeBtnContainer}>
         <RemoveItemsAction
-          title="Remove Elements"
+          title={t('browser.list.removeElements')}
           openRemoveItemPanel={openRemoveItemPanel}
         />
       </div>
@@ -88,12 +89,12 @@ const ListDetails = (props: Props) => {
           </AddKeysContainer>
         )}
         {isRemoveItemPanelOpen && (
-          <div className={cx('formFooterBar', styles.contentActive)}>
+          <AddKeysContainer>
             <RemoveListElements
               closePanel={closeRemoveItemPanel}
               onRemoveKey={onRemoveKey}
             />
-          </div>
+          </AddKeysContainer>
         )}
       </div>
     </div>

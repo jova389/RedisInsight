@@ -1,7 +1,13 @@
 import React from 'react'
 import reactRouterDom from 'react-router-dom'
 import { cloneDeep } from 'lodash'
-import { render, screen, cleanup, mockedStore, fireEvent } from 'uiSrc/utils/test-utils'
+import {
+  render,
+  screen,
+  cleanup,
+  mockedStore,
+  fireEvent,
+} from 'uiSrc/utils/test-utils'
 
 import { Pages } from 'uiSrc/constants'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
@@ -96,7 +102,7 @@ describe('HomeTabs', () => {
     expect(sendEventTelemetry).toBeCalledWith({
       event: TelemetryEvent.INSTANCES_TAB_CHANGED,
       eventData: {
-        tab: 'Redis Data Integration',
+        tab: 'rdi-instances',
       },
     })
   })
@@ -110,8 +116,6 @@ describe('HomeTabs', () => {
 
     render(<HomeTabs />)
 
-    expect(
-      screen.queryByText('Redis Data Integration'),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Redis Data Integration')).not.toBeInTheDocument()
   })
 })

@@ -1,13 +1,21 @@
 import AdvancedSettings from './advanced-settings'
+import AppVersion from './app-version'
 import WorkbenchSettings from './workbench-settings'
 import CloudSettings from './cloud-settings'
 import GeneralSettings from './general-settings'
 import ThemeSettings from './theme-settings'
+import LanguageSettings from './language-settings'
+import UpdateSettings from './update-settings'
+import { CopyDiagnostics } from './copy-diagnostics/CopyDiagnostics'
 
 export {
   AdvancedSettings,
+  AppVersion,
   WorkbenchSettings,
   CloudSettings,
   GeneralSettings,
   ThemeSettings,
+  LanguageSettings,
+  UpdateSettings,
+  CopyDiagnostics,
 }

@@ -26,6 +26,7 @@ import { ThemeContext } from 'uiSrc/contexts/themeContext'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
 import { CancelSlimIcon, CheckThinIcon } from 'uiSrc/components/base/icons'
 import { RiSelect } from 'uiSrc/components/base/forms/select/RiSelect'
+import { MonacoGlobalStyles } from 'uiSrc/components/base/code-editor/CodeEditor.styles'
 import styles from './styles.module.scss'
 
 const LangSelect = styled(RiSelect)`
@@ -210,10 +211,17 @@ const DedicatedEditor = (props: Props) => {
         selectedLang.completionProvider?.(keywords, functions)!,
       ).dispose
 
-    monaco.languages.setMonarchTokensProvider(
-      selectedLang.language,
-      selectedLang.tokensProvider?.(keywords, functions)!,
-    )
+    try {
+      monaco.languages.setMonarchTokensProvider(
+        selectedLang.language,
+        selectedLang.tokensProvider?.(keywords, functions)!,
+      )
+    } catch (exception) {
+      console.error(
+        `Monaco ${selectedLang.language} language setup error: `,
+        exception,
+      )
+    }
   }
 
   const onChangeLanguageSelect = (id: string) => {
@@ -253,6 +261,7 @@ const DedicatedEditor = (props: Props) => {
     <AutoSizer onResize={onResize}>
       {() => (
         <div className="editorBounder">
+          <MonacoGlobalStyles />
           <Rnd
             ref={rndRef}
             default={{

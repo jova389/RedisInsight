@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { isNull, last, toString } from 'lodash'
 import cx from 'classnames'
 
@@ -23,7 +23,8 @@ import { selectedKeyDataSelector } from 'uiSrc/slices/browser/keys'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import RangeFilter from 'uiSrc/components/range-filter'
 import { ProgressBarLoader } from 'uiSrc/components/base/display'
-import { GetStreamEntriesResponse } from 'apiSrc/modules/browser/stream/dto'
+import { Col } from 'uiSrc/components/base/layout/flex'
+import { GetStreamEntriesResponse } from 'apiClient'
 
 import ConsumersViewWrapper from '../consumers-view'
 import GroupsViewWrapper from '../groups-view'
@@ -41,14 +42,14 @@ const StreamDetailsBody = (props: Props) => {
     viewType,
     loading,
     sortOrder: entryColumnSortOrder,
-  } = useSelector(streamSelector)
-  const { loading: loadingGroups } = useSelector(streamGroupsSelector)
-  const { start, end } = useSelector(streamRangeSelector)
-  const { firstEntry, lastEntry, entries } = useSelector(streamDataSelector)
-  const { name: key } = useSelector(selectedKeyDataSelector) ?? { name: '' }
-  const { id: instanceId } = useSelector(connectedInstanceSelector)
+  } = useAppSelector(streamSelector)
+  const { loading: loadingGroups } = useAppSelector(streamGroupsSelector)
+  const { start, end } = useAppSelector(streamRangeSelector)
+  const { firstEntry, lastEntry, entries } = useAppSelector(streamDataSelector)
+  const { name: key } = useAppSelector(selectedKeyDataSelector) ?? { name: '' }
+  const { id: instanceId } = useAppSelector(connectedInstanceSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const firstEntryTimeStamp = useMemo(
     () => getTimestampFromId(firstEntry?.id),
@@ -197,12 +198,9 @@ const StreamDetailsBody = (props: Props) => {
   }, [])
 
   return (
-    <div data-testid="stream-details" className={styles.container}>
+    <Col data-testid="stream-details" className={styles.container} gap="m">
       {(loading || loadingGroups) && (
-        <ProgressBarLoader
-          color="primary"
-          data-testid="progress-key-stream"
-        />
+        <ProgressBarLoader color="primary" data-testid="progress-key-stream" />
       )}
       {shouldFilterRender ? (
         <RangeFilter
@@ -233,7 +231,7 @@ const StreamDetailsBody = (props: Props) => {
       {viewType === StreamViewType.Messages && (
         <MessagesViewWrapper {...props} />
       )}
-    </div>
+    </Col>
   )
 }
 

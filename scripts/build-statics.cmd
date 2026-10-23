@@ -15,26 +15,29 @@ xcopy ".\vendor\." "%PLUGINS_VENDOR_DIR%" /s /e /y
 
 :: Install developing tools for plugins
 set PACKAGES_DIR=".\redisinsight\ui\src\packages"
-call yarn --cwd "%PACKAGES_DIR%"
+call npm install --prefix "%PACKAGES_DIR%"
 
 :: Install plugins dependencies
 set REDISEARCH_DIR=".\redisinsight\ui\src\packages\redisearch"
-call yarn --cwd "%REDISEARCH_DIR%"
+call npm install --prefix "%REDISEARCH_DIR%"
 
 set REDISGRAPH_DIR=".\redisinsight\ui\src\packages\redisgraph"
-call yarn --cwd "%REDISGRAPH_DIR%"
+call npm install --prefix "%REDISGRAPH_DIR%"
 
 set REDISTIMESERSIES_DIR=".\redisinsight\ui\src\packages\redistimeseries-app"
-call yarn --cwd "%REDISTIMESERSIES_DIR%"
+call npm install --prefix "%REDISTIMESERSIES_DIR%"
 
 set RI_EXPLIAIN_DIR=".\redisinsight\ui\src\packages\ri-explain"
-call yarn --cwd "%RI_EXPLIAIN_DIR%"
+call npm install --prefix "%RI_EXPLIAIN_DIR%"
 
 set CLIENTS_LIST_DIR=".\redisinsight\ui\src\packages\clients-list"
-call yarn --cwd "%CLIENTS_LIST_DIR%"
+call npm install --prefix "%CLIENTS_LIST_DIR%"
+
+set GEODATA_DIR=".\redisinsight\ui\src\packages\geodata"
+call npm install --prefix "%GEODATA_DIR%"
 
 ::  Build all plugins and common libraries
-call yarn --cwd "%PACKAGES_DIR%" build
+call npm run build --prefix "%PACKAGES_DIR%"
 
 :: Copy common libraries to plugins
 set COMMON_DIR=".\redisinsight\ui\src\packages\common"
@@ -72,3 +75,9 @@ if not exist "%PLUGINS_DIR%\clients-list" mkdir "%PLUGINS_DIR%\clients-list"
 if not exist "%PLUGINS_DIR%\clients-list\dist" mkdir "%PLUGINS_DIR%\clients-list\dist"
 xcopy "%CLIENTS_LIST_DIR%\dist" "%PLUGINS_DIR%\clients-list\dist\" /s /e /y
 copy "%CLIENTS_LIST_DIR%\package.json" "%PLUGINS_DIR%\clients-list\"
+
+:: Copy geodata plugin
+if not exist "%PLUGINS_DIR%\geodata" mkdir "%PLUGINS_DIR%\geodata"
+if not exist "%PLUGINS_DIR%\geodata\dist" mkdir "%PLUGINS_DIR%\geodata\dist"
+xcopy "%GEODATA_DIR%\dist" "%PLUGINS_DIR%\geodata\dist\" /s /e /y
+copy "%GEODATA_DIR%\package.json" "%PLUGINS_DIR%\geodata\"

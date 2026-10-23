@@ -1,0 +1,612 @@
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+import { catchAclError, catchMultiTransactionError } from 'src/utils';
+import { RedisErrorCodes } from 'src/constants';
+import ERROR_MESSAGES from 'src/constants/error-messages';
+import { ReplyError } from 'src/models';
+import {
+  BrowserToolKeysCommands,
+  BrowserToolVectorSetCommands,
+} from 'src/modules/browser/constants/browser-tool-commands';
+import { plainToInstance } from 'class-transformer';
+import { ClientMetadata } from 'src/common/models';
+import {
+  AddElementsToVectorSetDto,
+  CreateVectorSetDto,
+  DeleteVectorSetElementsDto,
+  DeleteVectorSetElementsResponse,
+  GetVectorSetElementsDto,
+  GetVectorSetElementsResponse,
+  SimilaritySearchDto,
+  SearchVectorSetPreviewResponse,
+  SearchVectorSetResponse,
+  SetVectorSetElementAttributeDto,
+  SetVectorSetElementAttributeResponse,
+  VectorSetElementDetailsDto,
+  VectorSetElementKeyDto,
+  VECTOR_EMBEDDING_MAX_DISPLAY_LENGTH,
+} from 'src/modules/browser/vector-set/dto';
+import { DatabaseClientFactory } from 'src/modules/database/providers/database.client.factory';
+import { Readable } from 'stream';
+import {
+  RedisClient,
+  RedisClientCommand,
+  RedisFeature,
+} from 'src/modules/redis/client';
+import {
+  checkIfKeyExists,
+  checkIfKeyNotExists,
+} from 'src/modules/browser/utils';
+import {
+  buildVaddCommand,
+  buildVsimCommand,
+  formatVsimCommandPreview,
+  parseVsimReply,
+} from 'src/modules/browser/vector-set/vector-set.utils';
+
+@Injectable()
+export class VectorSetService {
+  private logger = new Logger('VectorSetService');
+
+  constructor(private databaseClientFactory: DatabaseClientFactory) {}
+
+  public async createVectorSet(
+    clientMetadata: ClientMetadata,
+    dto: CreateVectorSetDto,
+  ): Promise<void> {
+    try {
+      this.logger.debug('Creating VectorSet data type.', clientMetadata);
+      const { keyName, elements, expire } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyExists(keyName, client);
+
+      const commands: RedisClientCommand[] = elements.map((element) =>
+        buildVaddCommand(keyName, element),
+      );
+
+      if (expire) {
+        commands.push([
+          BrowserToolKeysCommands.Expire,
+          keyName,
+          expire,
+        ] as RedisClientCommand);
+      }
+
+      const transactionResults = await client.sendPipeline(commands);
+      catchMultiTransactionError(transactionResults);
+
+      this.logger.debug(
+        'Succeed to create VectorSet data type.',
+        clientMetadata,
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to create VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async addElements(
+    clientMetadata: ClientMetadata,
+    dto: AddElementsToVectorSetDto,
+  ): Promise<void> {
+    try {
+      this.logger.debug(
+        'Adding elements to the VectorSet data type.',
+        clientMetadata,
+      );
+
+      const { keyName, elements } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      const commands: RedisClientCommand[] = elements.map((element) =>
+        buildVaddCommand(keyName, element),
+      );
+
+      const transactionResults = await client.sendPipeline(commands);
+      catchMultiTransactionError(transactionResults);
+
+      this.logger.debug(
+        'Succeed to add elements to VectorSet data type.',
+        clientMetadata,
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to add elements to VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async getElements(
+    clientMetadata: ClientMetadata,
+    dto: GetVectorSetElementsDto,
+  ): Promise<GetVectorSetElementsResponse> {
+    try {
+      this.logger.debug(
+        'Getting elements of the VectorSet data type stored at key.',
+        clientMetadata,
+      );
+      const { keyName } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      const total = (await client.sendCommand([
+        BrowserToolVectorSetCommands.VCard,
+        keyName,
+      ])) as number;
+
+      const { elementNames, nextCursor, isPaginationSupported } =
+        await this.listElementNames(client, dto);
+
+      const elements: { name: string | Buffer; attributes?: string }[] =
+        elementNames.map((name) => ({ name }));
+
+      if (elements.length > 0) {
+        await this.fetchAttributesForMatches(client, keyName, elements);
+      }
+
+      this.logger.debug(
+        'Succeed to get elements of the VectorSet data type.',
+        clientMetadata,
+      );
+      return plainToInstance(GetVectorSetElementsResponse, {
+        keyName,
+        total,
+        nextCursor,
+        isPaginationSupported,
+        elements,
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to get elements of the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async deleteElements(
+    clientMetadata: ClientMetadata,
+    dto: DeleteVectorSetElementsDto,
+  ): Promise<DeleteVectorSetElementsResponse> {
+    try {
+      this.logger.debug(
+        'Deleting elements from the VectorSet data type.',
+        clientMetadata,
+      );
+      const { keyName, elements } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      if (!elements.length) {
+        return { affected: 0 };
+      }
+
+      const pipelineCommands: RedisClientCommand[] = elements.map((element) => [
+        BrowserToolVectorSetCommands.VRem,
+        keyName,
+        element,
+      ]);
+
+      const pipelineResults = await client.sendPipeline(pipelineCommands);
+      catchMultiTransactionError(pipelineResults);
+
+      // Pipeline returns one [error, reply] pair per VREM. Each reply is how many
+      // members that call removed (0 or 1). Sum them for the API response total.
+      const affected = pipelineResults.reduce(
+        (removedSoFar, [, membersRemovedByThisCommand]) =>
+          removedSoFar + (membersRemovedByThisCommand as number),
+        0,
+      );
+
+      this.logger.debug(
+        'Succeed to delete elements from the VectorSet data type.',
+        clientMetadata,
+      );
+      return { affected };
+    } catch (error) {
+      this.logger.error(
+        'Failed to delete elements from the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async getElementDetails(
+    clientMetadata: ClientMetadata,
+    dto: VectorSetElementKeyDto,
+  ): Promise<VectorSetElementDetailsDto> {
+    try {
+      this.logger.debug(
+        'Getting element details in the VectorSet data type.',
+        clientMetadata,
+      );
+      const { keyName, element } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      const details = await this.fetchElementDetails(
+        client,
+        keyName,
+        element.toString(),
+      );
+
+      this.logger.debug(
+        'Succeed to get element details in the VectorSet data type.',
+        clientMetadata,
+      );
+
+      return plainToInstance(VectorSetElementDetailsDto, details);
+    } catch (error) {
+      this.logger.error(
+        'Failed to get element details in the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async setElementAttribute(
+    clientMetadata: ClientMetadata,
+    dto: SetVectorSetElementAttributeDto,
+  ): Promise<SetVectorSetElementAttributeResponse> {
+    try {
+      this.logger.debug(
+        'Setting element attribute in the VectorSet data type.',
+        clientMetadata,
+      );
+      const { keyName, element, attributes } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      await client.sendCommand([
+        BrowserToolVectorSetCommands.VSetAttr,
+        keyName,
+        element,
+        attributes,
+      ]);
+
+      const storedAttributes = (await client.sendCommand([
+        BrowserToolVectorSetCommands.VGetAttr,
+        keyName,
+        element,
+      ])) as string | undefined;
+
+      this.logger.debug(
+        'Succeed to set element attribute in the VectorSet data type.',
+        clientMetadata,
+      );
+
+      return plainToInstance(SetVectorSetElementAttributeResponse, {
+        attributes: storedAttributes,
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to set element attribute in the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async downloadEmbedding(
+    clientMetadata: ClientMetadata,
+    dto: VectorSetElementKeyDto,
+  ): Promise<{ stream: Readable }> {
+    try {
+      this.logger.debug('Downloading vector embedding.', clientMetadata);
+      const { keyName, element } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      const rawVector = (await client.sendCommand([
+        BrowserToolVectorSetCommands.VEmb,
+        keyName,
+        element,
+      ])) as string[];
+
+      const formatted = rawVector ? `[${rawVector.join(', ')}]` : '[]';
+
+      const stream = Readable.from(formatted);
+      return { stream };
+    } catch (error) {
+      this.logger.error(
+        'Failed to download vector embedding.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async similaritySearch(
+    clientMetadata: ClientMetadata,
+    dto: SimilaritySearchDto,
+  ): Promise<SearchVectorSetResponse> {
+    try {
+      this.logger.debug(
+        'Running similarity search on the VectorSet data type.',
+        clientMetadata,
+      );
+      const { keyName } = dto;
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+
+      await checkIfKeyNotExists(keyName, client);
+
+      // Redis 8.0.0–8.0.2 errors out when WITHATTRIBS is appended to VSIM, so
+      // on those versions we omit the option and back-fill attributes via
+      // per-element VGETATTR after the search returns. The response shape
+      // stays identical for FE consumers.
+      const withAttribs = await client.isFeatureSupported(
+        RedisFeature.VsimWithAttribs,
+      );
+
+      const command = buildVsimCommand(dto, { withAttribs });
+      const reply = (await client.sendCommand(command)) as Array<
+        string | Buffer | null
+      >;
+
+      const elements = parseVsimReply(reply, this.logger, { withAttribs });
+
+      if (!withAttribs && elements.length > 0) {
+        await this.fetchAttributesForMatches(client, keyName, elements);
+      }
+
+      this.logger.debug(
+        'Succeed to run similarity search on the VectorSet data type.',
+        clientMetadata,
+      );
+
+      return plainToInstance(SearchVectorSetResponse, {
+        keyName,
+        elements,
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to run similarity search on the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      this.throwWrongTypeOrAcl(error);
+    }
+  }
+
+  public async getSimilaritySearchPreview(
+    clientMetadata: ClientMetadata,
+    dto: SimilaritySearchDto,
+  ): Promise<SearchVectorSetPreviewResponse> {
+    try {
+      this.logger.debug(
+        'Building VSIM command preview for the VectorSet data type.',
+        clientMetadata,
+      );
+
+      // Mirror the version-aware branch in `similaritySearch` so the preview
+      // never advertises a WITHATTRIBS that the actual search would skip on
+      // Redis 8.0.0–8.0.2.
+      const client: RedisClient =
+        await this.databaseClientFactory.getOrCreateClient(clientMetadata);
+      const withAttribs = await client.isFeatureSupported(
+        RedisFeature.VsimWithAttribs,
+      );
+
+      const preview = formatVsimCommandPreview(dto, { withAttribs });
+
+      return plainToInstance(SearchVectorSetPreviewResponse, { preview });
+    } catch (error) {
+      this.logger.error(
+        'Failed to build VSIM command preview for the VectorSet data type.',
+        error,
+        clientMetadata,
+      );
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw catchAclError(error);
+    }
+  }
+
+  /**
+   * Resolve the element names for `getElements`, preferring the ordered,
+   * paginated VRANGE and falling back to the unordered VRANDMEMBER when VRANGE
+   * is unavailable. When neither command can list the elements, throws so the
+   * caller surfaces a server error.
+   */
+  private async listElementNames(
+    client: RedisClient,
+    dto: GetVectorSetElementsDto,
+  ): Promise<{
+    elementNames: string[];
+    nextCursor?: string;
+    isPaginationSupported: boolean;
+  }> {
+    const { keyName, start, end, count } = dto;
+
+    const vRangeCommand: RedisClientCommand = [
+      BrowserToolVectorSetCommands.VRange,
+      keyName,
+      start || '-',
+      end || '+',
+      count,
+    ];
+    const vRangeResult = await this.trySendCommand(client, vRangeCommand);
+    if (vRangeResult !== null) {
+      const nextCursor =
+        vRangeResult.length === count && vRangeResult.length > 0
+          ? `(${vRangeResult[vRangeResult.length - 1]}`
+          : undefined;
+
+      return {
+        elementNames: vRangeResult,
+        nextCursor,
+        isPaginationSupported: true,
+      };
+    }
+
+    const vRandMemberCommand: RedisClientCommand = [
+      BrowserToolVectorSetCommands.VRandMember,
+      keyName,
+      count,
+    ];
+    const vRandMemberResult = await this.trySendCommand(
+      client,
+      vRandMemberCommand,
+    );
+    if (vRandMemberResult !== null) {
+      return { elementNames: vRandMemberResult, isPaginationSupported: false };
+    }
+
+    throw new InternalServerErrorException(
+      ERROR_MESSAGES.UNABLE_TO_LIST_VECTOR_SET_ELEMENTS([
+        `${BrowserToolVectorSetCommands.VRange}`,
+        `${BrowserToolVectorSetCommands.VRandMember}`,
+      ]),
+    );
+  }
+
+  /**
+   * Send a command and return its reply, or `null` when the command itself is
+   * unavailable (unknown/unsupported on the connected Redis version or proxy)
+   * so callers can fall back. `null` is distinct from an empty reply, which is a
+   * valid result. Any other error (permission, bad arguments, transient) is
+   * rethrown so it surfaces to the caller instead of triggering a silent
+   * fallback.
+   */
+  private async trySendCommand(
+    client: RedisClient,
+    command: RedisClientCommand,
+  ): Promise<string[] | null> {
+    try {
+      return (await client.sendCommand(command)) as string[];
+    } catch (error) {
+      if (this.isUnsupportedCommandError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private isUnsupportedCommandError(error: unknown): boolean {
+    const message = (error as ReplyError)?.message ?? '';
+    return message.includes(RedisErrorCodes.UnknownCommand);
+  }
+
+  /**
+   * Translate a thrown Redis error into the appropriate HTTP exception:
+   * `WRONGTYPE` becomes a 400 (the client targeted a non-vector-set key), and
+   * everything else flows through `catchAclError` so NOPERM / unknown-command
+   * errors map to 403 / 500 as expected. Used by every public service method
+   * to keep the 8 copies of this catch logic in sync.
+   */
+  private throwWrongTypeOrAcl(error: ReplyError): never {
+    if (error?.message?.includes(RedisErrorCodes.WrongType)) {
+      throw new BadRequestException(error.message);
+    }
+    throw catchAclError(error);
+  }
+
+  /**
+   * Back-fill the `attributes` field on each item by issuing one VGETATTR
+   * per element in a single pipeline. Used by `getElements` (VRANGE /
+   * VRANDMEMBER don't return attributes) and as the fallback path of
+   * `similaritySearch` on Redis 8.0.0–8.0.2 where VSIM rejects WITHATTRIBS.
+   *
+   * Mutates `matches` in place. Per-element errors are swallowed (logged at
+   * debug) so a single failing VGETATTR cannot drop the whole reply;
+   * elements without attributes simply keep `attributes` undefined.
+   */
+  private async fetchAttributesForMatches(
+    client: RedisClient,
+    keyName: Buffer | string,
+    matches: { name: string | Buffer; attributes?: string }[],
+  ): Promise<void> {
+    const commands: RedisClientCommand[] = matches.map((match) => [
+      BrowserToolVectorSetCommands.VGetAttr,
+      keyName,
+      match.name,
+    ]);
+
+    const results = await client.sendPipeline(commands);
+
+    results.forEach(([err, value], i) => {
+      if (err) {
+        this.logger.debug(
+          `VGETATTR failed for match ${matches[i].name?.toString()}; leaving attributes undefined.`,
+          err,
+        );
+        return;
+      }
+      if (value !== null && value !== undefined) {
+        matches[i].attributes =
+          typeof value === 'string' ? value : String(value);
+      }
+    });
+  }
+
+  private async fetchElementDetails(
+    client: RedisClient,
+    keyName: Buffer | string,
+    elementName: string,
+  ): Promise<VectorSetElementDetailsDto> {
+    const results = await client.sendPipeline([
+      [BrowserToolVectorSetCommands.VEmb, keyName, elementName],
+      [BrowserToolVectorSetCommands.VGetAttr, keyName, elementName],
+    ]);
+
+    const [embErr, rawEmb] = results[0];
+    const [attrErr, rawAttr] = results[1];
+
+    if (embErr) throw embErr;
+    if (attrErr) throw attrErr;
+
+    const rawVector = rawEmb
+      ? (rawEmb as string[]).map((v) => parseFloat(v))
+      : undefined;
+
+    const vectorTruncated =
+      rawVector !== undefined &&
+      rawVector.length > VECTOR_EMBEDDING_MAX_DISPLAY_LENGTH;
+
+    const vector = vectorTruncated
+      ? rawVector.slice(0, VECTOR_EMBEDDING_MAX_DISPLAY_LENGTH)
+      : rawVector;
+
+    return plainToInstance(VectorSetElementDetailsDto, {
+      name: elementName,
+      vector,
+      vectorTruncated: vectorTruncated || undefined,
+      attributes: (rawAttr as string) || undefined,
+    });
+  }
+}

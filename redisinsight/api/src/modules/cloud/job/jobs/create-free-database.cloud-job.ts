@@ -15,6 +15,7 @@ import { WaitForActiveDatabaseCloudJob } from 'src/modules/cloud/job/jobs/wait-f
 import { CloudJobName } from 'src/modules/cloud/job/constants';
 import { CloudJobStatus, CloudJobStep } from 'src/modules/cloud/job/models';
 import {
+  CloudDatabaseEndpointInvalidException,
   CloudDatabaseImportForbiddenException,
   CloudJobUnexpectedErrorException,
   CloudTaskNoResourceIdException,
@@ -138,6 +139,10 @@ export class CreateFreeDatabaseCloudJob extends CloudJob {
 
       const { publicEndpoint, name, password } = cloudDatabase;
 
+      if (!publicEndpoint) {
+        throw new CloudDatabaseEndpointInvalidException();
+      }
+
       const [host, port] = publicEndpoint.split(':');
 
       const database = await this.dependencies.databaseService.create(
@@ -171,7 +176,10 @@ export class CreateFreeDatabaseCloudJob extends CloudJob {
           this.dependencies.bulkImportService.importDefaultData(clientMetadata);
         }
       } catch (e) {
-        this.logger.error('Error when trying to feed the db with default data', e);
+        this.logger.error(
+          'Error when trying to feed the db with default data',
+          e,
+        );
       }
 
       this.result = {

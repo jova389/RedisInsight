@@ -1,8 +1,7 @@
 import React, { FormEvent, useEffect, useState } from 'react'
 import cx from 'classnames'
 
-import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
-import { Spacer } from 'uiSrc/components/base/layout/spacer'
+import { Col, FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import {
   IconButton,
   PrimaryButton,
@@ -11,6 +10,11 @@ import {
 import { EditIcon } from 'uiSrc/components/base/icons'
 import { Loader } from 'uiSrc/components/base/display'
 import { RiPopover } from 'uiSrc/components/base'
+import {
+  BrowserConfirmationCommandId,
+  useProductionWriteConfirmation,
+} from 'uiSrc/components/production-write-confirmation'
+import { useTranslation } from 'uiSrc/i18n'
 import styles from './styles.module.scss'
 
 export interface Props {
@@ -54,6 +58,8 @@ const EditablePopover = (props: Props) => {
   const [isHovering, setIsHovering] = useState(false)
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(isOpen)
   const [isDelayed, setIsDelayed] = useState(false)
+  const { t } = useTranslation()
+  const { requestConfirmation } = useProductionWriteConfirmation()
 
   const delayPopover = () => {
     if (!delay) return
@@ -84,8 +90,18 @@ const EditablePopover = (props: Props) => {
   }
 
   const handleApply = (): void => {
-    setIsPopoverOpen(false)
-    onApply()
+    requestConfirmation({
+      title: t('browser.keyDetails.editable.confirmTitle'),
+      actionDescription: t('browser.keyDetails.editable.confirmMessage'),
+      confirmButtonText: t('browser.keyDetails.editable.confirmButton'),
+      commandId: BrowserConfirmationCommandId.EditValue,
+      disableConfirmationInput: true,
+      onConfirm: () => {
+        setIsPopoverOpen(false)
+        onApply()
+      },
+      onCancel: () => setIsPopoverOpen(false),
+    })
   }
 
   const handleDecline = () => {
@@ -108,7 +124,7 @@ const EditablePopover = (props: Props) => {
     <IconButton
       disabled={isPopoverOpen || isDisabledEditButton}
       icon={btnIconType || EditIcon}
-      aria-label="Edit field"
+      aria-label={t('browser.keyDetails.editable.editAria')}
       color="primary"
       onClick={isDisabledEditButton ? () => {} : handleButtonClick}
       className={editBtnClassName}
@@ -127,47 +143,54 @@ const EditablePopover = (props: Props) => {
       })}
       closePopover={handleDecline}
       button={
-        <div
+        <Row
+          align="center"
           className={styles.contentWrapper}
           onMouseEnter={() => setIsHovering(!isDisabledEditButton)}
           onMouseLeave={() => setIsHovering(false)}
+          onClick={(e) => e.stopPropagation()}
           data-testid={`${prefix}_content-value-${field}`}
         >
           {content}
-          {isDelayed && (
-            <Loader className={cx(editBtnClassName, styles.spinner)} size="m" />
-          )}
-          {!isPopoverOpen && isHovering && !isDelayed && button}
-        </div>
+          <FlexItem style={{ marginLeft: '-19px' }}>
+            {isDelayed && (
+              <Loader
+                className={cx(editBtnClassName, styles.spinner)}
+                size="m"
+              />
+            )}
+            {(isPopoverOpen || isHovering) && !isDelayed && button}
+          </FlexItem>
+        </Row>
       }
       data-testid="popover-item-editor"
       onClick={(e) => e.stopPropagation()}
     >
       <form onSubmit={onFormSubmit}>
-        <div className={styles.content}>{children}</div>
-        <Spacer size="s" />
-        <Row className={styles.footer} justify="end" gap="m">
-          <FlexItem>
-            <SecondaryButton
-              size="s"
-              onClick={() => handleDecline()}
-              data-testid="cancel-btn"
-            >
-              Cancel
-            </SecondaryButton>
-          </FlexItem>
-
-          <FlexItem>
-            <PrimaryButton
-              size="s"
-              type="submit"
-              disabled={isDisabledApply()}
-              data-testid="save-btn"
-            >
-              Save
-            </PrimaryButton>
-          </FlexItem>
-        </Row>
+        <Col gap="l">
+          <Row>{children}</Row>
+          <Row justify="end" gap="m">
+            <FlexItem>
+              <SecondaryButton
+                size="s"
+                onClick={() => handleDecline()}
+                data-testid="cancel-btn"
+              >
+                {t('browser.keyDetails.editable.cancelButton')}
+              </SecondaryButton>
+            </FlexItem>
+            <FlexItem>
+              <PrimaryButton
+                size="s"
+                type="submit"
+                disabled={isDisabledApply()}
+                data-testid="save-btn"
+              >
+                {t('browser.keyDetails.editable.saveButton')}
+              </PrimaryButton>
+            </FlexItem>
+          </Row>
+        </Col>
       </form>
     </RiPopover>
   )

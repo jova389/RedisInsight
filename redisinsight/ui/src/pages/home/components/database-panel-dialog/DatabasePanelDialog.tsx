@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import cx from 'classnames'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+
 import { Nullable } from 'uiSrc/utils'
 import { UrlHandlingActions } from 'uiSrc/slices/interfaces/urlHandling'
 import { Instance } from 'uiSrc/slices/interfaces'
@@ -30,13 +30,15 @@ import CloudConnectionFormWrapper from 'uiSrc/pages/home/components/cloud-connec
 import ImportDatabase from 'uiSrc/pages/home/components/import-database'
 import { FormDialog } from 'uiSrc/components'
 import { ModalHeaderProvider } from 'uiSrc/contexts/ModalTitleProvider'
-import { Title } from 'uiSrc/components/base/text/Title'
 import ClusterConnectionFormWrapper from 'uiSrc/pages/home/components/cluster-connection'
 import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { IconButton } from 'uiSrc/components/base/forms/buttons'
-import { ArrowLeftIcon } from 'uiSrc/components/base/icons'
-import styles from './styles.module.scss'
+import { ChevronLeftIcon } from 'uiSrc/components/base/icons'
 import { FooterDatabaseForm } from 'uiSrc/components/form-dialog/FooterDatabaseForm'
+import { Title } from 'uiSrc/components/base/text'
+import { useTranslation } from 'uiSrc/i18n'
+
+import { FixedWrapper } from '../ManualConnection.styles'
 
 export interface Props {
   editMode: boolean
@@ -48,6 +50,7 @@ export interface Props {
 }
 
 const DatabasePanelDialog = (props: Props) => {
+  const { t } = useTranslation()
   const { editMode, onClose } = props
 
   const [initialValues, setInitialValues] = useState(null)
@@ -56,12 +59,12 @@ const DatabasePanelDialog = (props: Props) => {
   const [modalHeader, setModalHeader] =
     useState<Nullable<React.ReactNode>>(null)
 
-  const { credentials: clusterCredentials } = useSelector(clusterSelector)
-  const { credentials: cloudCredentials } = useSelector(cloudSelector)
-  const { data: sentinelMasters } = useSelector(sentinelSelector)
-  const { action, dbConnection } = useSelector(appRedirectionSelector)
+  const { credentials: clusterCredentials } = useAppSelector(clusterSelector)
+  const { credentials: cloudCredentials } = useAppSelector(cloudSelector)
+  const { data: sentinelMasters } = useAppSelector(sentinelSelector)
+  const { action, dbConnection } = useAppSelector(appRedirectionSelector)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     if (editMode) return
@@ -170,8 +173,8 @@ const DatabasePanelDialog = (props: Props) => {
           <FlexItem>
             <IconButton
               onClick={handleClickBack}
-              icon={ArrowLeftIcon}
-              aria-label="back"
+              icon={ChevronLeftIcon}
+              aria-label={t('home.form.ariaLabel.back')}
               data-testid="back-btn"
             />
           </FlexItem>
@@ -188,22 +191,18 @@ const DatabasePanelDialog = (props: Props) => {
     <FormDialog
       isOpen
       onClose={onClose}
-      header={modalHeader ?? 'Add Database'}
+      header={
+        modalHeader ?? <Title size="L">{t('addDatabase.modal.title')}</Title>
+      }
       footer={<FooterDatabaseForm />}
     >
-      <div
-        className={cx(styles.bodyWrapper, 'container relative', {
-          addDbWrapper: !editMode,
-        })}
-      >
-        <div className={styles.formWrapper}>
-          <ModalHeaderProvider
-            value={{ modalHeader, setModalHeader: handleSetModalHeader }}
-          >
-            {Form()}
-          </ModalHeaderProvider>
-        </div>
-      </div>
+      <FixedWrapper>
+        <ModalHeaderProvider
+          value={{ modalHeader, setModalHeader: handleSetModalHeader }}
+        >
+          {Form()}
+        </ModalHeaderProvider>
+      </FixedWrapper>
     </FormDialog>
   )
 }

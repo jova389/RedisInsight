@@ -19,17 +19,19 @@ import { FeaturesConfigEntity } from 'src/modules/feature/entities/features-conf
 import { CloudDatabaseDetailsEntity } from 'src/modules/cloud/database/entities/cloud-database-details.entity';
 import { CloudCapiKeyEntity } from 'src/modules/cloud/capi-key/entity/cloud-capi-key.entity';
 import { RdiEntity } from 'src/modules/rdi/entities/rdi.entity';
+import { PipelineDraftEntity } from 'src/modules/rdi/entities/pipeline-draft.entity';
 import { AiQueryMessageEntity } from 'src/modules/ai/query/entities/ai-query.message.entity';
 import { CloudSessionEntity } from 'src/modules/cloud/session/entities/cloud.session.entity';
 import { DatabaseSettingsEntity } from 'src/modules/database-settings/entities/database-setting.entity';
 import migrations from '../migration';
 import * as config from '../src/utils/config';
 import { TagEntity } from 'src/modules/tag/entities/tag.entity';
+import { QueryLibraryEntity } from 'src/modules/query-library/entities/query-library.entity';
 
 const dbConfig = config.get('db');
 
 const ormConfig = {
-  type: 'sqlite',
+  type: 'better-sqlite3',
   database: dbConfig.database,
   synchronize: dbConfig.synchronize,
   migrationsRun: dbConfig.migrationsRun,
@@ -53,14 +55,16 @@ const ormConfig = {
     CloudDatabaseDetailsEntity,
     CloudCapiKeyEntity,
     RdiEntity,
+    PipelineDraftEntity,
     AiQueryMessageEntity,
     CloudSessionEntity,
     DatabaseSettingsEntity,
     TagEntity,
+    QueryLibraryEntity,
   ],
   migrations,
 };
 
 export const ormModuleOptions: TypeOrmModuleOptions =
   ormConfig as TypeOrmModuleOptions;
-export default new DataSource({ ...ormConfig, type: 'sqlite' });
+export default new DataSource({ ...ormConfig, type: 'better-sqlite3' });

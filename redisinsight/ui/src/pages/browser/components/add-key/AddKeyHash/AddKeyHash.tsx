@@ -1,10 +1,5 @@
-import React, {
-  FormEvent,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { FormEvent, useEffect, useRef, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { toNumber } from 'lodash'
 import {
   isVersionHigherOrEquals,
@@ -23,13 +18,11 @@ import { FlexItem, Row } from 'uiSrc/components/base/layout/flex'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
 import { ActionFooter } from 'uiSrc/pages/browser/components/action-footer'
 import { TextInput } from 'uiSrc/components/base/inputs'
-import {
-  CreateHashWithExpireDto,
-  HashFieldDto,
-} from 'apiSrc/modules/browser/hash/dto'
+import { CreateHashWithExpireDto, HashFieldDto } from 'apiClient'
 
 import { IHashFieldState, INITIAL_HASH_FIELD_STATE } from './interfaces'
-import { AddHashFormConfig as config } from '../constants/fields-config'
+import { useTranslation } from 'uiSrc/i18n'
+import { getAddHashFormConfig } from '../constants/fields-config'
 
 export interface Props {
   keyName: string
@@ -39,10 +32,12 @@ export interface Props {
 
 const AddKeyHash = (props: Props) => {
   const { keyName = '', keyTTL, onCancel } = props
-  const { loading } = useSelector(addKeyStateSelector)
-  const { version } = useSelector(connectedInstanceOverviewSelector)
+  const { t } = useTranslation()
+  const config = getAddHashFormConfig(t)
+  const { loading } = useAppSelector(addKeyStateSelector)
+  const { version } = useAppSelector(connectedInstanceOverviewSelector)
   const { [FeatureFlags.hashFieldExpiration]: hashFieldExpirationFeature } =
-    useSelector(appFeatureFlagsFeaturesSelector)
+    useAppSelector(appFeatureFlagsFeaturesSelector)
 
   const [fields, setFields] = useState<IHashFieldState[]>([
     { ...INITIAL_HASH_FIELD_STATE },
@@ -55,7 +50,7 @@ const AddKeyHash = (props: Props) => {
     hashFieldExpirationFeature?.flag &&
     isVersionHigherOrEquals(version, CommandsVersions.HASH_TTL.since)
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     setIsFormValid(`${keyName}`.length > 0)
@@ -178,9 +173,7 @@ const AddKeyHash = (props: Props) => {
                   onChange={(value) =>
                     handleFieldChange('fieldName', item.id, value)
                   }
-                  ref={
-                    index === fields.length - 1 ? lastAddedFieldName : null
-                  }
+                  ref={index === fields.length - 1 ? lastAddedFieldName : null}
                   data-testid="field-name"
                 />
               </FormField>
@@ -206,7 +199,7 @@ const AddKeyHash = (props: Props) => {
                   <TextInput
                     name={`fieldTTL-${item.id}`}
                     id={`fieldTTL-${item.id}`}
-                    placeholder="Enter TTL"
+                    placeholder={t('browser.addKey.hash.ttlPlaceholder')}
                     value={item.fieldTTL || ''}
                     disabled={loading}
                     onChange={(value) =>
@@ -228,7 +221,7 @@ const AddKeyHash = (props: Props) => {
       <ActionFooter
         onCancel={() => onCancel(true)}
         onAction={submitData}
-        actionText="Add Key"
+        actionText={t('browser.addKey.button.submit')}
         loading={loading}
         disabled={!isFormValid}
         actionTestId="add-key-hash-btn"

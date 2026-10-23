@@ -1,9 +1,12 @@
 version: "3.4"
 
+x-logging:
+  logging: &logging
+    driver: none
+
 services:
   static-server:
-    logging: &logging
-      driver: none
+    logging: *logging
     build:
       context: .
       dockerfile: static-server.Dockerfile
@@ -11,6 +14,11 @@ services:
       - ./remote:/app/remote
     ports:
       - 5551:5551
+    networks:
+      default:
+        ipv4_address: 172.31.100.131
+      ssh:
+        ipv4_address: 172.33.100.131
   # RDI mocked
   # rdi:
   #   logging: *logging
@@ -54,6 +62,11 @@ services:
     ]
     ports:
       - 8100:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.109
+      ssh:
+        ipv4_address: 172.33.100.109
 
   oss-standalone-empty:
     logging: *logging
@@ -67,6 +80,11 @@ services:
     ]
     ports:
       - 8105:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.110
+      ssh:
+        ipv4_address: 172.33.100.110
 
   # oss standalone v5
   oss-standalone-v5:
@@ -104,18 +122,28 @@ services:
       ssh:
         ipv4_address: 172.33.100.113
 
-  # oss standalone redisearch
-  oss-standalone-redisearch:
+  # oss standalone v8.8.0
+  oss-standalone-v8-8-0:
     logging: *logging
-    image: redislabs/redismod
+    image: redis:8.8.0
     ports:
-      - 8102:6379
+      - 8110:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.114
+      ssh:
+        ipv4_address: 172.33.100.114
 
   oss-standalone-redisgears-2-0:
     logging: *logging
     image: redislabs/redisgears:edge
     ports:
       - 8106:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.115
+      ssh:
+        ipv4_address: 172.33.100.115
 
   oss-standalone-big:
     logging: *logging
@@ -126,6 +154,11 @@ services:
         TEST_DB_DUMP: $TEST_BIG_DB_DUMP
     ports:
       - 8103:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.116
+      ssh:
+        ipv4_address: 172.33.100.116
 
   # oss standalone tls
   oss-standalone-tls:
@@ -135,6 +168,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - 8104:6379
+    networks:
+      default:
+        ipv4_address: 172.31.100.117
+      ssh:
+        ipv4_address: 172.33.100.117
 
   # oss sentinel
   oss-sentinel:
@@ -167,8 +205,12 @@ services:
   master-plain-7-1:
     logging: *logging
     build: &cluster-plain-7-build ./rte/oss-cluster-7
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - 8200:6379
+      - 18200:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-ip host.docker.internal --cluster-announce-port 8200 --cluster-announce-bus-port 18200
     networks:
       default:
         ipv4_address: 172.31.100.211
@@ -177,15 +219,74 @@ services:
   master-plain-7-2:
     logging: *logging
     build: *cluster-plain-7-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8201:6379
+      - 18201:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-ip host.docker.internal --cluster-announce-port 8201 --cluster-announce-bus-port 18201
     networks:
       default:
         ipv4_address: 172.31.100.212
   master-plain-7-3:
     logging: *logging
     build: *cluster-plain-7-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8202:6379
+      - 18202:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-ip host.docker.internal --cluster-announce-port 8202 --cluster-announce-bus-port 18202
     networks:
       default:
         ipv4_address: 172.31.100.213
+
+  # oss cluster (v7) with cluster-announce-hostname
+  cluster-hostname-creator-7:
+    logging: *logging
+    build:
+      context: ./rte/oss-cluster-7-hostname
+      dockerfile: creator.Dockerfile
+    depends_on:
+      - master-hostname-7-1
+      - master-hostname-7-2
+      - master-hostname-7-3
+  master-hostname-7-1:
+    logging: *logging
+    build: &cluster-hostname-7-build ./rte/oss-cluster-7-hostname
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8210:6379
+      - 18210:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-hostname master-hostname-7-1 --cluster-announce-ip host.docker.internal --cluster-announce-port 8210 --cluster-announce-bus-port 18210
+    networks:
+      default:
+        ipv4_address: 172.31.100.231
+  master-hostname-7-2:
+    logging: *logging
+    build: *cluster-hostname-7-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8211:6379
+      - 18211:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-hostname master-hostname-7-2 --cluster-announce-ip host.docker.internal --cluster-announce-port 8211 --cluster-announce-bus-port 18211
+    networks:
+      default:
+        ipv4_address: 172.31.100.232
+  master-hostname-7-3:
+    logging: *logging
+    build: *cluster-hostname-7-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8212:6379
+      - 18212:16379
+    command: redis-server /etc/redis/redis.conf --cluster-announce-hostname master-hostname-7-3 --cluster-announce-ip host.docker.internal --cluster-announce-port 8212 --cluster-announce-bus-port 18212
+    networks:
+      default:
+        ipv4_address: 172.31.100.233
 
   # oss cluster (v7) with rediserch > 2.2
   cluster-rs-creator-7:
@@ -276,6 +377,7 @@ services:
   # redis enterprise
   redis-enterprise:
     logging: *logging
+    platform: linux/amd64
     build: ./rte/redis-enterprise
     cap_add:
       - sys_resource

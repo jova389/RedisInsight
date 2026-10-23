@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
 import { useParams } from 'react-router-dom'
-import cx from 'classnames'
 
 import {
   fetchPipelineStrategies,
@@ -17,16 +16,17 @@ import {
   SecondaryButton,
 } from 'uiSrc/components/base/forms/buttons'
 import { FormField } from 'uiSrc/components/base/forms/FormField'
-import { Text } from 'uiSrc/components/base/text'
+import { Title } from 'uiSrc/components/base/text'
 import { RiTooltip } from 'uiSrc/components'
 import {
   RiSelectOption,
   RiSelect,
   defaultValueRender,
 } from 'uiSrc/components/base/forms/select/RiSelect'
-import { NO_TEMPLATE_VALUE, NO_OPTIONS, INGEST_OPTION } from './constants'
+import { NO_TEMPLATE_VALUE, INGEST_OPTION } from './constants'
+import i18n, { useTranslation } from 'uiSrc/i18n'
 
-import styles from './styles.module.scss'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
 
 export interface Props {
   setTemplate: (template: string) => void
@@ -42,36 +42,48 @@ export const getTooltipContent = (
   if (isNoTemplateOptions) {
     return (
       <>
-        No template is available.
+        {i18n.t('rdi.pipeline.template.noneAvailableLine1')}
         <br />
-        Close the form and try again.
+        {i18n.t('rdi.pipeline.template.noneAvailableLine2')}
       </>
     )
   }
 
   if (value) {
-    return 'Templates can be accessed only with the empty Editor to prevent potential data loss.'
+    return i18n.t('rdi.pipeline.template.editorOnly')
   }
 
   return null
 }
 
 const TemplateForm = (props: Props) => {
+  const { t } = useTranslation()
   const { closePopover, setTemplate, source, value } = props
 
-  const { loading, data } = useSelector(rdiPipelineStrategiesSelector)
+  const { loading, data } = useAppSelector(rdiPipelineStrategiesSelector)
 
   const { rdiInstanceId } = useParams<{ rdiInstanceId: string }>()
+
+  // Built at render (not module load) so the label follows the active language.
+  const noOptions: RiSelectOption[] = useMemo(
+    () => [
+      {
+        value: NO_TEMPLATE_VALUE,
+        label: t('rdi.pipeline.template.noTemplateLabel'),
+      },
+    ],
+    [t],
+  )
 
   const [pipelineTypeOptions, setPipelineTypeOptions] = useState<
     RiSelectOption[]
   >([])
   const [dbTypeOptions, setDbTypeOptions] =
-    useState<RiSelectOption[]>(NO_OPTIONS)
+    useState<RiSelectOption[]>(noOptions)
   const [selectedDbType, setSelectedDbType] = useState<string>('')
   const [selectedPipelineType, setSelectedPipelineType] = useState<string>('')
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const handleCancel = () => {
     closePopover()
@@ -114,8 +126,8 @@ const TemplateForm = (props: Props) => {
 
   useEffect(() => {
     if (!selectedPipelineType || !data.length) {
-      setDbTypeOptions(NO_OPTIONS)
-      setSelectedDbType(NO_OPTIONS[0].value)
+      setDbTypeOptions(noOptions)
+      setSelectedDbType(NO_TEMPLATE_VALUE)
 
       return
     }
@@ -133,10 +145,10 @@ const TemplateForm = (props: Props) => {
       setDbTypeOptions(newDbTypeOptions)
       setSelectedDbType(newDbTypeOptions[0].value)
     } else {
-      setDbTypeOptions(NO_OPTIONS)
-      setSelectedDbType(NO_OPTIONS[0].value)
+      setDbTypeOptions(noOptions)
+      setSelectedDbType(NO_TEMPLATE_VALUE)
     }
-  }, [data, selectedPipelineType])
+  }, [data, selectedPipelineType, noOptions])
 
   useEffect(() => {
     const newPipelineTypeOptions = data.map((strategy) => ({
@@ -145,7 +157,7 @@ const TemplateForm = (props: Props) => {
     }))
 
     setPipelineTypeOptions(
-      newPipelineTypeOptions.length ? newPipelineTypeOptions : NO_OPTIONS,
+      newPipelineTypeOptions.length ? newPipelineTypeOptions : noOptions,
     )
 
     if (data?.length) {
@@ -155,76 +167,69 @@ const TemplateForm = (props: Props) => {
         ) || newPipelineTypeOptions[0]
       setSelectedPipelineType(initialSelectedOption.value)
     } else {
-      setSelectedPipelineType(NO_OPTIONS[0].value)
+      setSelectedPipelineType(NO_TEMPLATE_VALUE)
     }
-  }, [data])
+  }, [data, noOptions])
 
   useEffect(() => {
     dispatch(fetchPipelineStrategies(rdiInstanceId))
   }, [])
 
   return (
-    <div className={cx(styles.container)}>
-      <Text className={styles.title}>Select a template</Text>
-      <Spacer size="s" />
+    <Col gap="l">
+      <Title size="M" color="primary">
+        {t('rdi.pipeline.template.title')}
+      </Title>
       <form>
         <Spacer size="xs" />
         {pipelineTypeOptions?.length > 1 && (
-          <FormField className={styles.formRow}>
-            <>
-              <div className={styles.rowLabel}>Pipeline type</div>
-              <RiSelect
-                options={pipelineTypeOptions}
-                valueRender={defaultValueRender}
-                value={selectedPipelineType}
-                onChange={(value) => setSelectedPipelineType(value)}
-                data-testid="pipeline-type-select"
-              />
-            </>
+          <FormField label={t('rdi.pipeline.template.pipelineType')}>
+            <RiSelect
+              options={pipelineTypeOptions}
+              valueRender={defaultValueRender}
+              value={selectedPipelineType}
+              onChange={(value) => setSelectedPipelineType(value)}
+              data-testid="pipeline-type-select"
+            />
           </FormField>
         )}
         {source === RdiPipelineTabs.Config && (
-          <FormField className={styles.formRow}>
-            <>
-              <div className={styles.rowLabel}>Database type</div>
-              <RiSelect
-                options={dbTypeOptions}
-                valueRender={defaultValueRender}
-                value={selectedDbType}
-                onChange={(value) => setSelectedDbType(value)}
-                data-testid="db-type-select"
-              />
-            </>
+          <FormField label={t('rdi.pipeline.template.dbType')}>
+            <RiSelect
+              options={dbTypeOptions}
+              valueRender={defaultValueRender}
+              value={selectedDbType}
+              onChange={(value) => setSelectedDbType(value)}
+              data-testid="db-type-select"
+            />
           </FormField>
         )}
       </form>
-      <div className={styles.actions}>
+      <Row gap="m" justify="end">
         <SecondaryButton
           onClick={handleCancel}
-          size="s"
-          className={styles.btn}
+          size="m"
           data-testid="template-cancel-btn"
         >
-          Cancel
+          {t('rdi.pipeline.template.cancel')}
         </SecondaryButton>
         <RiTooltip
           content={getTooltipContent(value, isNoTemplateOptions)}
           position="bottom"
-          className={styles.btn}
           anchorClassName="flex-row"
         >
           <PrimaryButton
             disabled={isNoTemplateOptions || !!value}
             onClick={handleApply}
             loading={loading}
-            size="s"
+            size="m"
             data-testid="template-apply-btn"
           >
-            Apply
+            {t('rdi.pipeline.template.apply')}
           </PrimaryButton>
         </RiTooltip>
-      </div>
-    </div>
+      </Row>
+    </Col>
   )
 }
 

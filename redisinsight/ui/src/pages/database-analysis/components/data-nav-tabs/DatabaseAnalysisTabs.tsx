@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { isNull } from 'lodash'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from 'uiSrc/slices/hooks'
+import { useTranslation } from 'uiSrc/i18n'
 import { EmptyMessage } from 'uiSrc/pages/database-analysis/constants'
 import { EmptyAnalysisMessage } from 'uiSrc/pages/database-analysis/components'
 import {
@@ -13,17 +14,17 @@ import { Nullable } from 'uiSrc/utils'
 import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
 import { renderOnboardingTourWithChild } from 'uiSrc/utils/onboarding'
 import { recommendationsSelector } from 'uiSrc/slices/recommendations/recommendations'
-import Tabs, { TabInfo } from 'uiSrc/components/base/layout/tabs'
+import { TabInfo } from 'uiSrc/components/base/layout/tabs'
 import { Text } from 'uiSrc/components/base/text'
 import { ONBOARDING_FEATURES } from 'uiSrc/components/onboarding-features'
-import {
-  ShortDatabaseAnalysis,
-  DatabaseAnalysis,
-} from 'apiSrc/modules/database-analysis/models'
+import { ShortDatabaseAnalysis, DatabaseAnalysis } from 'apiClient'
 import Recommendations from '../recommendations-view'
 import AnalysisDataView from '../analysis-data-view'
 
-import styles from './styles.module.scss'
+import {
+  EmptyMessageContainer,
+  StyledTabs,
+} from './DatabaseAnalysisTabs.styles'
 
 export interface Props {
   loading: boolean
@@ -34,27 +35,28 @@ export interface Props {
 const DatabaseAnalysisTabs = (props: Props) => {
   const { loading, reports, data } = props
 
-  const viewTab = useSelector(dbAnalysisViewTabSelector)
-  const { id: instanceId = '', provider } = useSelector(
+  const { t } = useTranslation()
+  const viewTab = useAppSelector(dbAnalysisViewTabSelector)
+  const { id: instanceId = '', provider } = useAppSelector(
     connectedInstanceSelector,
   )
-  const { content: recommendationsContent } = useSelector(
+  const { content: recommendationsContent } = useAppSelector(
     recommendationsSelector,
   )
 
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   const tabs: TabInfo[] = useMemo(
     () => [
       {
-        label: <Text>Data Summary</Text>,
+        label: <Text>{t('analytics.databaseAnalysis.tabs.dataSummary')}</Text>,
         value: DatabaseAnalysisViewTab.DataSummary,
         content: <AnalysisDataView />,
       },
       {
         label: renderOnboardingTourWithChild(
           <Text>
-            Tips{' '}
+            {t('analytics.databaseAnalysis.tabs.tips')}{' '}
             {data?.recommendations?.length
               ? `(${data.recommendations.length})`
               : ''}
@@ -64,12 +66,13 @@ const DatabaseAnalysisTabs = (props: Props) => {
             anchorPosition: 'downLeft',
           },
           viewTab === DatabaseAnalysisViewTab.Recommendations,
+          'analytics-recommendations-tab',
         ),
         value: DatabaseAnalysisViewTab.Recommendations,
         content: <Recommendations />,
       },
     ],
-    [viewTab, data?.recommendations],
+    [t, viewTab, data?.recommendations],
   )
 
   const handleTabChange = (id: string) => {
@@ -102,27 +105,21 @@ const DatabaseAnalysisTabs = (props: Props) => {
 
   if (!loading && !reports?.length) {
     return (
-      <div
-        data-testid="empty-reports-wrapper"
-        className={styles.emptyMessageWrapper}
-      >
+      <EmptyMessageContainer data-testid="empty-reports-wrapper">
         <EmptyAnalysisMessage name={EmptyMessage.Reports} />
-      </div>
+      </EmptyMessageContainer>
     )
   }
   if (!loading && !!reports?.length && isNull(data?.totalKeys)) {
     return (
-      <div
-        data-testid="empty-encrypt-wrapper"
-        className={styles.emptyMessageWrapper}
-      >
+      <EmptyMessageContainer data-testid="empty-encrypt-wrapper">
         <EmptyAnalysisMessage name={EmptyMessage.Encrypt} />
-      </div>
+      </EmptyMessageContainer>
     )
   }
 
   return (
-    <Tabs
+    <StyledTabs
       tabs={tabs}
       value={viewTab}
       onChange={handleTabChange}

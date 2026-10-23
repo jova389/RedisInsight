@@ -23,13 +23,19 @@ on:
         description: Enterprise build
         type: boolean
 
+      show_build_commit_sha:
+        description: Explicit override for RI_SHOW_BUILD_COMMIT_SHA ('true'/'false'); empty falls back to per-env default.
+        required: false
+        default: ''
+        type: string
+
 jobs:
   build:
     name: Build macos
     runs-on: macos-14
     environment: ${{ inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       # SSH Debug
       - name: Enable SSH
@@ -53,17 +59,18 @@ jobs:
         with:
           keytar-host-mirror: ${{ secrets.NPM_CONFIG_KEYTAR_BINARY_HOST_MIRROR }}
           sqlite3-host-mirror: ${{ secrets.NPM_CONFIG_NODE_SQLITE3_BINARY_HOST_MIRROR }}
+          cache-node-modules: '0'
 
       - name: Install plugins dependencies and build plugins
-        run: yarn build:statics
+        run: npm run build:statics
 
       - name: Build macos dmg (prod)
         if: vars.ENV == 'production' && inputs.target == vars.ALL
         run: |
           unset CSC_LINK
 
-          yarn package:prod
-          yarn package:mas
+          npm run package:prod
+          npm run package:mas
           rm -rf release/mac
           mv release/mas-universal/Redis-Insight-mac-universal-mas.pkg release/Redis-Insight-mac-universal-mas.pkg
 
@@ -75,7 +82,7 @@ jobs:
           echo $APP_BUNDLE_VERSION
           echo $CSC_KEYCHAIN
 
-          yarn package:stage && yarn package:mas
+          npm run package:stage && npm run package:mas
           rm -rf release/mac
 
           mv release/mas-universal/Redis-Insight-mac-universal-mas.pkg release/Redis-Insight-mac-universal-mas.pkg
@@ -88,9 +95,9 @@ jobs:
           target=$(echo "${{inputs.target}}" | grep -oE 'build_macos_[^ ]+' | sed 's/build_macos_/dmg:/' | paste -sd ' ' -)
 
           if [ "${{ vars.ENV == 'production' }}" == "true" ]; then
-            yarn package:prod --mac $target
+            npm run package:prod -- --mac $target
           else
-            yarn package:stage --mac $target
+            npm run package:stage -- --mac $target
           fi
 
           rm -rf release/mac
@@ -102,7 +109,7 @@ jobs:
           ARCH=arm64 ./.github/redisstack/dmg.repack.sh
 
       - name: Upload macos packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-builds
           path: |
@@ -117,7 +124,6 @@ jobs:
 
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       USE_HARD_LINKS: ${{ vars.USE_HARD_LINKS }}
@@ -139,10 +145,18 @@ jobs:
       RI_CLOUD_IDP_REDIRECT_URI: ${{ secrets.RI_CLOUD_IDP_REDIRECT_URI }}
       RI_CLOUD_IDP_TOKEN_URL: ${{ secrets.RI_CLOUD_IDP_TOKEN_URL }}
       RI_SEGMENT_WRITE_KEY: ${{ secrets.RI_SEGMENT_WRITE_KEY }}
+      RI_SENTRY_DSN: ${{ secrets.RI_SENTRY_DSN }}
+      RI_SENTRY_ENABLED: ${{ vars.RI_SENTRY_ENABLED }}
+      RI_SENTRY_ENVIRONMENT: ${{ vars.ENV }}
+      RI_SENTRY_AUTH_TOKEN: ${{ secrets.RI_SENTRY_AUTH_TOKEN }}
+      RI_SENTRY_ORG: ${{ vars.RI_SENTRY_ORG }}
+      RI_SENTRY_PROJECT: ${{ vars.RI_SENTRY_PROJECT }}
       RI_SERVER_TLS_CERT: ${{ secrets.RI_SERVER_TLS_CERT }}
       RI_SERVER_TLS_KEY: ${{ secrets.RI_SERVER_TLS_KEY }}
       RI_FEATURES_CONFIG_URL: ${{ secrets.RI_FEATURES_CONFIG_URL }}
-      RI_UPGRADES_LINK: ${{ secrets.RI_UPGRADES_LINK }}
+      RI_UPGRADES_LINK: ${{ secrets.RI_UPGRADES_LINK_NEW }}
       RI_FEATURES_CLOUD_ADS_DEFAULT_FLAG: ${{ inputs.enterprise == false }}
       RI_DISABLE_AUTO_UPGRADE: ${{ inputs.enterprise }}
       RI_APP_TYPE: ${{ inputs.enterprise && 'ELECTRON_ENTERPRISE' || 'ELECTRON' }}
+      RI_APP_BUILD_COMMIT_SHA: ${{ github.sha }}
+      RI_SHOW_BUILD_COMMIT_SHA: ${{ inputs.show_build_commit_sha != '' && inputs.show_build_commit_sha || (vars.ENV != 'production' && 'true' || 'false') }}

@@ -1,7 +1,11 @@
 import { lazy } from 'react'
 
 import { IRoute, PageNames, Pages } from 'uiSrc/constants'
-import { VectorSearchCreateIndexPage, VectorSearchPage } from 'uiSrc/pages'
+import {
+  VectorSearchPage,
+  VectorSearchCreateIndexPage,
+  VectorSearchQueryPage,
+} from 'uiSrc/pages/vector-search'
 import { LAZY_LOAD } from '../../config'
 
 const LazyVectorSearchPage = lazy(
@@ -9,6 +13,9 @@ const LazyVectorSearchPage = lazy(
 )
 const LazyVectorSearchCreateIndexPage = lazy(
   () => import('uiSrc/pages/vector-search/pages/VectorSearchCreateIndexPage'),
+)
+const LazyVectorSearchQueryPage = lazy(
+  () => import('uiSrc/pages/vector-search/pages/VectorSearchQueryPage'),
 )
 
 export const VECTOR_SEARCH_ROUTES: IRoute[] = [
@@ -18,6 +25,11 @@ export const VECTOR_SEARCH_ROUTES: IRoute[] = [
     component: LAZY_LOAD
       ? LazyVectorSearchCreateIndexPage
       : VectorSearchCreateIndexPage,
+  },
+  {
+    pageName: PageNames.vectorSearchQuery,
+    path: Pages.vectorSearchQuery(':instanceId', ':indexName'),
+    component: LAZY_LOAD ? LazyVectorSearchQueryPage : VectorSearchQueryPage,
   },
   {
     pageName: PageNames.vectorSearch,
