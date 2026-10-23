@@ -8,7 +8,7 @@
   "npmRebuild": false,
   "nodeGypRebuild": false,
   "buildDependenciesFromSource": false,
-  "asarUnpack": ["node_modules/keytar", "node_modules/sqlite3"],
+  "asarUnpack": ["**/node_modules/keytar/**/*", "node_modules/sqlite3"],
   "protocols": [
     {
       "name": "RedisInsight",

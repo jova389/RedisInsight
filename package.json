@@ -45,6 +45,7 @@
     "package:mac:arm": "yarn build:prod && electron-builder build --mac --arm64 -p never",
     "package:linux": "yarn build:prod && electron-builder build --linux -p never",
     "postinstall": "patch-package && vite optimize -c ./redisinsight/ui/vite.config.mjs && skip-postinstall || yarn-deduplicate yarn.lock",
+    "start": "node ./redisinsight/api/dist/src/main.js",
     "test": "jest ./redisinsight/ui -w 1",
     "test:api": "yarn --cwd redisinsight/api test",
     "test:api:integration": "yarn --cwd redisinsight/api test:api",
@@ -241,7 +242,8 @@
   "dependencies": {
     "@elastic/datemath": "^5.0.3",
     "@elastic/eui": "34.6.0",
-    "@makmurdevs/mdparserlib": "bitbucket:makmurdevs/mdparserlib#1.3.0",
+    "@makmurdevs/mdparserlib": "bitbucket:makmurdevs/mdparserlib#1.5.0-alpha.1",
+    "@makmurdevs/portfolioparserlib": "git+ssh://git@bitbucket.org/makmurdevs/portfolioparserlib.git#1.0.0",
     "@redis-ui/components": "^38.1.4",
     "@redis-ui/icons": "^4.16.1",
     "@redis-ui/styles": "^11.4.0",

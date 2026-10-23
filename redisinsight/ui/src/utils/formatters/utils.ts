@@ -1,6 +1,8 @@
 import { Exchange, parseMDAuctionIndicatorPb, parseMDOHLCVPb, parseMDSymbolDataPb, parseMDTradePb, parseMDTradingStatusPb, parseMDOBLevelUpdatePb, Side, TradingStatus } from "@makmurdevs/mdparserlib"
+import { VariantSignalSerializer } from "@makmurdevs/mdparserlib/lib/VariantSignalSerializer"
 import { RedisResponseBuffer } from "uiSrc/slices/interfaces"
 import { bufferToString, anyToBuffer } from "./bufferFormatters"
+import { parsePortfolioDeltaPositionUpdatePb, parsePortfolioPositionUpdatePb } from "@makmurdevs/portfolioparserlib"
 
 export const bufferFormatRangeItems = (
   items: any[],
@@ -25,9 +27,14 @@ const enum StreamType {
   TradingStatus = "TradingStatus",
   AuctionIndicator = "AuctionIndicator",
   Trade = "Trade",
+  Price = "Price",
   SymbolData = "SymbolData",
   OBLevelUpdate = "OBLevelUpdate",
   DelayedOHLCV = "DelayedOHLCV",
+  SignalKey = "SignalKey",
+  SignalValue = "SignalValue",
+  FundPositionUpdate = "FundPositionUpdate",
+  DeltaFundPositionUpdate = "DeltaFundPositionUpdate",
 }
 
 const needLibKey = new Map([
@@ -36,9 +43,14 @@ const needLibKey = new Map([
   [StreamType.TradingStatus, /^\{TradingStatus\}:(.+)$/],
   [StreamType.AuctionIndicator, /^\{AuctionIndicator\}:(.+)$/],
   [StreamType.Trade, /^\{Trade\}:(.+)$/],
+  [StreamType.Price, /^\{Price\}:(.+)$/],
   [StreamType.SymbolData, /^\{SymbolData\}:(.+)$/],
   [StreamType.OBLevelUpdate, /^\{OBLevelUpdate\}:(.+)$/],
   [StreamType.DelayedOHLCV, /^\{DelayedOHLCV\}:(.+)$/],
+  [StreamType.SignalKey, /^\{SignalKey\}:(.+)$/],
+  [StreamType.SignalValue, /^\{SignalValue\}:(.+)$/],
+  [StreamType.FundPositionUpdate, /^\{OTB}:Responses:Portfolio:FundPositionUpdate/],
+  [StreamType.DeltaFundPositionUpdate, /^\{OTB}:Responses:Portfolio:DeltaFundPositionUpdate/],
 ])
 
 const keyToParser = {
@@ -47,6 +59,7 @@ const keyToParser = {
   [StreamType.TradingStatus]: parseMDTradingStatusPb,
   [StreamType.AuctionIndicator]: parseMDAuctionIndicatorPb,
   [StreamType.Trade]: parseMDTradePb,
+  [StreamType.Price]: parseMDTradePb,
   [StreamType.SymbolData]: parseMDSymbolDataPb,
   [StreamType.OBLevelUpdate]: parseMDOBLevelUpdatePb,
   [StreamType.DelayedOHLCV]: (buffer: Buffer) => {
@@ -54,6 +67,10 @@ const keyToParser = {
     const stringb2 = bufferToString(b2)
     return parseMDOHLCVPb(Buffer.from(stringb2.split(',').map(Number)))
   },
+  [StreamType.SignalKey]: VariantSignalSerializer.deserialize,
+  [StreamType.SignalValue]: VariantSignalSerializer.deserialize,
+  [StreamType.FundPositionUpdate]: parsePortfolioPositionUpdatePb,
+  [StreamType.DeltaFundPositionUpdate]: parsePortfolioDeltaPositionUpdatePb,
 }
 
 const secondToHours = (secSinceMidnight: number): string => {
